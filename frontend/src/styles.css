@@ -179,6 +179,21 @@ strong {
   cursor: pointer;
 }
 
+.access-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.success {
+  margin: 0;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  background: #f0fdf4;
+  padding: 12px 14px;
+  color: #166534;
+}
+
 @media (max-width: 720px) {
   .app-shell {
     padding: 36px 16px;

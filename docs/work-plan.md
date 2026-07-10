@@ -22,6 +22,10 @@ No database, AI, Redis, Kafka, or Docker yet.
 
 The first step uses in-memory mock login, without database or real JWT.
 
+Phase 1.2 在 mock token 基础上保护接口路径。
+
+Phase 1.2 protects API paths on top of mock tokens.
+
 ## Phase 2：数据库核心 / Database Core
 
 - 添加 PostgreSQL。 / Add PostgreSQL.

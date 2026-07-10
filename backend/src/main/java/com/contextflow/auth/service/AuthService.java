@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 public class AuthService {
@@ -37,21 +38,25 @@ public class AuthService {
     }
 
     public CurrentUserResponse getCurrentUser(String authorizationHeader) {
-        String token = extractBearerToken(authorizationHeader);
-
-        return users.values().stream()
-                .filter(user -> user.token().equals(token))
-                .findFirst()
-                .map(this::toCurrentUserResponse)
+        return findCurrentUser(authorizationHeader)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or missing token."));
     }
 
-    private String extractBearerToken(String authorizationHeader) {
+    public Optional<CurrentUserResponse> findCurrentUser(String authorizationHeader) {
+        Optional<String> token = extractBearerToken(authorizationHeader);
+
+        return users.values().stream()
+                .filter(user -> token.isPresent() && user.token().equals(token.get()))
+                .findFirst()
+                .map(this::toCurrentUserResponse);
+    }
+
+    private Optional<String> extractBearerToken(String authorizationHeader) {
         if (authorizationHeader == null || !authorizationHeader.startsWith(TOKEN_TYPE + " ")) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or missing token.");
+            return Optional.empty();
         }
 
-        return authorizationHeader.substring((TOKEN_TYPE + " ").length());
+        return Optional.of(authorizationHeader.substring((TOKEN_TYPE + " ").length()));
     }
 
     private CurrentUserResponse toCurrentUserResponse(MockUser user) {
@@ -67,4 +72,3 @@ public class AuthService {
     ) {
     }
 }
-

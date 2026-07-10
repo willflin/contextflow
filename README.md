@@ -108,6 +108,17 @@ learner / learner123
 admin / admin123
 ```
 
+## Phase 1.2 权限验证 / Phase 1.2 Access Check
+
+当前 mock token 已用于接口权限保护。
+
+Mock tokens are now used for API access control.
+
+```text
+/api/learner/**  LEARNER or ADMIN
+/api/admin/**    ADMIN only
+```
+
 ## 开发原则 / Development Principle
 
 每个中间件都必须有清晰业务依据。

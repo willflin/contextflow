@@ -29,6 +29,11 @@ class AuthServiceTest {
     }
 
     @Test
+    void findCurrentUserShouldReturnEmptyForMissingToken() {
+        assertThat(authService.findCurrentUser(null)).isEmpty();
+    }
+
+    @Test
     void loginShouldRejectInvalidPassword() {
         assertThatThrownBy(() -> authService.login(new LoginRequest("learner", "wrong")))
                 .isInstanceOf(ResponseStatusException.class);

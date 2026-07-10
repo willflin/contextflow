@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { AccessProbe, fetchAccessProbe } from './api/access';
 import { CurrentUser, fetchCurrentUser, login } from './api/auth';
 import { fetchHealth, HealthStatus } from './api/health';
 
@@ -12,6 +13,8 @@ export default function App() {
   const [password, setPassword] = useState('learner123');
   const [error, setError] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [accessProbe, setAccessProbe] = useState<AccessProbe | null>(null);
+  const [accessError, setAccessError] = useState<string | null>(null);
 
   async function loadHealth() {
     setState('loading');
@@ -46,6 +49,7 @@ export default function App() {
     } catch {
       window.localStorage.removeItem('contextflow_token');
       setCurrentUser(null);
+      setAccessProbe(null);
     }
   }
 
@@ -57,6 +61,8 @@ export default function App() {
       const response = await login(username, password);
       window.localStorage.setItem('contextflow_token', response.token);
       setCurrentUser(response.user);
+      setAccessProbe(null);
+      setAccessError(null);
     } catch (exception) {
       setAuthError(exception instanceof Error ? exception.message : 'Login failed.');
       setCurrentUser(null);
@@ -66,6 +72,26 @@ export default function App() {
   function handleLogout() {
     window.localStorage.removeItem('contextflow_token');
     setCurrentUser(null);
+    setAccessProbe(null);
+    setAccessError(null);
+  }
+
+  async function checkProtectedEndpoint(path: '/api/learner/probe' | '/api/admin/probe') {
+    const token = window.localStorage.getItem('contextflow_token');
+
+    if (!token) {
+      setAccessError('Please log in first.');
+      return;
+    }
+
+    try {
+      const result = await fetchAccessProbe(path, token);
+      setAccessProbe(result);
+      setAccessError(null);
+    } catch (exception) {
+      setAccessProbe(null);
+      setAccessError(exception instanceof Error ? exception.message : 'Access check failed.');
+    }
   }
 
   return (
@@ -114,6 +140,28 @@ export default function App() {
             <button className="secondary-button" type="button" onClick={handleLogout}>
               Log out
             </button>
+            <div className="access-actions">
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => checkProtectedEndpoint('/api/learner/probe')}
+              >
+                Check learner API
+              </button>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => checkProtectedEndpoint('/api/admin/probe')}
+              >
+                Check admin API
+              </button>
+            </div>
+            {accessProbe && (
+              <p className="success">
+                {accessProbe.scope}: {accessProbe.message}
+              </p>
+            )}
+            {accessError && <p className="error compact">Access denied: {accessError}</p>}
           </div>
         ) : (
           <form className="login-form" onSubmit={handleLogin}>

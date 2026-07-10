@@ -7,11 +7,19 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ApiResponse<Void>> handleResponseStatusException(ResponseStatusException exception) {
+        return ResponseEntity
+                .status(exception.getStatusCode())
+                .body(ApiResponse.fail(exception.getStatusCode().toString(), exception.getReason()));
+    }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleUnexpectedException(Exception exception) {
@@ -21,4 +29,3 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.fail("INTERNAL_SERVER_ERROR", "The server is temporarily unavailable."));
     }
 }
-
