@@ -1,0 +1,78 @@
+# ContextFlow 工作计划 / ContextFlow Work Plan
+
+## Phase 0：基础框架 / Foundation
+
+- 创建后端项目。 / Create backend project.
+- 创建前端项目。 / Create frontend project.
+- 添加后端健康检查。 / Add backend health check.
+- 添加前端健康检查页面。 / Add frontend health check page.
+
+暂不加入数据库、AI、Redis、Kafka 或 Docker。
+
+No database, AI, Redis, Kafka, or Docker yet.
+
+## Phase 1：认证与权限 / Auth
+
+- 添加学习者/管理员角色。 / Add learner/admin roles.
+- 添加注册/登录。 / Add register/login.
+- 添加 JWT 认证。 / Add JWT authentication.
+- 保护管理员接口。 / Protect admin APIs.
+
+## Phase 2：数据库核心 / Database Core
+
+- 添加 PostgreSQL。 / Add PostgreSQL.
+- 添加迁移策略。 / Add migration strategy.
+- 添加 users、language_units、scenario_templates、learning_events、unit_stats。 / Add users, language units, scenario templates, learning events, and unit stats.
+
+## Phase 3：水平测试 / Placement
+
+- 添加水平测试题池。 / Add placement item pool.
+- 添加语境化测试流程。 / Add contextual test flow.
+- 生成初始用户画像。 / Generate initial user profile.
+
+## Phase 4：学习包 / Learning Packages
+
+- 添加场景模板。 / Add scenario templates.
+- 添加学习包。 / Add learning packages.
+- 添加双 Agent 响应结构。 / Add dual-agent response structure.
+- 记录学习事件。 / Record learning events.
+
+## Phase 5：复习系统 / Review
+
+- 添加掌握度计算。 / Add mastery score update.
+- 添加 `next_review_at`。 / Add `next_review_at`.
+- 添加复习包。 / Add review packages.
+
+## Phase 6：AI 预生成 / AI Pre-generation
+
+- 添加生成任务。 / Add generation jobs.
+- 添加 Prompt 模板。 / Add prompt templates.
+- 添加结构化 JSON 校验。 / Add structured JSON validation.
+- 添加 AI 使用日志。 / Add AI usage logs.
+
+## Phase 7：Redis
+
+只在需要 READY 内容缓存和 AI 限流后加入。
+
+Add only after READY package caching and AI rate limiting are needed.
+
+## Phase 8：音频 / Audio
+
+- 添加音频资产元数据。 / Add audio asset metadata.
+- 添加 TTS 生成。 / Add TTS generation.
+- 添加缓存和过期策略。 / Add cache and expiry.
+
+## Phase 9：管理员后台 / Admin
+
+- 用户管理。 / User management.
+- 场景模板管理。 / Scenario template management.
+- Prompt 模板管理。 / Prompt template management.
+- 反馈处理。 / Feedback handling.
+- AI 审计。 / AI audit.
+- 流量统计。 / Traffic analytics.
+
+## Phase 10：异步中间件 / Async Middleware
+
+只有当数据库任务轮询不够用时，才加入 Kafka 或 RabbitMQ。
+
+Kafka or RabbitMQ is added only after database task polling is not enough.
