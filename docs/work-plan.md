@@ -18,6 +18,10 @@ No database, AI, Redis, Kafka, or Docker yet.
 - 添加 JWT 认证。 / Add JWT authentication.
 - 保护管理员接口。 / Protect admin APIs.
 
+当前第一步先实现内存版登录，不接数据库，不接真实 JWT。
+
+The first step uses in-memory mock login, without database or real JWT.
+
 ## Phase 2：数据库核心 / Database Core
 
 - 添加 PostgreSQL。 / Add PostgreSQL.

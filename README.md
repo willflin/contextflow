@@ -97,6 +97,17 @@ Backend status: UP
 Service: contextflow-backend
 ```
 
+## Phase 1.1 测试账号 / Phase 1.1 Test Accounts
+
+当前认证是内存版 mock 登录，仅用于跑通前后端流程。
+
+Current authentication is an in-memory mock login for frontend-backend flow verification.
+
+```text
+learner / learner123
+admin / admin123
+```
+
 ## 开发原则 / Development Principle
 
 每个中间件都必须有清晰业务依据。
