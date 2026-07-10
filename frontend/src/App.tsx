@@ -3,6 +3,11 @@ import { AccessProbe, fetchAccessProbe } from './api/access';
 import { CurrentUser, fetchCurrentUser, login, register } from './api/auth';
 import { fetchHealth, HealthStatus } from './api/health';
 import {
+  fetchNextLearningPackage,
+  LearningPackage,
+  parseLearningPackageContent
+} from './api/learning';
+import {
   answerAdaptivePlacement,
   AdaptivePlacementSession,
   parsePlacementItemContent,
@@ -37,6 +42,9 @@ export default function App() {
   const [answerLog, setAnswerLog] = useState<string[]>([]);
   const [profile, setProfile] = useState<UserLevelProfile | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [learningPackage, setLearningPackage] = useState<LearningPackage | null>(null);
+  const [learningBusy, setLearningBusy] = useState(false);
+  const [learningError, setLearningError] = useState<string | null>(null);
 
   const isAdmin = currentUser?.role === 'ADMIN';
   const itemContent = currentItem ? parsePlacementItemContent(currentItem) : null;
@@ -101,6 +109,7 @@ export default function App() {
       setAccessProbe(null);
       setAccessError(null);
       resetPlacement();
+      resetLearning();
     } catch (exception) {
       setAuthError(exception instanceof Error ? exception.message : 'Login failed.');
       setCurrentUser(null);
@@ -115,6 +124,7 @@ export default function App() {
     setProfile(null);
     setProfileError(null);
     resetPlacement();
+    resetLearning();
   }
 
   async function checkProtectedEndpoint(path: '/api/learner/probe' | '/api/admin/probe') {
@@ -187,7 +197,7 @@ export default function App() {
       );
 
       setAnswerLog((previous) => [
-        `Item ${response.itemId}: ${response.correct ? 'correct' : 'wrong'} · difficulty ${response.currentDifficultyScore}`,
+        `Item ${response.itemId}: ${response.correct ? 'correct' : 'wrong'} - difficulty ${response.currentDifficultyScore}`,
         ...previous
       ]);
       setSelectedOptionIndex(null);
@@ -242,6 +252,34 @@ export default function App() {
     setPlacementError(null);
     setPlacementResult(null);
     setAnswerLog([]);
+  }
+
+  async function loadNextLearningPackage() {
+    const token = tokenOrNull();
+
+    if (!token) {
+      setLearningError('Please log in first.');
+      return;
+    }
+
+    setLearningBusy(true);
+    setLearningError(null);
+
+    try {
+      const result = await fetchNextLearningPackage(token);
+      setLearningPackage(result);
+    } catch (exception) {
+      setLearningPackage(null);
+      setLearningError(exception instanceof Error ? exception.message : 'Failed to load learning package.');
+    } finally {
+      setLearningBusy(false);
+    }
+  }
+
+  function resetLearning() {
+    setLearningPackage(null);
+    setLearningError(null);
+    setLearningBusy(false);
   }
 
   function tokenOrNull() {
@@ -363,6 +401,24 @@ export default function App() {
             </button>
           </div>
           {renderLearnerProfile()}
+        </section>
+
+        <section className="tool-panel learning-panel">
+          <div className="panel-heading">
+            <div>
+              <p className="eyebrow">Learning</p>
+              <h2>Next scenario</h2>
+            </div>
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={loadNextLearningPackage}
+              disabled={learningBusy || !profile}
+            >
+              Start learning
+            </button>
+          </div>
+          {renderLearningPackage()}
         </section>
       </section>
     );
@@ -596,6 +652,79 @@ export default function App() {
           Weak abilities
           <pre>{prettyJson(profile.weakAbilitiesJson)}</pre>
         </label>
+      </div>
+    );
+  }
+
+  function renderLearningPackage() {
+    if (!profile) {
+      return <p className="hint">Finish the placement test first. Your learning scenario will use your profile.</p>;
+    }
+
+    if (learningError) {
+      return <p className="error compact">Learning package failed: {learningError}</p>;
+    }
+
+    if (!learningPackage) {
+      return <p className="hint">Your next READY learning scenario will appear here.</p>;
+    }
+
+    const content = parseLearningPackageContent(learningPackage);
+
+    return (
+      <div className="learning-content">
+        <div className="scenario-header">
+          <div>
+            <span className="label">Scenario</span>
+            <strong>{learningPackage.scenarioName}</strong>
+          </div>
+          <span className="status-pill">{learningPackage.status}</span>
+        </div>
+
+        {content.scenario?.description && <p className="hint">{content.scenario.description}</p>}
+
+        {content.goals && content.goals.length > 0 && (
+          <section>
+            <h3>Goals</h3>
+            <ul>
+              {content.goals.map((goal) => (
+                <li key={goal}>{goal}</li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {content.roleplayAgent?.openingLine && (
+          <section className="dialogue-preview">
+            <span className="label">Roleplay opening</span>
+            <p>{content.roleplayAgent.openingLine}</p>
+          </section>
+        )}
+
+        {content.expressions && content.expressions.length > 0 && (
+          <section>
+            <h3>Useful expressions</h3>
+            <div className="expression-list">
+              {content.expressions.map((expression) => (
+                <div className="expression-item" key={expression.phrase}>
+                  <strong>{expression.phrase}</strong>
+                  <p>{expression.meaning}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {content.practice && content.practice.length > 0 && (
+          <section>
+            <h3>Practice</h3>
+            <ul>
+              {content.practice.map((item) => (
+                <li key={item.prompt}>{item.prompt}</li>
+              ))}
+            </ul>
+          </section>
+        )}
       </div>
     );
   }

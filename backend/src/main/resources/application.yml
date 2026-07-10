@@ -31,3 +31,5 @@ contextflow:
       access-token-ttl-seconds: 3600
   placement:
     seed-demo-items: true
+  scenario:
+    seed-demo-templates: true

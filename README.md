@@ -19,9 +19,9 @@ Long-term goals:
 
 ## 当前范围 / Current Scope
 
-当前已完成到 Phase 3.3 用户水平画像：
+当前已完成到 Phase 4.1 学习包基础：
 
-This repository currently includes the Phase 3.3 user level profile foundation:
+This repository currently includes the Phase 4.1 learning package foundation:
 
 - Spring Boot 后端 / Spring Boot backend
 - React + TypeScript + Vite 前端 / React + TypeScript + Vite frontend
@@ -34,6 +34,9 @@ This repository currently includes the Phase 3.3 user level profile foundation:
 - 自适应逐题测试基础 / adaptive step-by-step placement foundation
 - 用户水平画像 / user level profile
 - 前端学习者测试流程与管理员调试台 / frontend learner placement flow and admin debug console
+- 场景模板基础表 / scenario template foundation
+- READY 学习包基础表 / READY learning package foundation
+- 学习者网页获取下一个 READY 场景包 / learner web flow for fetching the next READY scenario package
 
 暂未加入：
 
@@ -266,6 +269,33 @@ Schema SQL is kept at:
 ```text
 backend/src/main/resources/db/migration/V5__create_user_level_profiles.sql
 docs/sql/phase3_user_level_profile_schema.sql
+```
+
+## Phase 4.1 学习包基础 / Phase 4.1 Learning Package Foundation
+
+当前已加入场景模板和用户 READY 学习包基础结构。
+
+Scenario templates and learner READY learning package foundations are now available.
+
+```text
+GET /api/learning/packages/next
+```
+
+当前阶段先使用 `SEEDED_TEMPLATE` 内容模拟未来 AI 预生成结果；后续会替换为 `AI_GENERATED` 生成链路。
+
+This phase uses `SEEDED_TEMPLATE` content as a stand-in for future AI pre-generated packages; later phases will replace it with the `AI_GENERATED` generation pipeline.
+
+前端学习者页面现在可以在完成水平测试并生成画像后，点击 Start learning 获取下一个 READY 场景学习包。
+
+The learner page can now fetch the next READY scenario package after placement creates a user profile.
+
+建表 SQL 保存位置：
+
+Schema SQL is kept at:
+
+```text
+backend/src/main/resources/db/migration/V6__create_learning_foundation.sql
+docs/sql/phase4_learning_foundation_schema.sql
 ```
 
 ## 前端调试入口 / Frontend Debug Entry

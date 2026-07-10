@@ -68,10 +68,14 @@ Phase 3.3.1 adds the web entry: learners use the normal flow, admins see debug t
 
 ## Phase 4：学习包 / Learning Packages
 
-- 添加场景模板。 / Add scenario templates.
-- 添加学习包。 / Add learning packages.
+- 添加场景模板。 / Add scenario templates. ✅ Phase 4.1
+- 添加学习包。 / Add learning packages. ✅ Phase 4.1
 - 添加双 Agent 响应结构。 / Add dual-agent response structure.
 - 记录学习事件。 / Record learning events.
+
+Phase 4.1 先建立场景模板、READY 学习包和学习者网页入口，内容暂时用种子模板模拟未来 AI 预生成结果。
+
+Phase 4.1 first adds scenario templates, READY learning packages, and the learner web entry. Seeded template content is used as a temporary stand-in for future AI pre-generation.
 
 ## Phase 5：复习系统 / Review
 

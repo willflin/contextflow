@@ -214,3 +214,33 @@
 ### 验证 / Verification
 
 - 前端 `npm run typecheck` 通过。 / Frontend `npm run typecheck` passed.
+
+## Phase 4.1：学习包基础 / Learning Package Foundation
+
+### 操作 / Operations
+
+- 新增 `scenario_templates` 表迁移脚本。 / Added the `scenario_templates` table migration.
+- 新增 `learning_packages` 表迁移脚本。 / Added the `learning_packages` table migration.
+- 新增 DataGrip 检查用 SQL 副本。 / Added a SQL copy for DataGrip inspection.
+- 新增 `scenario` 模块的 Entity、Repository 和启动种子数据。 / Added entity, repository, and startup seed data for the `scenario` module.
+- 新增 `learning` 模块的学习包 Entity、Repository、Service、DTO 和 Controller。 / Added learning package entity, repository, service, DTO, and controller for the `learning` module.
+- 新增前端学习包 API 封装。 / Added frontend API wrappers for learning packages.
+- 在学习者页面新增下一个 READY 场景学习包入口。 / Added the next READY scenario package entry to the learner page.
+
+### 新增功能 / Added Features
+
+- 支持保存系统级场景模板。 / Supports storing system-level scenario templates.
+- 支持为用户创建或读取 READY 学习包。 / Supports creating or reading READY learning packages for a learner.
+- 创建新学习包时优先避开该用户已分配过的场景。 / New package creation first avoids scenarios already assigned to that learner.
+- 新增接口 `GET /api/learning/packages/next`。 / Added `GET /api/learning/packages/next`.
+- 学习包内容暂时使用 `SEEDED_TEMPLATE`，为后续 `AI_GENERATED` 预生成链路预留字段。 / Learning package content currently uses `SEEDED_TEMPLATE`, reserving fields for the later `AI_GENERATED` pre-generation flow.
+- 普通学习者完成水平测试并生成画像后，可以在网页获取下一个学习场景。 / Learners can fetch the next scenario in the browser after placement creates a profile.
+
+### 验证 / Verification
+
+- 前端 `npm run typecheck` 通过。 / Frontend `npm run typecheck` passed.
+
+### 问题与解决方案 / Issues and Solutions
+
+- 后端命令行编译时，`backend/target/classes/application.yml` 和 `backend/target/maven-status/.../createdFiles.lst` 写入被拒绝，当前机器上存在正在运行的 Java 进程。 / Backend command-line compilation was denied when writing `backend/target/classes/application.yml` and `backend/target/maven-status/.../createdFiles.lst`; Java processes are currently running on this machine.
+  - 解决方案：不强制结束用户进程；需要完整 Maven 编译时，先停止正在运行的后端，再用 JDK 21 编译。 / Solution: do not force-stop user processes; for a full Maven compile, stop the running backend first, then compile with JDK 21.
