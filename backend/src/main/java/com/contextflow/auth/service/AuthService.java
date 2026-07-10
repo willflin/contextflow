@@ -1,15 +1,15 @@
 package com.contextflow.auth.service;
 
 import com.contextflow.auth.config.JwtProperties;
-import com.contextflow.auth.domain.UserRole;
 import com.contextflow.auth.dto.CurrentUserResponse;
 import com.contextflow.auth.dto.LoginRequest;
 import com.contextflow.auth.dto.LoginResponse;
+import com.contextflow.user.domain.UserEntity;
+import com.contextflow.user.repository.UserRepository;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
-
-import java.util.Map;
 
 @Service
 public class AuthService {
@@ -18,21 +18,27 @@ public class AuthService {
 
     private final JwtProperties jwtProperties;
     private final JwtTokenService jwtTokenService;
+    private final PasswordEncoder passwordEncoder;
+    private final UserRepository userRepository;
 
-    private final Map<String, MockUser> users = Map.of(
-            "learner", new MockUser("learner", "learner123", "Demo Learner", UserRole.LEARNER),
-            "admin", new MockUser("admin", "admin123", "Demo Admin", UserRole.ADMIN)
-    );
-
-    public AuthService(JwtProperties jwtProperties, JwtTokenService jwtTokenService) {
+    public AuthService(
+            JwtProperties jwtProperties,
+            JwtTokenService jwtTokenService,
+            PasswordEncoder passwordEncoder,
+            UserRepository userRepository
+    ) {
         this.jwtProperties = jwtProperties;
         this.jwtTokenService = jwtTokenService;
+        this.passwordEncoder = passwordEncoder;
+        this.userRepository = userRepository;
     }
 
     public LoginResponse login(LoginRequest request) {
-        MockUser user = users.get(request.username());
+        UserEntity user = userRepository.findByUsername(request.username())
+                .filter(UserEntity::isActive)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid username or password."));
 
-        if (user == null || !user.password().equals(request.password())) {
+        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid username or password.");
         }
 
@@ -50,22 +56,13 @@ public class AuthService {
         CurrentUserResponse tokenUser = jwtTokenService.parseUser(authorizationHeader)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or missing token."));
 
-        if (!users.containsKey(tokenUser.username())) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or missing token.");
-        }
-
-        return tokenUser;
+        return userRepository.findByUsername(tokenUser.username())
+                .filter(UserEntity::isActive)
+                .map(this::toCurrentUserResponse)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or missing token."));
     }
 
-    private CurrentUserResponse toCurrentUserResponse(MockUser user) {
-        return new CurrentUserResponse(user.username(), user.displayName(), user.role());
-    }
-
-    private record MockUser(
-            String username,
-            String password,
-            String displayName,
-            UserRole role
-    ) {
+    private CurrentUserResponse toCurrentUserResponse(UserEntity user) {
+        return new CurrentUserResponse(user.getUsername(), user.getDisplayName(), user.getRole());
     }
 }

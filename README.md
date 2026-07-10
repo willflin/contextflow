@@ -119,6 +119,28 @@ JWTs are now used for API access control.
 /api/admin/**    ADMIN only
 ```
 
+## Phase 2.1 数据库 / Phase 2.1 Database
+
+本地开发数据库：
+
+Local development database:
+
+```text
+MySQL 8
+database: contextflow
+username: contextflow
+password: 123456
+```
+
+建表 SQL 保存在：
+
+Schema SQL is kept at:
+
+```text
+backend/src/main/resources/db/migration/V1__create_users.sql
+docs/sql/phase2_mysql_schema.sql
+```
+
 ## 开发原则 / Development Principle
 
 每个中间件都必须有清晰业务依据。

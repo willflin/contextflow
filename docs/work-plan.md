@@ -28,9 +28,13 @@ Phase 1.2 protects API paths on top of mock tokens.
 
 ## Phase 2：数据库核心 / Database Core
 
-- 添加 PostgreSQL。 / Add PostgreSQL.
+- 添加 MySQL。 / Add MySQL.
 - 添加迁移策略。 / Add migration strategy.
 - 添加 users、language_units、scenario_templates、learning_events、unit_stats。 / Add users, language units, scenario templates, learning events, and unit stats.
+
+Phase 2.1 先接入 MySQL、Flyway 和 users 表。
+
+Phase 2.1 first adds MySQL, Flyway, and the users table.
 
 ## Phase 3：水平测试 / Placement
 
