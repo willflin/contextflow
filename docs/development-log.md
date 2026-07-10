@@ -155,3 +155,62 @@
 - 支持从 READY 题池创建一次水平测试会话。 / Supports creating a placement session from READY items.
 - 支持保存用户答案并计算正确率。 / Supports saving user answers and calculating accuracy.
 - 支持返回临时 CEFR 等级判断。 / Supports returning a temporary CEFR level estimate.
+
+## Phase 3.2.1：自适应水平测试基础 / Adaptive Placement Foundation
+
+### 操作 / Operations
+
+- 扩展 `placement_items`，新增难度分、能力维度、判分类型字段。 / Extended `placement_items` with difficulty score, ability dimension, and grading type.
+- 扩展 `placement_sessions`，新增测试模式、已答题数、最大题数、当前难度字段。 / Extended `placement_sessions` with mode, answered count, max item count, and current difficulty.
+- 扩展 `placement_session_answers`，新增判分类型、题目难度、文本答案和 AI 判分载荷字段。 / Extended `placement_session_answers` with grading type, difficulty, text answer, and AI judge payload.
+- 新增自适应开始测试接口。 / Added the adaptive placement start API.
+- 新增逐题提交答案接口。 / Added the step-by-step answer API.
+
+### 新增功能 / Added Features
+
+- 支持根据上一题对错调整下一题难度。 / Supports adjusting the next item difficulty based on the previous answer.
+- 自适应接口返回题目时不暴露答案字段。 / Adaptive APIs do not expose answer fields to the client.
+- 为判断题、近义词/反义词选择题、填空题、AI 判分预留结构。 / Reserved structure for true/false, synonym/antonym choice, cloze text, and AI judging.
+
+### 问题与解决方案 / Issues and Solutions
+
+- Postman 请求中把 `{sessionId}` 当作真实路径发送，导致后端尝试把字符串转换成 `Long`。 / Postman sent `{sessionId}` as the real path, causing the backend to convert that string to `Long`.
+  - 解决方案：测试时必须替换成真实 `sessionId`；同时新增参数类型错误处理，返回清晰的 `400 PARAMETER_TYPE_MISMATCH`。 / Solution: replace it with the real `sessionId` during testing; also added type mismatch handling that returns a clear `400 PARAMETER_TYPE_MISMATCH`.
+
+## Phase 3.3：用户水平画像 / User Level Profile
+
+### 操作 / Operations
+
+- 新增 `user_level_profiles` 表。 / Added the `user_level_profiles` table.
+- 新增用户画像 Entity、Repository、Service 和 Controller。 / Added user profile entity, repository, service, and controller.
+- 新增 `GET /api/user/profile`。 / Added `GET /api/user/profile`.
+- 水平测试结束时自动写入或更新用户画像。 / Automatically writes or updates the user profile when placement testing finishes.
+
+### 新增功能 / Added Features
+
+- 支持保存 `cefr_level`。 / Supports storing `cefr_level`.
+- 支持保存能力维度得分。 / Supports storing ability dimension scores.
+- 支持保存薄弱场景和薄弱能力。 / Supports storing weak scenarios and weak abilities.
+
+### 问题与解决方案 / Issues and Solutions
+
+- 命令行 Maven 已切到 JDK 21，但 `target/classes` 被正在运行的 Java 进程占用，导致无法写入编译产物。 / Command-line Maven was switched to JDK 21, but `target/classes` was held by a running Java process, so Maven could not write compiled output.
+  - 解决方案：停止正在运行的后端后再命令行编译，或直接用 IntelliJ 的 JDK 21 启动验证。 / Solution: stop the running backend before command-line compilation, or verify by running with JDK 21 in IntelliJ.
+
+## Phase 3.3.1：网页调试入口 / Web Debug Entry
+
+### 操作 / Operations
+
+- 新增前端自适应水平测试 API 封装。 / Added frontend API wrappers for adaptive placement testing.
+- 新增前端用户画像 API 封装。 / Added frontend API wrapper for user level profile.
+- 重构首页登录后界面。 / Refactored the signed-in homepage.
+- 将普通学习者界面与管理员调试界面分离。 / Separated learner-facing UI from admin debug UI.
+
+### 新增功能 / Added Features
+
+- 学习者可在网页中开始测试、逐题作答并查看等级结果。 / Learners can start placement, answer step by step, and view their level in the browser.
+- 管理员可在网页中查看健康检查、权限探测、测试沙盒和原始画像 JSON。 / Admins can use health check, access probes, placement sandbox, and raw profile JSON in the browser.
+
+### 验证 / Verification
+
+- 前端 `npm run typecheck` 通过。 / Frontend `npm run typecheck` passed.

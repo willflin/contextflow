@@ -29,8 +29,21 @@ public class PlacementSessionEntity {
     @Column(nullable = false, length = 32)
     private PlacementSessionStatus status;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 32)
+    private PlacementSessionMode mode;
+
     @Column(name = "item_count", nullable = false)
     private Integer itemCount;
+
+    @Column(name = "answered_count", nullable = false)
+    private Integer answeredCount;
+
+    @Column(name = "max_item_count", nullable = false)
+    private Integer maxItemCount;
+
+    @Column(name = "current_difficulty_score", nullable = false)
+    private Integer currentDifficultyScore;
 
     @Column(name = "correct_count")
     private Integer correctCount;
@@ -57,7 +70,23 @@ public class PlacementSessionEntity {
     public PlacementSessionEntity(Long userId, Integer itemCount) {
         this.userId = userId;
         this.itemCount = itemCount;
+        this.answeredCount = 0;
+        this.maxItemCount = itemCount;
+        this.currentDifficultyScore = 50;
+        this.mode = PlacementSessionMode.BATCH;
         this.status = PlacementSessionStatus.STARTED;
+    }
+
+    public static PlacementSessionEntity adaptive(Long userId, Integer maxItemCount, Integer currentDifficultyScore) {
+        PlacementSessionEntity session = new PlacementSessionEntity();
+        session.userId = userId;
+        session.itemCount = maxItemCount;
+        session.answeredCount = 0;
+        session.maxItemCount = maxItemCount;
+        session.currentDifficultyScore = currentDifficultyScore;
+        session.mode = PlacementSessionMode.ADAPTIVE;
+        session.status = PlacementSessionStatus.STARTED;
+        return session;
     }
 
     @PrePersist
@@ -74,6 +103,22 @@ public class PlacementSessionEntity {
 
     public void submit(Integer correctCount, BigDecimal scorePercent, CefrLevel estimatedLevel) {
         this.status = PlacementSessionStatus.SUBMITTED;
+        this.correctCount = correctCount;
+        this.answeredCount = this.itemCount;
+        this.scorePercent = scorePercent;
+        this.estimatedLevel = estimatedLevel;
+        this.submittedAt = Instant.now();
+    }
+
+    public void updateAdaptiveProgress(Integer answeredCount, Integer correctCount, Integer currentDifficultyScore) {
+        this.answeredCount = answeredCount;
+        this.correctCount = correctCount;
+        this.currentDifficultyScore = currentDifficultyScore;
+    }
+
+    public void finishAdaptive(Integer answeredCount, Integer correctCount, BigDecimal scorePercent, CefrLevel estimatedLevel) {
+        this.status = PlacementSessionStatus.SUBMITTED;
+        this.answeredCount = answeredCount;
         this.correctCount = correctCount;
         this.scorePercent = scorePercent;
         this.estimatedLevel = estimatedLevel;
@@ -92,8 +137,24 @@ public class PlacementSessionEntity {
         return status;
     }
 
+    public PlacementSessionMode getMode() {
+        return mode;
+    }
+
     public Integer getItemCount() {
         return itemCount;
+    }
+
+    public Integer getAnsweredCount() {
+        return answeredCount;
+    }
+
+    public Integer getMaxItemCount() {
+        return maxItemCount;
+    }
+
+    public Integer getCurrentDifficultyScore() {
+        return currentDifficultyScore;
     }
 
     public Integer getCorrectCount() {

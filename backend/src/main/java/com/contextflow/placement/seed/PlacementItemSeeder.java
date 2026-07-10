@@ -2,6 +2,7 @@ package com.contextflow.placement.seed;
 
 import com.contextflow.placement.domain.CefrLevel;
 import com.contextflow.placement.domain.PlacementItemEntity;
+import com.contextflow.placement.domain.PlacementItemGradingType;
 import com.contextflow.placement.domain.PlacementItemStatus;
 import com.contextflow.placement.domain.PlacementItemType;
 import com.contextflow.placement.repository.PlacementItemRepository;
@@ -38,9 +39,12 @@ public class PlacementItemSeeder implements ApplicationRunner {
                 new PlacementItemEntity(
                         PlacementItemType.SCENE_DIALOGUE_CHOICE,
                         CefrLevel.A2,
+                        35,
                         "hotel_check_in",
                         "contextual_vocabulary",
+                        "contextual_understanding",
                         PlacementItemStatus.READY,
+                        PlacementItemGradingType.LOCAL_EXACT,
                         """
                                 {
                                   "question": "You are checking in at a hotel. The receptionist says: 'Could I see your ID, please?' What should you do?",
@@ -58,9 +62,12 @@ public class PlacementItemSeeder implements ApplicationRunner {
                 new PlacementItemEntity(
                         PlacementItemType.CONTEXT_MEANING,
                         CefrLevel.B1,
+                        55,
                         "shopping",
                         "word_meaning_in_context",
+                        "vocabulary_meaning",
                         PlacementItemStatus.READY,
+                        PlacementItemGradingType.LOCAL_EXACT,
                         """
                                 {
                                   "question": "In a store, the clerk says: 'This jacket is on sale.' What does 'on sale' mean here?",
@@ -78,9 +85,12 @@ public class PlacementItemSeeder implements ApplicationRunner {
                 new PlacementItemEntity(
                         PlacementItemType.POLITENESS_JUDGMENT,
                         CefrLevel.B1,
+                        60,
                         "bank_account",
                         "natural_expression",
+                        "expression_naturalness",
                         PlacementItemStatus.READY,
+                        PlacementItemGradingType.LOCAL_EXACT,
                         """
                                 {
                                   "question": "You want to open a bank account. Which sentence sounds the most natural and polite?",
@@ -98,9 +108,12 @@ public class PlacementItemSeeder implements ApplicationRunner {
                 new PlacementItemEntity(
                         PlacementItemType.INTENT_UNDERSTANDING,
                         CefrLevel.B2,
+                        75,
                         "police_stop",
                         "intent_understanding",
+                        "pragmatic_understanding",
                         PlacementItemStatus.READY,
+                        PlacementItemGradingType.LOCAL_EXACT,
                         """
                                 {
                                   "question": "A police officer says: 'Do you know why I stopped you?' What is the officer asking?",

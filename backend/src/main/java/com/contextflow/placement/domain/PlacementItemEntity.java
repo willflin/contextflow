@@ -29,15 +29,25 @@ public class PlacementItemEntity {
     @Column(name = "cefr_level", nullable = false, length = 16)
     private CefrLevel cefrLevel;
 
+    @Column(name = "difficulty_score", nullable = false)
+    private Integer difficultyScore;
+
     @Column(name = "scenario_tag", nullable = false, length = 64)
     private String scenarioTag;
 
     @Column(name = "target_skill", nullable = false, length = 64)
     private String targetSkill;
 
+    @Column(name = "ability_dimension", nullable = false, length = 64)
+    private String abilityDimension;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
     private PlacementItemStatus status;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "grading_type", nullable = false, length = 32)
+    private PlacementItemGradingType gradingType;
 
     @Column(name = "content", nullable = false, columnDefinition = "json")
     private String contentJson;
@@ -59,12 +69,49 @@ public class PlacementItemEntity {
             PlacementItemStatus status,
             String contentJson
     ) {
+        this(
+                itemType,
+                cefrLevel,
+                defaultDifficulty(cefrLevel),
+                scenarioTag,
+                targetSkill,
+                targetSkill,
+                status,
+                PlacementItemGradingType.LOCAL_EXACT,
+                contentJson
+        );
+    }
+
+    public PlacementItemEntity(
+            PlacementItemType itemType,
+            CefrLevel cefrLevel,
+            Integer difficultyScore,
+            String scenarioTag,
+            String targetSkill,
+            String abilityDimension,
+            PlacementItemStatus status,
+            PlacementItemGradingType gradingType,
+            String contentJson
+    ) {
         this.itemType = itemType;
         this.cefrLevel = cefrLevel;
+        this.difficultyScore = difficultyScore;
         this.scenarioTag = scenarioTag;
         this.targetSkill = targetSkill;
+        this.abilityDimension = abilityDimension;
         this.status = status;
+        this.gradingType = gradingType;
         this.contentJson = contentJson;
+    }
+
+    private static int defaultDifficulty(CefrLevel cefrLevel) {
+        return switch (cefrLevel) {
+            case A1 -> 20;
+            case A2 -> 35;
+            case B1 -> 55;
+            case B2 -> 75;
+            case C1 -> 90;
+        };
     }
 
     @PrePersist
@@ -91,6 +138,10 @@ public class PlacementItemEntity {
         return cefrLevel;
     }
 
+    public Integer getDifficultyScore() {
+        return difficultyScore;
+    }
+
     public String getScenarioTag() {
         return scenarioTag;
     }
@@ -99,8 +150,16 @@ public class PlacementItemEntity {
         return targetSkill;
     }
 
+    public String getAbilityDimension() {
+        return abilityDimension;
+    }
+
     public PlacementItemStatus getStatus() {
         return status;
+    }
+
+    public PlacementItemGradingType getGradingType() {
+        return gradingType;
     }
 
     public String getContentJson() {

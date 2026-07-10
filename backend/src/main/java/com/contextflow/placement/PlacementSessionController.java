@@ -2,8 +2,11 @@ package com.contextflow.placement;
 
 import com.contextflow.auth.dto.CurrentUserResponse;
 import com.contextflow.common.api.ApiResponse;
+import com.contextflow.placement.dto.AdaptivePlacementAnswerResponse;
+import com.contextflow.placement.dto.AdaptivePlacementSessionResponse;
 import com.contextflow.placement.dto.PlacementSessionResponse;
 import com.contextflow.placement.dto.PlacementSessionResultResponse;
+import com.contextflow.placement.dto.SubmitAdaptivePlacementAnswerRequest;
 import com.contextflow.placement.dto.SubmitPlacementSessionRequest;
 import com.contextflow.placement.service.PlacementSessionService;
 import jakarta.validation.Valid;
@@ -29,6 +32,20 @@ public class PlacementSessionController {
     @PostMapping("/start")
     public ApiResponse<PlacementSessionResponse> start(Authentication authentication) {
         return ApiResponse.ok(placementSessionService.startSession(currentUsername(authentication)));
+    }
+
+    @PostMapping("/adaptive/start")
+    public ApiResponse<AdaptivePlacementSessionResponse> startAdaptive(Authentication authentication) {
+        return ApiResponse.ok(placementSessionService.startAdaptiveSession(currentUsername(authentication)));
+    }
+
+    @PostMapping("/{sessionId}/answer")
+    public ApiResponse<AdaptivePlacementAnswerResponse> answerAdaptive(
+            @PathVariable Long sessionId,
+            @Valid @RequestBody SubmitAdaptivePlacementAnswerRequest request,
+            Authentication authentication
+    ) {
+        return ApiResponse.ok(placementSessionService.answerAdaptive(currentUsername(authentication), sessionId, request));
     }
 
     @PostMapping("/{sessionId}/submit")

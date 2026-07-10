@@ -19,9 +19,9 @@ Long-term goals:
 
 ## 当前范围 / Current Scope
 
-当前已完成到 Phase 3.2 水平测试会话：
+当前已完成到 Phase 3.3 用户水平画像：
 
-This repository currently includes the Phase 3.2 placement session foundation:
+This repository currently includes the Phase 3.3 user level profile foundation:
 
 - Spring Boot 后端 / Spring Boot backend
 - React + TypeScript + Vite 前端 / React + TypeScript + Vite frontend
@@ -31,6 +31,9 @@ This repository currently includes the Phase 3.2 placement session foundation:
 - MySQL 用户表 / MySQL users table
 - 水平测试 READY 题池 / READY placement item pool
 - 水平测试会话与临时评分 / placement sessions and temporary scoring
+- 自适应逐题测试基础 / adaptive step-by-step placement foundation
+- 用户水平画像 / user level profile
+- 前端学习者测试流程与管理员调试台 / frontend learner placement flow and admin debug console
 
 暂未加入：
 
@@ -197,6 +200,83 @@ Schema SQL is kept at:
 backend/src/main/resources/db/migration/V3__create_placement_sessions.sql
 docs/sql/phase3_placement_session_schema.sql
 ```
+
+## Phase 3.2.1 自适应测试基础 / Phase 3.2.1 Adaptive Placement Foundation
+
+当前新增逐题测试接口，为最终版“AI 预生成题池 + 动态调难度”铺路。
+
+Step-by-step placement APIs are now available, preparing for the final AI pre-generated adaptive test flow.
+
+```text
+POST /api/placement/session/adaptive/start
+POST /api/placement/session/{sessionId}/answer
+```
+
+关键字段 / Key fields:
+
+```text
+placement_items.difficulty_score
+placement_items.ability_dimension
+placement_items.grading_type
+placement_sessions.mode
+placement_sessions.current_difficulty_score
+```
+
+后续可支持的题型 / Future item types:
+
+```text
+TRUE_FALSE
+SYNONYM_CHOICE
+ANTONYM_CHOICE
+CLOZE_TEXT
+```
+
+后续可支持的判分方式 / Future grading types:
+
+```text
+LOCAL_EXACT
+LOCAL_ACCEPTED_ANSWERS
+AI_JUDGE
+```
+
+## Phase 3.3 用户水平画像 / Phase 3.3 User Level Profile
+
+水平测试结束后，系统会写入用户画像，作为后续学习包生成输入。
+
+After placement testing finishes, the system stores a user level profile for later learning package generation.
+
+```text
+GET /api/user/profile
+```
+
+画像字段 / Profile fields:
+
+```text
+cefr_level
+dimension_scores
+weak_scenarios
+weak_abilities
+last_placement_session_id
+```
+
+建表 SQL 保存在：
+
+Schema SQL is kept at:
+
+```text
+backend/src/main/resources/db/migration/V5__create_user_level_profiles.sql
+docs/sql/phase3_user_level_profile_schema.sql
+```
+
+## 前端调试入口 / Frontend Debug Entry
+
+普通学习者登录后只看到正式学习流程：开始水平测试、逐题作答、查看自己的等级。
+
+Learners only see the normal product flow: start placement, answer items, and view their level.
+
+管理员登录后额外看到调试台：健康检查、权限探测、测试沙盒、原始画像 JSON。
+
+Admins additionally see debug tools: health check, access probes, placement sandbox, and raw profile JSON.
 
 ## 开发原则 / Development Principle
 
