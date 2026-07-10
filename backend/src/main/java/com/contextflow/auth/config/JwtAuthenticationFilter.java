@@ -1,7 +1,7 @@
 package com.contextflow.auth.config;
 
 import com.contextflow.auth.dto.CurrentUserResponse;
-import com.contextflow.auth.service.AuthService;
+import com.contextflow.auth.service.JwtTokenService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -16,12 +16,12 @@ import java.io.IOException;
 import java.util.List;
 
 @Component
-public class MockTokenAuthenticationFilter extends OncePerRequestFilter {
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-    private final AuthService authService;
+    private final JwtTokenService jwtTokenService;
 
-    public MockTokenAuthenticationFilter(AuthService authService) {
-        this.authService = authService;
+    public JwtAuthenticationFilter(JwtTokenService jwtTokenService) {
+        this.jwtTokenService = jwtTokenService;
     }
 
     @Override
@@ -32,7 +32,7 @@ public class MockTokenAuthenticationFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
         String authorizationHeader = request.getHeader("Authorization");
 
-        authService.findCurrentUser(authorizationHeader)
+        jwtTokenService.parseUser(authorizationHeader)
                 .ifPresent(this::authenticate);
 
         filterChain.doFilter(request, response);

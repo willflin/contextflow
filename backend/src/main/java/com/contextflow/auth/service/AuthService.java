@@ -1,5 +1,6 @@
 package com.contextflow.auth.service;
 
+import com.contextflow.auth.config.JwtProperties;
 import com.contextflow.auth.domain.UserRole;
 import com.contextflow.auth.dto.CurrentUserResponse;
 import com.contextflow.auth.dto.LoginRequest;
@@ -9,18 +10,24 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
-import java.util.Optional;
 
 @Service
 public class AuthService {
 
     private static final String TOKEN_TYPE = "Bearer";
-    private static final long MOCK_TOKEN_TTL_SECONDS = 3600;
+
+    private final JwtProperties jwtProperties;
+    private final JwtTokenService jwtTokenService;
 
     private final Map<String, MockUser> users = Map.of(
-            "learner", new MockUser("learner", "learner123", "Demo Learner", UserRole.LEARNER, "mock-token-learner"),
-            "admin", new MockUser("admin", "admin123", "Demo Admin", UserRole.ADMIN, "mock-token-admin")
+            "learner", new MockUser("learner", "learner123", "Demo Learner", UserRole.LEARNER),
+            "admin", new MockUser("admin", "admin123", "Demo Admin", UserRole.ADMIN)
     );
+
+    public AuthService(JwtProperties jwtProperties, JwtTokenService jwtTokenService) {
+        this.jwtProperties = jwtProperties;
+        this.jwtTokenService = jwtTokenService;
+    }
 
     public LoginResponse login(LoginRequest request) {
         MockUser user = users.get(request.username());
@@ -29,34 +36,25 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid username or password.");
         }
 
+        CurrentUserResponse currentUser = toCurrentUserResponse(user);
+
         return new LoginResponse(
-                user.token(),
+                jwtTokenService.createToken(currentUser),
                 TOKEN_TYPE,
-                MOCK_TOKEN_TTL_SECONDS,
-                toCurrentUserResponse(user)
+                jwtProperties.accessTokenTtlSeconds(),
+                currentUser
         );
     }
 
     public CurrentUserResponse getCurrentUser(String authorizationHeader) {
-        return findCurrentUser(authorizationHeader)
+        CurrentUserResponse tokenUser = jwtTokenService.parseUser(authorizationHeader)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or missing token."));
-    }
 
-    public Optional<CurrentUserResponse> findCurrentUser(String authorizationHeader) {
-        Optional<String> token = extractBearerToken(authorizationHeader);
-
-        return users.values().stream()
-                .filter(user -> token.isPresent() && user.token().equals(token.get()))
-                .findFirst()
-                .map(this::toCurrentUserResponse);
-    }
-
-    private Optional<String> extractBearerToken(String authorizationHeader) {
-        if (authorizationHeader == null || !authorizationHeader.startsWith(TOKEN_TYPE + " ")) {
-            return Optional.empty();
+        if (!users.containsKey(tokenUser.username())) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or missing token.");
         }
 
-        return Optional.of(authorizationHeader.substring((TOKEN_TYPE + " ").length()));
+        return tokenUser;
     }
 
     private CurrentUserResponse toCurrentUserResponse(MockUser user) {
@@ -67,8 +65,7 @@ public class AuthService {
             String username,
             String password,
             String displayName,
-            UserRole role,
-            String token
+            UserRole role
     ) {
     }
 }

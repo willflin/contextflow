@@ -5,3 +5,8 @@ spring:
   application:
     name: contextflow-backend
 
+contextflow:
+  auth:
+    jwt:
+      secret: ${CONTEXTFLOW_JWT_SECRET:contextflow-dev-secret-key-change-before-production-32bytes}
+      access-token-ttl-seconds: 3600

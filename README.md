@@ -99,9 +99,9 @@ Service: contextflow-backend
 
 ## Phase 1.1 测试账号 / Phase 1.1 Test Accounts
 
-当前认证是内存版 mock 登录，仅用于跑通前后端流程。
+当前用户仍是内存账号，但 token 已升级为真实 JWT。
 
-Current authentication is an in-memory mock login for frontend-backend flow verification.
+Current users are still in memory, but tokens are now real JWTs.
 
 ```text
 learner / learner123
@@ -110,9 +110,9 @@ admin / admin123
 
 ## Phase 1.2 权限验证 / Phase 1.2 Access Check
 
-当前 mock token 已用于接口权限保护。
+当前 JWT 已用于接口权限保护。
 
-Mock tokens are now used for API access control.
+JWTs are now used for API access control.
 
 ```text
 /api/learner/**  LEARNER or ADMIN

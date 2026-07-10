@@ -127,8 +127,8 @@ export default function App() {
 
       <section className="login-panel">
         <div>
-          <p className="eyebrow">Phase 1.1</p>
-          <h2>Mock login</h2>
+          <p className="eyebrow">Phase 1.3</p>
+          <h2>JWT login</h2>
           <p className="hint">Try learner / learner123 or admin / admin123.</p>
         </div>
 

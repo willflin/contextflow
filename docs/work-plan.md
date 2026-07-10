@@ -18,9 +18,9 @@ No database, AI, Redis, Kafka, or Docker yet.
 - 添加 JWT 认证。 / Add JWT authentication.
 - 保护管理员接口。 / Protect admin APIs.
 
-当前第一步先实现内存版登录，不接数据库，不接真实 JWT。
+当前先实现内存版账号，不接数据库；Phase 1.3 将 token 升级为真实 JWT。
 
-The first step uses in-memory mock login, without database or real JWT.
+The current step keeps in-memory users without database; Phase 1.3 upgrades the token to a real JWT.
 
 Phase 1.2 在 mock token 基础上保护接口路径。
 

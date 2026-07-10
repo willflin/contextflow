@@ -17,6 +17,20 @@ class SecurityAccessTest {
     @Autowired
     private MockMvc mockMvc;
 
+    private String loginToken(String username, String password) throws Exception {
+        String response = mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/auth/login")
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"username":"%s","password":"%s"}
+                                """.formatted(username, password)))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        return com.jayway.jsonpath.JsonPath.read(response, "$.data.token");
+    }
+
     @Test
     void learnerEndpointShouldRequireAuthentication() throws Exception {
         mockMvc.perform(get("/api/learner/probe"))
@@ -25,23 +39,29 @@ class SecurityAccessTest {
 
     @Test
     void learnerTokenShouldAccessLearnerEndpoint() throws Exception {
+        String token = loginToken("learner", "learner123");
+
         mockMvc.perform(get("/api/learner/probe")
-                        .header("Authorization", "Bearer mock-token-learner"))
+                        .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.scope").value("LEARNER"));
     }
 
     @Test
     void learnerTokenShouldNotAccessAdminEndpoint() throws Exception {
+        String token = loginToken("learner", "learner123");
+
         mockMvc.perform(get("/api/admin/probe")
-                        .header("Authorization", "Bearer mock-token-learner"))
+                        .header("Authorization", "Bearer " + token))
                 .andExpect(status().isForbidden());
     }
 
     @Test
     void adminTokenShouldAccessAdminEndpoint() throws Exception {
+        String token = loginToken("admin", "admin123");
+
         mockMvc.perform(get("/api/admin/probe")
-                        .header("Authorization", "Bearer mock-token-admin"))
+                        .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.scope").value("ADMIN"));
     }
