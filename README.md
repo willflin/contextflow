@@ -141,6 +141,16 @@ backend/src/main/resources/db/migration/V1__create_users.sql
 docs/sql/phase2_mysql_schema.sql
 ```
 
+## Phase 2.2 注册 / Phase 2.2 Registration
+
+普通用户可以通过 `/api/auth/register` 注册，默认角色固定为 `LEARNER`。
+
+Learners can register through `/api/auth/register`; the default role is always `LEARNER`.
+
+管理员账号不允许通过前端注册创建。
+
+Admin accounts cannot be created through frontend registration.
+
 ## 开发原则 / Development Principle
 
 每个中间件都必须有清晰业务依据。

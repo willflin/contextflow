@@ -36,6 +36,10 @@ Phase 2.1 先接入 MySQL、Flyway 和 users 表。
 
 Phase 2.1 first adds MySQL, Flyway, and the users table.
 
+Phase 2.2 添加普通学习者注册。
+
+Phase 2.2 adds learner registration.
+
 ## Phase 3：水平测试 / Placement
 
 - 添加水平测试题池。 / Add placement item pool.

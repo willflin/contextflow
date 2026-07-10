@@ -21,6 +21,15 @@ type ApiResponse<T> = {
   timestamp: string;
 };
 
+async function readErrorMessage(response: Response, fallback: string): Promise<string> {
+  try {
+    const result = (await response.json()) as ApiResponse<unknown>;
+    return result.message || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export async function login(username: string, password: string): Promise<LoginResponse> {
   const response = await fetch('/api/auth/login', {
     method: 'POST',
@@ -31,7 +40,28 @@ export async function login(username: string, password: string): Promise<LoginRe
   });
 
   if (!response.ok) {
-    throw new Error('Invalid username or password.');
+    throw new Error(await readErrorMessage(response, 'Invalid username or password.'));
+  }
+
+  const result = (await response.json()) as ApiResponse<LoginResponse>;
+  return result.data;
+}
+
+export async function register(
+  username: string,
+  password: string,
+  displayName: string
+): Promise<LoginResponse> {
+  const response = await fetch('/api/auth/register', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ username, password, displayName })
+  });
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, 'Registration failed.'));
   }
 
   const result = (await response.json()) as ApiResponse<LoginResponse>;
@@ -46,10 +76,9 @@ export async function fetchCurrentUser(token: string): Promise<CurrentUser> {
   });
 
   if (!response.ok) {
-    throw new Error('Current user request failed.');
+    throw new Error(await readErrorMessage(response, 'Current user request failed.'));
   }
 
   const result = (await response.json()) as ApiResponse<CurrentUser>;
   return result.data;
 }
-

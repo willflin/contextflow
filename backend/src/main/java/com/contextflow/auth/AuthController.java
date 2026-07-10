@@ -3,6 +3,7 @@ package com.contextflow.auth;
 import com.contextflow.auth.dto.CurrentUserResponse;
 import com.contextflow.auth.dto.LoginRequest;
 import com.contextflow.auth.dto.LoginResponse;
+import com.contextflow.auth.dto.RegisterRequest;
 import com.contextflow.auth.service.AuthService;
 import com.contextflow.common.api.ApiResponse;
 import jakarta.validation.Valid;
@@ -28,6 +29,11 @@ public class AuthController {
         return ApiResponse.ok(authService.login(request));
     }
 
+    @PostMapping("/register")
+    public ApiResponse<LoginResponse> register(@Valid @RequestBody RegisterRequest request) {
+        return ApiResponse.ok(authService.register(request));
+    }
+
     @GetMapping("/me")
     public ApiResponse<CurrentUserResponse> me(
             @RequestHeader(name = "Authorization", required = false) String authorizationHeader
@@ -35,4 +41,3 @@ public class AuthController {
         return ApiResponse.ok(authService.getCurrentUser(authorizationHeader));
     }
 }
-

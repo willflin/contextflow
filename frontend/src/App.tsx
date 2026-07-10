@@ -1,16 +1,19 @@
 import { useEffect, useState } from 'react';
 import { AccessProbe, fetchAccessProbe } from './api/access';
-import { CurrentUser, fetchCurrentUser, login } from './api/auth';
+import { CurrentUser, fetchCurrentUser, login, register } from './api/auth';
 import { fetchHealth, HealthStatus } from './api/health';
 
 type LoadState = 'idle' | 'loading' | 'success' | 'error';
+type AuthMode = 'login' | 'register';
 
 export default function App() {
   const [state, setState] = useState<LoadState>('idle');
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [authMode, setAuthMode] = useState<AuthMode>('login');
   const [username, setUsername] = useState('learner');
   const [password, setPassword] = useState('learner123');
+  const [displayName, setDisplayName] = useState('New Learner');
   const [error, setError] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [accessProbe, setAccessProbe] = useState<AccessProbe | null>(null);
@@ -58,7 +61,10 @@ export default function App() {
     setAuthError(null);
 
     try {
-      const response = await login(username, password);
+      const response =
+        authMode === 'login'
+          ? await login(username, password)
+          : await register(username, password, displayName);
       window.localStorage.setItem('contextflow_token', response.token);
       setCurrentUser(response.user);
       setAccessProbe(null);
@@ -128,8 +134,12 @@ export default function App() {
       <section className="login-panel">
         <div>
           <p className="eyebrow">Phase 1.3</p>
-          <h2>JWT login</h2>
-          <p className="hint">Try learner / learner123 or admin / admin123.</p>
+          <h2>{authMode === 'login' ? 'JWT login' : 'Learner registration'}</h2>
+          <p className="hint">
+            {authMode === 'login'
+              ? 'Try learner / learner123 or admin / admin123.'
+              : 'New users are always registered as LEARNER.'}
+          </p>
         </div>
 
         {currentUser ? (
@@ -165,10 +175,32 @@ export default function App() {
           </div>
         ) : (
           <form className="login-form" onSubmit={handleLogin}>
+            <div className="auth-mode">
+              <button
+                className={authMode === 'login' ? 'mode-button active' : 'mode-button'}
+                type="button"
+                onClick={() => setAuthMode('login')}
+              >
+                Login
+              </button>
+              <button
+                className={authMode === 'register' ? 'mode-button active' : 'mode-button'}
+                type="button"
+                onClick={() => setAuthMode('register')}
+              >
+                Register
+              </button>
+            </div>
             <label>
               Username
               <input value={username} onChange={(event) => setUsername(event.target.value)} />
             </label>
+            {authMode === 'register' && (
+              <label>
+                Display name
+                <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
+              </label>
+            )}
             <label>
               Password
               <input
@@ -177,9 +209,9 @@ export default function App() {
                 onChange={(event) => setPassword(event.target.value)}
               />
             </label>
-            {authError && <p className="error compact">Login failed: {authError}</p>}
+            {authError && <p className="error compact">Auth failed: {authError}</p>}
             <button className="refresh-button compact-button" type="submit">
-              Log in
+              {authMode === 'login' ? 'Log in' : 'Create learner account'}
             </button>
           </form>
         )}

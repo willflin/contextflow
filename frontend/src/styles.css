@@ -137,6 +137,27 @@ strong {
   gap: 14px;
 }
 
+.auth-mode {
+  display: inline-flex;
+  width: fit-content;
+  border: 1px solid #cfd8dd;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.mode-button {
+  border: 0;
+  background: #ffffff;
+  padding: 9px 13px;
+  color: #44535b;
+  cursor: pointer;
+}
+
+.mode-button.active {
+  background: #172026;
+  color: #ffffff;
+}
+
 .login-form label {
   display: grid;
   gap: 6px;

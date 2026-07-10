@@ -111,3 +111,16 @@
 
 - 登录用户从内存数据迁移到 MySQL `users` 表。 / Login users were moved from memory to the MySQL `users` table.
 - 启动时可自动创建 demo 用户。 / Demo users can be seeded on startup.
+
+## Phase 2.2：用户注册 / User Registration
+
+### 操作 / Operations
+
+- 新增 `POST /api/auth/register`。 / Added `POST /api/auth/register`.
+- 新增前端注册模式。 / Added frontend registration mode.
+
+### 新增功能 / Added Features
+
+- 普通用户可注册学习者账号。 / Users can register learner accounts.
+- 注册用户默认角色固定为 `LEARNER`。 / Registered users always receive the `LEARNER` role.
+- 管理员账号不能通过前端注册创建。 / Admin accounts cannot be created through frontend registration.

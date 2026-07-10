@@ -1,14 +1,18 @@
 package com.contextflow.auth.service;
 
 import com.contextflow.auth.config.JwtProperties;
+import com.contextflow.auth.domain.UserRole;
 import com.contextflow.auth.dto.CurrentUserResponse;
 import com.contextflow.auth.dto.LoginRequest;
 import com.contextflow.auth.dto.LoginResponse;
+import com.contextflow.auth.dto.RegisterRequest;
 import com.contextflow.user.domain.UserEntity;
+import com.contextflow.user.domain.UserStatus;
 import com.contextflow.user.repository.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
@@ -43,6 +47,36 @@ public class AuthService {
         }
 
         CurrentUserResponse currentUser = toCurrentUserResponse(user);
+
+        return new LoginResponse(
+                jwtTokenService.createToken(currentUser),
+                TOKEN_TYPE,
+                jwtProperties.accessTokenTtlSeconds(),
+                currentUser
+        );
+    }
+
+    @Transactional
+    public LoginResponse register(RegisterRequest request) {
+        if (userRepository.existsByUsername(request.username())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Username already exists.");
+        }
+
+        UserEntity user = new UserEntity(
+                request.username(),
+                passwordEncoder.encode(request.password()),
+                request.displayName(),
+                UserRole.LEARNER,
+                UserStatus.ACTIVE
+        );
+
+        userRepository.save(user);
+
+        CurrentUserResponse currentUser = new CurrentUserResponse(
+                request.username(),
+                request.displayName(),
+                UserRole.LEARNER
+        );
 
         return new LoginResponse(
                 jwtTokenService.createToken(currentUser),
