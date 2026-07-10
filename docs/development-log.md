@@ -235,6 +235,7 @@
 - 新增接口 `GET /api/learning/packages/next`。 / Added `GET /api/learning/packages/next`.
 - 学习包内容暂时使用 `SEEDED_TEMPLATE`，为后续 `AI_GENERATED` 预生成链路预留字段。 / Learning package content currently uses `SEEDED_TEMPLATE`, reserving fields for the later `AI_GENERATED` pre-generation flow.
 - 普通学习者完成水平测试并生成画像后，可以在网页获取下一个学习场景。 / Learners can fetch the next scenario in the browser after placement creates a profile.
+- 当前网页学习包展示只是过渡形态，后续要替换为 Roleplay Agent + Mentor Agent 双 Agent 对话界面。 / The current web learning package display is only transitional and must later be replaced by a Roleplay Agent + Mentor Agent dual-agent dialogue UI.
 
 ### 验证 / Verification
 
@@ -244,3 +245,31 @@
 
 - 后端命令行编译时，`backend/target/classes/application.yml` 和 `backend/target/maven-status/.../createdFiles.lst` 写入被拒绝，当前机器上存在正在运行的 Java 进程。 / Backend command-line compilation was denied when writing `backend/target/classes/application.yml` and `backend/target/maven-status/.../createdFiles.lst`; Java processes are currently running on this machine.
   - 解决方案：不强制结束用户进程；需要完整 Maven 编译时，先停止正在运行的后端，再用 JDK 21 编译。 / Solution: do not force-stop user processes; for a full Maven compile, stop the running backend first, then compile with JDK 21.
+
+## Phase 4.2：双 Agent 对话骨架 / Dual-Agent Dialogue Foundation
+
+### 操作 / Operations
+
+- 新增 `learning_dialogue_turns` 表迁移脚本。 / Added the `learning_dialogue_turns` table migration.
+- 新增 DataGrip 检查用 SQL 副本。 / Added a SQL copy for DataGrip inspection.
+- 新增学习对话轮次 Entity 和 Repository。 / Added the learning dialogue turn entity and repository.
+- 新增双 Agent 对话请求与响应 DTO。 / Added request and response DTOs for dual-agent dialogue.
+- 新增 `POST /api/learning/packages/{packageId}/dialog`。 / Added `POST /api/learning/packages/{packageId}/dialog`.
+- 将前端学习区从静态学习包展示改为双 Agent 对话界面。 / Replaced the frontend static learning package display with a dual-agent dialogue UI.
+
+### 新增功能 / Added Features
+
+- Roleplay Agent 在主区域返回英文场景回复。 / The Roleplay Agent returns English scenario replies in the main area.
+- Mentor Agent 在侧栏返回中文纠错、解释和更自然表达。 / The Mentor Agent returns Chinese corrections, explanations, and more natural expressions in the side panel.
+- 每轮对话保存用户发言、Roleplay 回复、Mentor 反馈、纠错列表、自然表达和评分信号。 / Each dialogue turn stores the learner message, Roleplay reply, Mentor feedback, corrections, natural expression, and scoring signal.
+- 当前阶段使用本地规则模拟双 Agent，后续替换为真实 AI 调用。 / This phase uses local rules to simulate dual agents and will later be replaced by real AI calls.
+
+### 验证 / Verification
+
+- 前端 `npm run typecheck` 通过。 / Frontend `npm run typecheck` passed.
+- `git diff --check` 通过，仅有 Windows 换行提示。 / `git diff --check` passed with only Windows line-ending warnings.
+
+### 问题与解决方案 / Issues and Solutions
+
+- 后端 Maven 编译仍无法写入 `backend/target/classes` 或临时 class 输出目录，当前机器存在正在运行的 Java/IDE 进程。 / Backend Maven compilation still cannot write to `backend/target/classes` or a temporary class output directory; Java/IDE processes are currently running on this machine.
+  - 解决方案：本次不强制结束进程；网页验证前先重启后端，让 Flyway 执行 V7 迁移。 / Solution: do not force-stop processes in this step; restart the backend before browser verification so Flyway can run the V7 migration.

@@ -70,12 +70,16 @@ Phase 3.3.1 adds the web entry: learners use the normal flow, admins see debug t
 
 - 添加场景模板。 / Add scenario templates. ✅ Phase 4.1
 - 添加学习包。 / Add learning packages. ✅ Phase 4.1
-- 添加双 Agent 响应结构。 / Add dual-agent response structure.
+- 添加双 Agent 响应结构。 / Add dual-agent response structure. ✅ Phase 4.2
 - 记录学习事件。 / Record learning events.
 
 Phase 4.1 先建立场景模板、READY 学习包和学习者网页入口，内容暂时用种子模板模拟未来 AI 预生成结果。
 
 Phase 4.1 first adds scenario templates, READY learning packages, and the learner web entry. Seeded template content is used as a temporary stand-in for future AI pre-generation.
+
+Phase 4.2 已把当前静态学习包展示替换为双 Agent 对话界面：Roleplay Agent 负责沉浸式英文场景对话，Mentor Agent 负责实时纠错、解释和更自然表达建议。当前使用本地规则模拟，后续替换为真实 AI 调用。
+
+Phase 4.2 replaced the current static learning package view with a dual-agent dialogue UI: the Roleplay Agent handles immersive English roleplay, and the Mentor Agent gives live corrections, explanations, and more natural expression suggestions. It currently uses local rules and will later be replaced by real AI calls.
 
 ## Phase 5：复习系统 / Review
 

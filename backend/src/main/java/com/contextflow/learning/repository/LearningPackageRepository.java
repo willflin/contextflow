@@ -11,5 +11,7 @@ public interface LearningPackageRepository extends JpaRepository<LearningPackage
 
     Optional<LearningPackageEntity> findFirstByUserIdAndStatusOrderByIdAsc(Long userId, LearningPackageStatus status);
 
+    Optional<LearningPackageEntity> findByIdAndUserId(Long id, Long userId);
+
     List<LearningPackageEntity> findByUserIdOrderByIdAsc(Long userId);
 }

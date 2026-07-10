@@ -4,8 +4,10 @@ import { CurrentUser, fetchCurrentUser, login, register } from './api/auth';
 import { fetchHealth, HealthStatus } from './api/health';
 import {
   fetchNextLearningPackage,
+  LearningDialogueTurn,
   LearningPackage,
-  parseLearningPackageContent
+  parseLearningPackageContent,
+  sendLearningDialogueMessage
 } from './api/learning';
 import {
   answerAdaptivePlacement,
@@ -45,6 +47,10 @@ export default function App() {
   const [learningPackage, setLearningPackage] = useState<LearningPackage | null>(null);
   const [learningBusy, setLearningBusy] = useState(false);
   const [learningError, setLearningError] = useState<string | null>(null);
+  const [dialogueTurns, setDialogueTurns] = useState<LearningDialogueTurn[]>([]);
+  const [dialogueMessage, setDialogueMessage] = useState('');
+  const [dialogueBusy, setDialogueBusy] = useState(false);
+  const [dialogueError, setDialogueError] = useState<string | null>(null);
 
   const isAdmin = currentUser?.role === 'ADMIN';
   const itemContent = currentItem ? parsePlacementItemContent(currentItem) : null;
@@ -268,6 +274,9 @@ export default function App() {
     try {
       const result = await fetchNextLearningPackage(token);
       setLearningPackage(result);
+      setDialogueTurns([]);
+      setDialogueMessage('');
+      setDialogueError(null);
     } catch (exception) {
       setLearningPackage(null);
       setLearningError(exception instanceof Error ? exception.message : 'Failed to load learning package.');
@@ -280,6 +289,40 @@ export default function App() {
     setLearningPackage(null);
     setLearningError(null);
     setLearningBusy(false);
+    setDialogueTurns([]);
+    setDialogueMessage('');
+    setDialogueError(null);
+    setDialogueBusy(false);
+  }
+
+  async function submitDialogueMessage(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const token = tokenOrNull();
+    const trimmedMessage = dialogueMessage.trim();
+
+    if (!token || !learningPackage) {
+      setDialogueError('Load a learning scenario first.');
+      return;
+    }
+
+    if (!trimmedMessage) {
+      setDialogueError('Please enter an English reply.');
+      return;
+    }
+
+    setDialogueBusy(true);
+    setDialogueError(null);
+
+    try {
+      const response = await sendLearningDialogueMessage(token, learningPackage.id, trimmedMessage);
+      setDialogueTurns((previous) => [...previous, response]);
+      setDialogueMessage('');
+    } catch (exception) {
+      setDialogueError(exception instanceof Error ? exception.message : 'Dialogue failed.');
+    } finally {
+      setDialogueBusy(false);
+    }
   }
 
   function tokenOrNull() {
@@ -670,6 +713,7 @@ export default function App() {
     }
 
     const content = parseLearningPackageContent(learningPackage);
+    const latestTurn = dialogueTurns.length > 0 ? dialogueTurns[dialogueTurns.length - 1] : null;
 
     return (
       <div className="learning-content">
@@ -683,23 +727,85 @@ export default function App() {
 
         {content.scenario?.description && <p className="hint">{content.scenario.description}</p>}
 
-        {content.goals && content.goals.length > 0 && (
-          <section>
-            <h3>Goals</h3>
-            <ul>
-              {content.goals.map((goal) => (
-                <li key={goal}>{goal}</li>
-              ))}
-            </ul>
-          </section>
-        )}
+        <section className="dual-agent-layout">
+          <div className="roleplay-area">
+            <div className="agent-heading">
+              <div>
+                <span className="label">Roleplay Agent</span>
+                <strong>{content.roleplayAgent?.role ?? 'Scenario partner'}</strong>
+              </div>
+            </div>
 
-        {content.roleplayAgent?.openingLine && (
-          <section className="dialogue-preview">
-            <span className="label">Roleplay opening</span>
-            <p>{content.roleplayAgent.openingLine}</p>
-          </section>
-        )}
+            <div className="dialogue-thread">
+              {content.roleplayAgent?.openingLine && (
+                <div className="message-row agent">
+                  <div className="message-bubble">
+                    <span>Roleplay</span>
+                    <p>{content.roleplayAgent.openingLine}</p>
+                  </div>
+                </div>
+              )}
+
+              {dialogueTurns.map((turn) => (
+                <div className="turn-group" key={turn.turnId}>
+                  <div className="message-row user">
+                    <div className="message-bubble">
+                      <span>You</span>
+                      <p>{turn.userMessage}</p>
+                    </div>
+                  </div>
+                  <div className="message-row agent">
+                    <div className="message-bubble">
+                      <span>Roleplay</span>
+                      <p>{turn.roleplayReply}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <form className="dialogue-form" onSubmit={submitDialogueMessage}>
+              <textarea
+                value={dialogueMessage}
+                onChange={(event) => setDialogueMessage(event.target.value)}
+                placeholder="Type your English reply..."
+                rows={3}
+              />
+              <button className="refresh-button compact-button" type="submit" disabled={dialogueBusy}>
+                Send
+              </button>
+            </form>
+            {dialogueError && <p className="error compact">Dialogue failed: {dialogueError}</p>}
+          </div>
+
+          <aside className="mentor-panel">
+            <span className="label">Mentor Agent</span>
+            {!latestTurn ? (
+              <p className="hint">Mentor feedback will appear after your first reply.</p>
+            ) : (
+              <div className="mentor-content">
+                <p>{latestTurn.mentorFeedback}</p>
+                {latestTurn.corrections.length > 0 && (
+                  <div>
+                    <h3>Corrections</h3>
+                    <div className="correction-list">
+                      {latestTurn.corrections.map((correction) => (
+                        <div className="correction-item" key={`${correction.original}-${correction.suggestion}`}>
+                          <strong>{correction.suggestion}</strong>
+                          <p>{correction.reason}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="natural-expression">
+                  <span className="label">Natural expression</span>
+                  <p>{latestTurn.naturalExpression}</p>
+                </div>
+              </div>
+            )}
+          </aside>
+        </section>
 
         {content.expressions && content.expressions.length > 0 && (
           <section>

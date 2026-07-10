@@ -46,6 +46,25 @@ export type LearningPackageContent = {
   }>;
 };
 
+export type DialogueCorrection = {
+  original: string;
+  suggestion: string;
+  reason: string;
+};
+
+export type LearningDialogueTurn = {
+  turnId: number;
+  packageId: number;
+  turnIndex: number;
+  userMessage: string;
+  roleplayReply: string;
+  mentorFeedback: string;
+  corrections: DialogueCorrection[];
+  naturalExpression: string;
+  scoringSignal: Record<string, unknown>;
+  createdAt: string;
+};
+
 async function readErrorMessage(response: Response, fallback: string): Promise<string> {
   try {
     const result = (await response.json()) as ApiResponse<unknown>;
@@ -67,6 +86,28 @@ export async function fetchNextLearningPackage(token: string): Promise<LearningP
   }
 
   const result = (await response.json()) as ApiResponse<LearningPackage>;
+  return result.data;
+}
+
+export async function sendLearningDialogueMessage(
+  token: string,
+  packageId: number,
+  message: string
+): Promise<LearningDialogueTurn> {
+  const response = await fetch(`/api/learning/packages/${packageId}/dialog`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ message })
+  });
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, 'Failed to send dialogue message.'));
+  }
+
+  const result = (await response.json()) as ApiResponse<LearningDialogueTurn>;
   return result.data;
 }
 

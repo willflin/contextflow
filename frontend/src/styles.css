@@ -433,6 +433,143 @@ strong {
   line-height: 1.6;
 }
 
+.dual-agent-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+  gap: 24px;
+}
+
+.roleplay-area,
+.mentor-panel {
+  min-width: 0;
+}
+
+.agent-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.dialogue-thread {
+  display: grid;
+  gap: 14px;
+  min-height: 260px;
+  max-height: 520px;
+  overflow-y: auto;
+  border: 1px solid #d9e1e5;
+  border-radius: 8px;
+  background: #f8fafb;
+  padding: 16px;
+}
+
+.turn-group {
+  display: grid;
+  gap: 10px;
+}
+
+.message-row {
+  display: flex;
+}
+
+.message-row.user {
+  justify-content: flex-end;
+}
+
+.message-row.agent {
+  justify-content: flex-start;
+}
+
+.message-bubble {
+  max-width: min(78%, 640px);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.message-bubble span {
+  display: block;
+  margin-bottom: 6px;
+  color: #6b7a83;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.message-bubble p {
+  margin: 0;
+  color: #172026;
+  line-height: 1.5;
+}
+
+.message-row.agent .message-bubble {
+  border: 1px solid #cfd8dd;
+  background: #ffffff;
+}
+
+.message-row.user .message-bubble {
+  background: #172026;
+}
+
+.message-row.user .message-bubble span,
+.message-row.user .message-bubble p {
+  color: #ffffff;
+}
+
+.dialogue-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+  margin-top: 14px;
+}
+
+.dialogue-form textarea {
+  box-sizing: border-box;
+  width: 100%;
+  resize: vertical;
+  border: 1px solid #cfd8dd;
+  border-radius: 8px;
+  padding: 12px;
+  color: #172026;
+  line-height: 1.5;
+}
+
+.mentor-panel {
+  border-left: 4px solid #0f766e;
+  background: #f0fdfa;
+  padding: 16px;
+}
+
+.mentor-content {
+  display: grid;
+  gap: 16px;
+}
+
+.mentor-content > p {
+  margin: 0;
+  color: #172026;
+  line-height: 1.6;
+}
+
+.correction-list {
+  display: grid;
+  gap: 10px;
+}
+
+.correction-item {
+  border: 1px solid #b7d8d3;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 12px;
+}
+
+.correction-item p,
+.natural-expression p {
+  margin: 8px 0 0;
+  color: #44535b;
+  line-height: 1.5;
+}
+
 .scenario-header {
   display: flex;
   align-items: center;
@@ -515,6 +652,15 @@ strong {
 
   .metrics-row {
     grid-template-columns: 1fr;
+  }
+
+  .dual-agent-layout,
+  .dialogue-form {
+    grid-template-columns: 1fr;
+  }
+
+  .message-bubble {
+    max-width: 100%;
   }
 
   .scenario-header {

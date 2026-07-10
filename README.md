@@ -19,9 +19,9 @@ Long-term goals:
 
 ## 当前范围 / Current Scope
 
-当前已完成到 Phase 4.1 学习包基础：
+当前已完成到 Phase 4.2 双 Agent 对话骨架：
 
-This repository currently includes the Phase 4.1 learning package foundation:
+This repository currently includes the Phase 4.2 dual-agent dialogue foundation:
 
 - Spring Boot 后端 / Spring Boot backend
 - React + TypeScript + Vite 前端 / React + TypeScript + Vite frontend
@@ -37,6 +37,9 @@ This repository currently includes the Phase 4.1 learning package foundation:
 - 场景模板基础表 / scenario template foundation
 - READY 学习包基础表 / READY learning package foundation
 - 学习者网页获取下一个 READY 场景包 / learner web flow for fetching the next READY scenario package
+- 双 Agent 对话接口骨架 / dual-agent dialogue API foundation
+- 学习者网页双 Agent 对话界面 / learner web dual-agent dialogue UI
+- 对话轮次持久化 / dialogue turn persistence
 
 暂未加入：
 
@@ -296,6 +299,37 @@ Schema SQL is kept at:
 ```text
 backend/src/main/resources/db/migration/V6__create_learning_foundation.sql
 docs/sql/phase4_learning_foundation_schema.sql
+```
+
+## Phase 4.2 双 Agent 对话骨架 / Phase 4.2 Dual-Agent Dialogue Foundation
+
+当前学习页面已从静态学习包展示升级为双 Agent 对话界面。
+
+The learning page has been upgraded from a static package view to a dual-agent dialogue UI.
+
+```text
+POST /api/learning/packages/{packageId}/dialog
+```
+
+当前阶段先用本地规则模拟 AI 返回，响应结构对齐未来模型输出：
+
+This phase uses local rules to simulate AI output, while keeping the response shape aligned with future model output:
+
+```text
+roleplayReply
+mentorFeedback
+corrections
+naturalExpression
+scoringSignal
+```
+
+建表 SQL 保存位置：
+
+Schema SQL is kept at:
+
+```text
+backend/src/main/resources/db/migration/V7__create_learning_dialogue_turns.sql
+docs/sql/phase4_dual_agent_dialogue_schema.sql
 ```
 
 ## 前端调试入口 / Frontend Debug Entry

@@ -1,0 +1,20 @@
+CREATE TABLE learning_dialogue_turns (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    user_id BIGINT NOT NULL,
+    learning_package_id BIGINT NOT NULL,
+    turn_index INT NOT NULL,
+    user_message TEXT NOT NULL,
+    roleplay_reply TEXT NOT NULL,
+    mentor_feedback TEXT NOT NULL,
+    corrections JSON NOT NULL,
+    natural_expression TEXT NOT NULL,
+    scoring_signal JSON NOT NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_dialogue_turn_package_index (learning_package_id, turn_index),
+    KEY idx_dialogue_turns_user_created (user_id, created_at),
+    KEY idx_dialogue_turns_package (learning_package_id),
+    CONSTRAINT fk_dialogue_turns_user FOREIGN KEY (user_id) REFERENCES users (id),
+    CONSTRAINT fk_dialogue_turns_package FOREIGN KEY (learning_package_id) REFERENCES learning_packages (id),
+    CONSTRAINT ck_dialogue_turns_index CHECK (turn_index > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
