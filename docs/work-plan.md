@@ -42,9 +42,13 @@ Phase 2.2 adds learner registration.
 
 ## Phase 3：水平测试 / Placement
 
-- 添加水平测试题池。 / Add placement item pool.
+- 添加水平测试题池。 / Add placement item pool. ✅ Phase 3.1
 - 添加语境化测试流程。 / Add contextual test flow.
 - 生成初始用户画像。 / Generate initial user profile.
+
+Phase 3.1 先保存 READY 状态题目，并提供样例读取接口。
+
+Phase 3.1 first stores READY items and exposes a sample read API.
 
 ## Phase 4：学习包 / Learning Packages
 

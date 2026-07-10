@@ -124,3 +124,18 @@
 - 普通用户可注册学习者账号。 / Users can register learner accounts.
 - 注册用户默认角色固定为 `LEARNER`。 / Registered users always receive the `LEARNER` role.
 - 管理员账号不能通过前端注册创建。 / Admin accounts cannot be created through frontend registration.
+
+## Phase 3.1：水平测试题池 / Placement Item Pool
+
+### 操作 / Operations
+
+- 新增 `placement_items` 表迁移脚本。 / Added the `placement_items` table migration script.
+- 新增 DataGrip 检查用 SQL 副本。 / Added a SQL copy for DataGrip review.
+- 新增 `placement` 模块的领域模型、Repository、Service 和 Controller。 / Added domain model, repository, service, and controller for the `placement` module.
+- 新增启动时写入的水平测试种子题。 / Added startup seed data for placement test items.
+- 配置 `/api/placement/**` 需要 `LEARNER` 或 `ADMIN` 权限。 / Configured `/api/placement/**` to require `LEARNER` or `ADMIN`.
+
+### 新增功能 / Added Features
+
+- 支持读取 READY 状态的水平测试样例题。 / Supports reading READY placement sample items.
+- 新增接口 `GET /api/placement/items/sample`。 / Added `GET /api/placement/items/sample`.

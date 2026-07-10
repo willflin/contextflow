@@ -19,21 +19,22 @@ Long-term goals:
 
 ## 当前范围 / Current Scope
 
-当前只包含 Phase 0 基础框架：
+当前已完成到 Phase 3.1 基础题池：
 
-This repository currently contains only the Phase 0 foundation:
+This repository currently includes the Phase 3.1 placement item pool foundation:
 
 - Spring Boot 后端 / Spring Boot backend
 - React + TypeScript + Vite 前端 / React + TypeScript + Vite frontend
 - 后端健康检查接口 / backend health check API
 - 前端健康检查页面 / frontend health check page
+- JWT 登录、注册、角色权限 / JWT login, registration, role-based access
+- MySQL 用户表 / MySQL users table
+- 水平测试 READY 题池 / READY placement item pool
 
 暂未加入：
 
 Not included yet:
 
-- 数据库 / database
-- 登录 / login
 - Redis
 - Docker
 - Kafka
@@ -150,6 +151,31 @@ Learners can register through `/api/auth/register`; the default role is always `
 管理员账号不允许通过前端注册创建。
 
 Admin accounts cannot be created through frontend registration.
+
+## Phase 3.1 水平测试题池 / Phase 3.1 Placement Item Pool
+
+水平测试题保存在 `placement_items` 表。用户只读取 `READY` 状态题目。
+
+Placement test items are stored in the `placement_items` table. Users only receive `READY` items.
+
+```text
+GET /api/placement/items/sample
+```
+
+权限 / Access:
+
+```text
+LEARNER or ADMIN
+```
+
+建表 SQL 保存在：
+
+Schema SQL is kept at:
+
+```text
+backend/src/main/resources/db/migration/V2__create_placement_items.sql
+docs/sql/phase3_placement_schema.sql
+```
 
 ## 开发原则 / Development Principle
 
