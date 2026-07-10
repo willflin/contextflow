@@ -19,9 +19,9 @@ Long-term goals:
 
 ## 当前范围 / Current Scope
 
-当前已完成到 Phase 3.1 基础题池：
+当前已完成到 Phase 3.2 水平测试会话：
 
-This repository currently includes the Phase 3.1 placement item pool foundation:
+This repository currently includes the Phase 3.2 placement session foundation:
 
 - Spring Boot 后端 / Spring Boot backend
 - React + TypeScript + Vite 前端 / React + TypeScript + Vite frontend
@@ -30,6 +30,7 @@ This repository currently includes the Phase 3.1 placement item pool foundation:
 - JWT 登录、注册、角色权限 / JWT login, registration, role-based access
 - MySQL 用户表 / MySQL users table
 - 水平测试 READY 题池 / READY placement item pool
+- 水平测试会话与临时评分 / placement sessions and temporary scoring
 
 暂未加入：
 
@@ -175,6 +176,26 @@ Schema SQL is kept at:
 ```text
 backend/src/main/resources/db/migration/V2__create_placement_items.sql
 docs/sql/phase3_placement_schema.sql
+```
+
+## Phase 3.2 水平测试会话 / Phase 3.2 Placement Session
+
+学习者可以开始一次水平测试、提交答案，并得到临时评分。
+
+Learners can start a placement session, submit answers, and receive a temporary score.
+
+```text
+POST /api/placement/session/start
+POST /api/placement/session/{sessionId}/submit
+```
+
+建表 SQL 保存在：
+
+Schema SQL is kept at:
+
+```text
+backend/src/main/resources/db/migration/V3__create_placement_sessions.sql
+docs/sql/phase3_placement_session_schema.sql
 ```
 
 ## 开发原则 / Development Principle

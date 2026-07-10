@@ -139,3 +139,19 @@
 
 - 支持读取 READY 状态的水平测试样例题。 / Supports reading READY placement sample items.
 - 新增接口 `GET /api/placement/items/sample`。 / Added `GET /api/placement/items/sample`.
+
+## Phase 3.2：水平测试会话 / Placement Session
+
+### 操作 / Operations
+
+- 新增 `placement_sessions` 表。 / Added the `placement_sessions` table.
+- 新增 `placement_session_answers` 表。 / Added the `placement_session_answers` table.
+- 新增 DataGrip 检查用 SQL 副本。 / Added a SQL copy for DataGrip review.
+- 新增开始测试接口。 / Added the start placement session API.
+- 新增提交答案接口。 / Added the submit placement answers API.
+
+### 新增功能 / Added Features
+
+- 支持从 READY 题池创建一次水平测试会话。 / Supports creating a placement session from READY items.
+- 支持保存用户答案并计算正确率。 / Supports saving user answers and calculating accuracy.
+- 支持返回临时 CEFR 等级判断。 / Supports returning a temporary CEFR level estimate.
