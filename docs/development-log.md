@@ -582,3 +582,29 @@
 
 - `git diff --check` 通过，仅有 Windows 换行提示。 / `git diff --check` passed with only Windows line-ending warnings.
 - 常规 Maven 入口仍使用 Java 17，报“不支持发行版本 21”；本机未找到可直接使用的 JDK 21，未继续绕环境。 / The regular Maven entry still uses Java 17 and reports unsupported release 21; no directly usable JDK 21 was found on this machine, so no further environment workaround was attempted.
+
+## Phase 6.1.1：Spring AI 与 DeepSeek 入口 / Spring AI and DeepSeek Entry
+
+### 操作 / Operations
+
+- 将 Spring Boot parent 从 `3.3.5` 升级到 `3.5.0`，以匹配 Spring AI 1.0.x 支持线。 / Upgraded the Spring Boot parent from `3.3.5` to `3.5.0` to match the Spring AI 1.0.x support line.
+- 引入 `spring-ai-bom:1.0.9` 和 `spring-ai-starter-model-deepseek`。 / Added `spring-ai-bom:1.0.9` and `spring-ai-starter-model-deepseek`.
+- 新增 `AgentModelClient` 抽象和 `SpringAiAgentModelClient` 实现。 / Added the `AgentModelClient` abstraction and `SpringAiAgentModelClient` implementation.
+- 新增 `AgentRuntimeService` 和 `contextflow.agent.provider` 开关。 / Added `AgentRuntimeService` and the `contextflow.agent.provider` switch.
+- 新增 DeepSeek 配置：`CONTEXTFLOW_AI_CHAT_MODEL`、`DEEPSEEK_API_KEY`、`DEEPSEEK_BASE_URL`、`DEEPSEEK_MODEL`。 / Added DeepSeek configuration: `CONTEXTFLOW_AI_CHAT_MODEL`, `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL`, and `DEEPSEEK_MODEL`.
+- 新增 admin 运行时状态接口 `GET /api/admin/agent-contract/runtime`。 / Added the admin runtime status endpoint `GET /api/admin/agent-contract/runtime`.
+- 更新 `docs/agent-contract.md` 和 `docs/work-plan.md`。 / Updated `docs/agent-contract.md` and `docs/work-plan.md`.
+
+### 新增功能 / Added Features
+
+- 默认仍为本地规则 Agent，真实模型调用默认关闭。 / The default Agent remains local-rule based, with real model calls disabled by default.
+- 设置 `CONTEXTFLOW_AGENT_PROVIDER=spring-ai` 且 `CONTEXTFLOW_AI_CHAT_MODEL=deepseek` 后，学习对话可通过 Spring AI 调 DeepSeek chat model。 / After setting `CONTEXTFLOW_AGENT_PROVIDER=spring-ai` and `CONTEXTFLOW_AI_CHAT_MODEL=deepseek`, learning dialogue can call a DeepSeek chat model through Spring AI.
+- Spring AI 输出会解析为 `AgentDialogueOutput` 并执行 `agent-dialogue.v1` 契约校验。 / Spring AI output is parsed into `AgentDialogueOutput` and validated against the `agent-dialogue.v1` contract.
+- 模型失败默认回退本地规则，避免阻断当前学习流程。 / Model failures fall back to local rules by default to avoid blocking the current learning flow.
+
+### 验证 / Verification
+
+- 使用 JDK 21 和临时 Maven settings 编译通过：`mvn -q -DskipTests compile`。 / Compiled successfully with JDK 21 and a temporary Maven settings file: `mvn -q -DskipTests compile`.
+- `git diff --check` 通过，仅有 Windows 换行提示。 / `git diff --check` passed with only Windows line-ending warnings.
+- 修复默认配置会在无 API key 时创建 `deepSeekChatModel` 的问题；默认改为 `spring.ai.model.chat=none`，显式设置 `CONTEXTFLOW_AI_CHAT_MODEL=deepseek` 才启用。 / Fixed the issue where default configuration created `deepSeekChatModel` without an API key; default is now `spring.ai.model.chat=none`, and DeepSeek is enabled only by explicitly setting `CONTEXTFLOW_AI_CHAT_MODEL=deepseek`.
+- 使用 JDK 21 和临时 Maven settings 跑通 `mvn -q test`。 / Ran `mvn -q test` successfully with JDK 21 and a temporary Maven settings file.

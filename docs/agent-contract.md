@@ -119,9 +119,45 @@ Phase 6.1 fixes the input/output JSON before real Agent integration. The system 
 - `POST /api/learning/agent-tools/events`：记录 Agent 判定后的学习事件。 / Record an Agent-judged learning event.
 - `POST /api/learning/agent-tools/sense-feedback`：提交缺失词义反馈。 / Submit missing-sense feedback.
 - `GET /api/admin/agent-contract/dialogue/sample`：查看当前对话契约样例。 / View the current dialogue contract sample.
+- `GET /api/admin/agent-contract/runtime`：查看当前 Agent 运行时配置。 / View the current Agent runtime configuration.
+
+## Spring AI / DeepSeek 运行时 / Spring AI / DeepSeek Runtime
+
+当前项目已引入 Spring AI DeepSeek starter，用 DeepSeek API 作为后续真实模型入口。默认仍关闭真实模型调用。
+The project now includes the Spring AI DeepSeek starter and reserves the DeepSeek API as the real model entry point. Real model calls are still disabled by default.
+
+默认配置 / Defaults:
+
+```yaml
+spring:
+  ai:
+    model:
+      chat: none
+    deepseek:
+      api-key: ""
+contextflow:
+  agent:
+    provider: local
+    fallback-to-local-on-error: true
+```
+
+启用 DeepSeek / Enable DeepSeek:
+
+```powershell
+$env:CONTEXTFLOW_AI_CHAT_MODEL="deepseek"
+$env:CONTEXTFLOW_AGENT_PROVIDER="spring-ai"
+$env:DEEPSEEK_API_KEY="<your-key>"
+$env:DEEPSEEK_BASE_URL="https://api.deepseek.com"
+$env:DEEPSEEK_MODEL="deepseek-chat"
+```
+
+- `spring.ai.model.chat=none` 时不会创建 Spring AI DeepSeek ChatModel。 / `spring.ai.model.chat=none` prevents Spring AI from creating a DeepSeek ChatModel.
+- `contextflow.agent.provider=local` 时学习对话继续走本地规则模拟。 / `contextflow.agent.provider=local` keeps learning dialogue on local rule simulation.
+- `contextflow.agent.provider=spring-ai` 且 ChatModel 可用时，才通过 Spring AI 调 DeepSeek。 / Only when `contextflow.agent.provider=spring-ai` and ChatModel is available does the system call DeepSeek through Spring AI.
+- `fallback-to-local-on-error=true` 时模型失败会回退本地规则，避免阻断学习流程。 / With `fallback-to-local-on-error=true`, model failures fall back to local rules to avoid blocking learning.
 
 ## 接入真实词义数据前提 / Before Real Sense Data Import
 
 - 真实数据应优先填充 `learning_units`、`learning_unit_senses`、`learning_unit_forms` 和来源表。 / Real data should first populate `learning_units`, `learning_unit_senses`, `learning_unit_forms`, and source tables.
 - 如果要让学习计划更会选词，还需要补充 `frequencyScore`、`frequencyBand`、`difficultyLevel` 和场景标签。 / Better planning also needs `frequencyScore`, `frequencyBand`, `difficultyLevel`, and scenario tags.
-- 不需要为 Phase 6.1 新增 Redis、Kafka、Docker 或 AI API。 / Phase 6.1 does not require Redis, Kafka, Docker, or an AI API.
+- 当前不需要新增 Redis、Kafka 或 Docker。 / Redis, Kafka, and Docker are still not needed at this stage.

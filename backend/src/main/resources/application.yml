@@ -5,6 +5,17 @@ spring:
   application:
     name: contextflow-backend
 
+  ai:
+    model:
+      chat: ${CONTEXTFLOW_AI_CHAT_MODEL:none}
+    deepseek:
+      api-key: ${DEEPSEEK_API_KEY:}
+      base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
+      chat:
+        options:
+          model: ${DEEPSEEK_MODEL:deepseek-chat}
+          temperature: ${DEEPSEEK_TEMPERATURE:0.2}
+
   datasource:
     url: jdbc:mysql://${CONTEXTFLOW_DB_HOST:localhost}:${CONTEXTFLOW_DB_PORT:3306}/${CONTEXTFLOW_DB_NAME:contextflow}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
     username: ${CONTEXTFLOW_DB_USERNAME:contextflow}
@@ -39,3 +50,6 @@ contextflow:
     priority-refresh-enabled: true
     priority-refresh-initial-delay-ms: 60000
     priority-refresh-fixed-delay-ms: 3600000
+  agent:
+    provider: ${CONTEXTFLOW_AGENT_PROVIDER:local}
+    fallback-to-local-on-error: true

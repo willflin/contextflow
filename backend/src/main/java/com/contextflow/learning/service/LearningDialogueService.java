@@ -1,7 +1,14 @@
 package com.contextflow.learning.service;
 
+import com.contextflow.ai.agent.dto.AgentCorrection;
+import com.contextflow.ai.agent.dto.AgentConversationContext;
+import com.contextflow.ai.agent.dto.AgentDialogueHistoryTurn;
+import com.contextflow.ai.agent.dto.AgentDialogueInput;
 import com.contextflow.ai.agent.dto.AgentDialogueOutput;
+import com.contextflow.ai.agent.dto.AgentLearnerProfileContext;
+import com.contextflow.ai.agent.dto.AgentLearningPackageContext;
 import com.contextflow.ai.agent.service.AgentDialogueContractService;
+import com.contextflow.ai.agent.service.AgentRuntimeService;
 import com.contextflow.learning.domain.LearningDialogueTurnEntity;
 import com.contextflow.learning.domain.LearningPackageEntity;
 import com.contextflow.learning.domain.LearningPackageStatus;
@@ -21,7 +28,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -39,6 +48,7 @@ public class LearningDialogueService {
     private final LearningDialogueTurnRepository learningDialogueTurnRepository;
     private final LearningEventService learningEventService;
     private final AgentDialogueContractService agentDialogueContractService;
+    private final AgentRuntimeService agentRuntimeService;
     private final ObjectMapper objectMapper;
 
     public LearningDialogueService(
@@ -47,6 +57,7 @@ public class LearningDialogueService {
             LearningDialogueTurnRepository learningDialogueTurnRepository,
             LearningEventService learningEventService,
             AgentDialogueContractService agentDialogueContractService,
+            AgentRuntimeService agentRuntimeService,
             ObjectMapper objectMapper
     ) {
         this.userRepository = userRepository;
@@ -54,6 +65,7 @@ public class LearningDialogueService {
         this.learningDialogueTurnRepository = learningDialogueTurnRepository;
         this.learningEventService = learningEventService;
         this.agentDialogueContractService = agentDialogueContractService;
+        this.agentRuntimeService = agentRuntimeService;
         this.objectMapper = objectMapper;
     }
 
@@ -78,13 +90,18 @@ public class LearningDialogueService {
         String mentorFeedback = mentorFeedback(corrections, features);
         String naturalExpression = naturalExpression(scenarioCode);
         Map<String, Object> scoringSignal = scoringSignal(scenarioCode, features, corrections, turnIndex);
-        AgentDialogueOutput agentOutput = agentDialogueContractService.localOutput(
-                roleplayReply,
-                mentorFeedback,
-                corrections,
-                naturalExpression,
-                scoringSignal
+        AgentDialogueInput agentInput = agentInput(user, packageEntity, packageContent, turnIndex, userMessage);
+        AgentDialogueOutput agentOutput = agentRuntimeService.generateDialogue(
+                agentInput,
+                () -> agentDialogueContractService.localOutput(
+                        roleplayReply,
+                        mentorFeedback,
+                        corrections,
+                        naturalExpression,
+                        scoringSignal
+                )
         );
+        List<CorrectionResponse> outputCorrections = correctionResponses(agentOutput.corrections());
 
         LearningDialogueTurnEntity saved = learningDialogueTurnRepository.save(new LearningDialogueTurnEntity(
                 user.getId(),
@@ -93,11 +110,11 @@ public class LearningDialogueService {
                 userMessage,
                 agentOutput.reply(),
                 agentOutput.feedback(),
-                serialize(corrections),
+                serialize(outputCorrections),
                 agentOutput.naturalExpression(),
                 serialize(agentOutput.scoringSignal())
         ));
-        learningEventService.recordDialogueTurnEvents(saved, scenarioCode, corrections, agentOutput.scoringSignal());
+        learningEventService.recordDialogueTurnEvents(saved, scenarioCode, outputCorrections, agentOutput.scoringSignal());
 
         return new LearningDialogueResponse(
                 saved.getId(),
@@ -125,6 +142,75 @@ public class LearningDialogueService {
         } catch (JsonProcessingException exception) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Invalid learning package content.");
         }
+    }
+
+    private AgentDialogueInput agentInput(
+            UserEntity user,
+            LearningPackageEntity packageEntity,
+            JsonNode packageContent,
+            int turnIndex,
+            String userMessage
+    ) {
+        JsonNode scenario = packageContent.path("scenario");
+        JsonNode learnerProfile = packageContent.path("learnerProfile");
+        return new AgentDialogueInput(
+                AgentDialogueContractService.CONTRACT_VERSION,
+                new AgentConversationContext(user.getId(), packageEntity.getId(), turnIndex, "zh-CN", Instant.now()),
+                new AgentLearnerProfileContext(
+                        learnerProfile.path("cefrLevel").asText("UNKNOWN"),
+                        objectMap(learnerProfile.path("dimensionScores")),
+                        stringList(learnerProfile.path("weakScenarios")),
+                        stringList(learnerProfile.path("weakAbilities"))
+                ),
+                new AgentLearningPackageContext(
+                        packageEntity.getId(),
+                        packageEntity.getStatus().name(),
+                        packageEntity.getTitle(),
+                        scenario.path("code").asText("general"),
+                        scenario.path("name").asText("General English"),
+                        packageEntity.getContent()
+                ),
+                List.of(),
+                dialogueHistory(packageEntity.getId()),
+                userMessage,
+                agentDialogueContractService.toolAccess()
+        );
+    }
+
+    private List<AgentDialogueHistoryTurn> dialogueHistory(Long packageId) {
+        return learningDialogueTurnRepository.findTop6ByLearningPackageIdOrderByTurnIndexDesc(packageId)
+                .stream()
+                .sorted(Comparator.comparing(LearningDialogueTurnEntity::getTurnIndex))
+                .map(turn -> new AgentDialogueHistoryTurn(
+                        turn.getId(),
+                        turn.getTurnIndex(),
+                        turn.getUserMessage(),
+                        turn.getRoleplayReply(),
+                        turn.getMentorFeedback(),
+                        turn.getCreatedAt()
+                ))
+                .toList();
+    }
+
+    private Map<String, Object> objectMap(JsonNode node) {
+        if (node == null || !node.isObject()) {
+            return Map.of();
+        }
+        return objectMapper.convertValue(node, new TypeReference<>() {
+        });
+    }
+
+    private List<String> stringList(JsonNode node) {
+        if (node == null || !node.isArray()) {
+            return List.of();
+        }
+        List<String> values = new ArrayList<>();
+        node.forEach(item -> {
+            if (!item.asText("").isBlank()) {
+                values.add(item.asText());
+            }
+        });
+        return values;
     }
 
     private MessageFeatures analyze(String message) {
@@ -248,6 +334,19 @@ public class LearningDialogueService {
         } catch (JsonProcessingException exception) {
             return List.of();
         }
+    }
+
+    private List<CorrectionResponse> correctionResponses(List<AgentCorrection> corrections) {
+        if (corrections == null) {
+            return List.of();
+        }
+        return corrections.stream()
+                .map(correction -> new CorrectionResponse(
+                        correction.original(),
+                        correction.suggestion(),
+                        correction.reason()
+                ))
+                .toList();
     }
 
     private Map<String, Object> deserializeScoringSignal(String scoringSignal) {
