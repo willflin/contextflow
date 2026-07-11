@@ -138,6 +138,8 @@ Phase 5.3 changes `/api/review/plan` to read persisted `review_priority_score`; 
 
 - 固定 Agent 对话输入/输出 JSON 契约。 / Fix the Agent dialogue input/output JSON contract. ✅ Phase 6.1
 - 引入 Spring AI + DeepSeek 运行时入口。 / Add the Spring AI + DeepSeek runtime entry. ✅ Phase 6.1.1
+- 导入 ECDICT 原始词典表。 / Import ECDICT raw dictionary tables. ✅ Phase 6.2 raw
+- 清洗 ECDICT 单词候选表。 / Clean ECDICT word candidate table. ✅ Phase 6.2 clean
 - 添加生成任务。 / Add generation jobs.
 - 添加 Prompt 模板。 / Add prompt templates.
 - 添加结构化 JSON 校验。 / Add structured JSON validation.
@@ -150,6 +152,14 @@ Phase 6.1 fixes `agent-dialogue.v1`: input contains the learner profile, READY p
 Phase 6.1.1 引入 Spring AI DeepSeek starter，并预留真实模型入口；默认 `local`，只有显式配置 `spring-ai` provider 和 API key 后才调用模型，失败可回退本地规则。
 
 Phase 6.1.1 adds the Spring AI DeepSeek starter and reserves a real model entry. The default provider is still `local`; model calls happen only after explicitly enabling the `spring-ai` provider and API key, with local fallback available on failure.
+
+Phase 6.2 raw 新增 ECDICT 原始导入批次表和原始词条表，只保存外部 CSV 原始字段与频率排名，不直接写入业务词义表。
+
+Phase 6.2 raw adds ECDICT raw import batch and entry tables, storing external CSV fields and frequency ranks without writing directly into business sense tables.
+
+Phase 6.2 clean 新增 `ecdict_clean_word_entries`，只保留普通单词形态且有有效频率的候选项，排除短语、数字、连字符、撇号、缩写、专名和词根前后缀，不写入正式学习单元表。
+
+Phase 6.2 clean adds `ecdict_clean_word_entries`, keeping ordinary word candidates with valid frequency and excluding phrases, digits, hyphens, apostrophes, abbreviations, proper names, and affix/root noise without writing into formal learning unit tables.
 
 ## Phase 7：Redis
 

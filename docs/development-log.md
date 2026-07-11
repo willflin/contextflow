@@ -608,3 +608,54 @@
 - `git diff --check` 通过，仅有 Windows 换行提示。 / `git diff --check` passed with only Windows line-ending warnings.
 - 修复默认配置会在无 API key 时创建 `deepSeekChatModel` 的问题；默认改为 `spring.ai.model.chat=none`，显式设置 `CONTEXTFLOW_AI_CHAT_MODEL=deepseek` 才启用。 / Fixed the issue where default configuration created `deepSeekChatModel` without an API key; default is now `spring.ai.model.chat=none`, and DeepSeek is enabled only by explicitly setting `CONTEXTFLOW_AI_CHAT_MODEL=deepseek`.
 - 使用 JDK 21 和临时 Maven settings 跑通 `mvn -q test`。 / Ran `mvn -q test` successfully with JDK 21 and a temporary Maven settings file.
+
+## Phase 6.2 raw：ECDICT 原始导入表 / ECDICT Raw Import Tables
+
+### 操作 / Operations
+
+- 新增 `V13__create_ecdict_raw_import_tables.sql`。 / Added `V13__create_ecdict_raw_import_tables.sql`.
+- 新增 `ecdict_import_batches`，记录 ECDICT 文件来源、许可、导入状态和行数统计。 / Added `ecdict_import_batches` to record ECDICT source, license, import status, and row counts.
+- 新增 `ecdict_import_entries`，原样保存 ECDICT CSV 字段，并保留 `bnc_rank`、`frq_rank` 解析列。 / Added `ecdict_import_entries` to store raw ECDICT CSV fields with parsed `bnc_rank` and `frq_rank`.
+- 新增 `docs/sql/phase6_ecdict_raw_import_schema.sql` 和 `docs/sql/ecdict_raw_import_template.sql`。 / Added `docs/sql/phase6_ecdict_raw_import_schema.sql` and `docs/sql/ecdict_raw_import_template.sql`.
+- 更新 `docs/sql/contextflow_full_schema.sql` 和 `docs/work-plan.md`。 / Updated `docs/sql/contextflow_full_schema.sql` and `docs/work-plan.md`.
+
+### 新增功能 / Added Features
+
+- 支持先把 ECDICT 原始数据落到 staging 表，再由后续任务规范化到 `learning_units` 和 `learning_unit_senses`。 / Supports loading ECDICT raw data into staging tables before later normalization into `learning_units` and `learning_unit_senses`.
+- 不新增 Java CSV 解析依赖；当前导入模板使用 MySQL `LOAD DATA LOCAL INFILE`。 / Added no Java CSV parsing dependency; the current import template uses MySQL `LOAD DATA LOCAL INFILE`.
+- 新增 `tools/EcdictRawImporter.java`，用于在 MySQL 禁用 `local_infile` 时通过 JDBC 批量导入原始 CSV。 / Added `tools/EcdictRawImporter.java` to batch-import raw CSV through JDBC when MySQL disables `local_infile`.
+- 将 `data/*.csv` 加入 `.gitignore`，避免误提交大体积外部词典文件。 / Added `data/*.csv` to `.gitignore` to avoid accidentally committing large external dictionary files.
+
+### 验证 / Verification
+
+- 本次新增 SQL、文档和本地 JDBC 导入工具；未运行完整后端编译。 / This change added SQL, documentation, and a local JDBC importer; full backend compilation was not run.
+- 已下载 ECDICT `ecdict.csv` 到本地忽略目录 `data/`，并导入当前 MySQL 原始表。 / Downloaded ECDICT `ecdict.csv` into the ignored local `data/` directory and imported it into the current MySQL raw tables.
+- 当前成功批次 `batchId=2`：`ecdict_import_entries=770611`，`frq_rank` 非空 42231 行，`bnc_rank` 非空 45443 行。 / Current successful batch `batchId=2`: `ecdict_import_entries=770611`, with 42231 rows containing `frq_rank` and 45443 rows containing `bnc_rank`.
+- MySQL 服务端禁用了 `local_infile` 且当前用户无权开启，因此改用 JDBC 批量导入工具完成真实落库。 / MySQL server disabled `local_infile` and the current user cannot enable it, so the real database load was completed with the JDBC batch importer.
+- Flyway 历史当前仍停在 V12；已将 V13 改为 `CREATE TABLE IF NOT EXISTS`，后续正常启动后端时可补记 V13，不会覆盖已导入数据。 / Flyway history is still at V12; V13 now uses `CREATE TABLE IF NOT EXISTS`, so a later normal backend start can record V13 without overwriting imported data.
+- `git diff --check` 通过，仅有 Windows 换行提示。 / `git diff --check` passed with only Windows line-ending warnings.
+
+## Phase 6.2 clean：ECDICT 清洗单词表 / ECDICT Cleaned Word Table
+
+### 操作 / Operations
+
+- 新增 `V14__create_ecdict_clean_word_entries.sql`。 / Added `V14__create_ecdict_clean_word_entries.sql`.
+- 新增 `ecdict_clean_word_entries`，作为清洗 staging 表，不属于正式学习单元表。 / Added `ecdict_clean_word_entries` as a cleaned staging table, not a formal learning unit table.
+- 新增 `docs/sql/phase6_ecdict_clean_word_entries_schema.sql` 和 `docs/sql/ecdict_clean_word_entries_fill.sql`。 / Added `docs/sql/phase6_ecdict_clean_word_entries_schema.sql` and `docs/sql/ecdict_clean_word_entries_fill.sql`.
+- 更新 `docs/sql/contextflow_full_schema.sql` 和 `docs/work-plan.md`。 / Updated `docs/sql/contextflow_full_schema.sql` and `docs/work-plan.md`.
+
+### 新增功能 / Added Features
+
+- `word-frequency-v2` 清洗规则只保留普通单词形态、必须有有效频率，并排除缩写和专名。 / The `word-frequency-v2` cleaning rule keeps ordinary word-shaped entries with valid frequency and excludes abbreviations and proper names.
+- 清洗表保留 raw 追溯字段、释义、翻译、词性、标签、词形和有效频率排名，不修改 `ecdict_import_entries`。 / The cleaned table keeps raw trace fields, definitions, translations, POS, tags, forms, and valid frequency ranks without modifying `ecdict_import_entries`.
+
+### 验证 / Verification
+
+- 已从 `ecdict_import_entries` 清洗生成 `ecdict_clean_word_entries`。 / Generated `ecdict_clean_word_entries` from `ecdict_import_entries`.
+- 当前原始表仍为 770611 行；清洗表按 `word-frequency-v2` 重建后为 46559 行，且全部有有效频率排名。 / The raw table remains at 770611 rows; the cleaned table was rebuilt with `word-frequency-v2` to 46559 rows, all with valid frequency ranks.
+- `ecdict_clean_word_entries` 中非 `^[A-Za-z]+$` 的行数为 0，且 `aaa`、`aaad` 等缩写/字母串噪声不再进入清洗表。 / `ecdict_clean_word_entries` has 0 rows outside `^[A-Za-z]+$`, and abbreviation/letter-string noise such as `aaa` and `aaad` no longer enters the cleaned table.
+
+### 调整 / Adjustment
+
+- 将 `effective_frequency_rank` 改为 `COALESCE(frq_rank, bnc_rank)`，即优先使用 `frq_rank`，缺失时用 `bnc_rank`。 / Changed `effective_frequency_rank` to `COALESCE(frq_rank, bnc_rank)`, preferring `frq_rank` and falling back to `bnc_rank`.
+- 新增生成列 `frequency_source`，取值为 `FRQ` 或 `BNC`，用于解释当前有效频率来源。 / Added generated column `frequency_source` with `FRQ` or `BNC` to explain the effective frequency source.

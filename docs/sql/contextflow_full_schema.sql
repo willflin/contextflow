@@ -27,6 +27,111 @@ CREATE TABLE `flyway_schema_history` (
   KEY `flyway_schema_history_s_idx` (`success`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `ecdict_clean_word_entries`;
+DROP TABLE IF EXISTS `ecdict_import_entries`;
+DROP TABLE IF EXISTS `ecdict_import_batches`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `ecdict_import_batches` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `source_name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'ECDICT',
+  `source_version` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `source_url` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'https://github.com/skywind3000/ECDICT',
+  `license_name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'MIT',
+  `file_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `file_sha256` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `import_status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'PENDING',
+  `total_rows` int NOT NULL DEFAULT '0',
+  `loaded_rows` int NOT NULL DEFAULT '0',
+  `skipped_rows` int NOT NULL DEFAULT '0',
+  `error_message` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_by_user_id` bigint DEFAULT NULL,
+  `started_at` datetime(6) DEFAULT NULL,
+  `completed_at` datetime(6) DEFAULT NULL,
+  `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  `updated_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (`id`),
+  KEY `idx_ecdict_import_batches_status` (`import_status`,`created_at`),
+  KEY `idx_ecdict_import_batches_user_created` (`created_by_user_id`,`created_at`),
+  CONSTRAINT `fk_ecdict_import_batches_user` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `ck_ecdict_import_batches_counts` CHECK (((`total_rows` >= 0) and (`loaded_rows` >= 0) and (`skipped_rows` >= 0))),
+  CONSTRAINT `ck_ecdict_import_batches_status` CHECK ((`import_status` in (_utf8mb4'PENDING',_utf8mb4'LOADED',_utf8mb4'NORMALIZED',_utf8mb4'FAILED')))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `ecdict_import_entries` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `import_batch_id` bigint NOT NULL,
+  `source_row_number` int DEFAULT NULL,
+  `word` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `normalized_word` varchar(255) COLLATE utf8mb4_unicode_ci GENERATED ALWAYS AS (lower(trim(`word`))) STORED,
+  `phonetic` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `definition_raw` text COLLATE utf8mb4_unicode_ci,
+  `translation_raw` text COLLATE utf8mb4_unicode_ci,
+  `pos_raw` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `collins_raw` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `oxford_raw` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `tag_raw` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `bnc_raw` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `frq_raw` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `bnc_rank` int DEFAULT NULL,
+  `frq_rank` int DEFAULT NULL,
+  `exchange_raw` text COLLATE utf8mb4_unicode_ci,
+  `detail_raw` mediumtext COLLATE utf8mb4_unicode_ci,
+  `audio_raw` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `normalization_status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'RAW',
+  `normalize_error` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `normalized_at` datetime(6) DEFAULT NULL,
+  `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  `updated_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (`id`),
+  KEY `idx_ecdict_import_entries_batch` (`import_batch_id`,`id`),
+  KEY `idx_ecdict_import_entries_normalized_word` (`normalized_word`),
+  KEY `idx_ecdict_import_entries_frq_rank` (`frq_rank`),
+  KEY `idx_ecdict_import_entries_bnc_rank` (`bnc_rank`),
+  KEY `idx_ecdict_import_entries_normalization_status` (`normalization_status`,`updated_at`),
+  CONSTRAINT `fk_ecdict_import_entries_batch` FOREIGN KEY (`import_batch_id`) REFERENCES `ecdict_import_batches` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `ck_ecdict_import_entries_normalization_status` CHECK ((`normalization_status` in (_utf8mb4'RAW',_utf8mb4'NORMALIZED',_utf8mb4'SKIPPED',_utf8mb4'FAILED'))),
+  CONSTRAINT `ck_ecdict_import_entries_ranks` CHECK ((((`bnc_rank` is null) or (`bnc_rank` > 0)) and ((`frq_rank` is null) or (`frq_rank` > 0))))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `ecdict_clean_word_entries` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `raw_entry_id` bigint NOT NULL,
+  `raw_import_batch_id` bigint NOT NULL,
+  `source_row_number` int DEFAULT NULL,
+  `word` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `normalized_word` varchar(255) COLLATE utf8mb4_unicode_ci GENERATED ALWAYS AS (lower(trim(`word`))) STORED,
+  `phonetic` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `definition_raw` text COLLATE utf8mb4_unicode_ci,
+  `translation_raw` text COLLATE utf8mb4_unicode_ci,
+  `pos_raw` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `collins_raw` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `oxford_raw` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `tag_raw` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `bnc_rank` int DEFAULT NULL,
+  `frq_rank` int DEFAULT NULL,
+  `effective_frequency_rank` int GENERATED ALWAYS AS (coalesce(`frq_rank`,`bnc_rank`)) STORED,
+  `frequency_source` varchar(16) COLLATE utf8mb4_unicode_ci GENERATED ALWAYS AS ((case when (`frq_rank` is not null) then _utf8mb4'FRQ' when (`bnc_rank` is not null) then _utf8mb4'BNC' else NULL end)) STORED,
+  `exchange_raw` text COLLATE utf8mb4_unicode_ci,
+  `cleaning_rule_version` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'word-frequency-v2',
+  `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_ecdict_clean_word_entries_raw` (`raw_entry_id`),
+  UNIQUE KEY `uk_ecdict_clean_word_entries_word` (`normalized_word`),
+  KEY `idx_ecdict_clean_word_entries_batch` (`raw_import_batch_id`),
+  KEY `idx_ecdict_clean_word_entries_effective_rank` (`effective_frequency_rank`),
+  KEY `idx_ecdict_clean_word_entries_frequency_source` (`frequency_source`),
+  KEY `idx_ecdict_clean_word_entries_frq_rank` (`frq_rank`),
+  KEY `idx_ecdict_clean_word_entries_bnc_rank` (`bnc_rank`),
+  CONSTRAINT `fk_ecdict_clean_word_entries_batch` FOREIGN KEY (`raw_import_batch_id`) REFERENCES `ecdict_import_batches` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_ecdict_clean_word_entries_raw` FOREIGN KEY (`raw_entry_id`) REFERENCES `ecdict_import_entries` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `ck_ecdict_clean_word_entries_ranks` CHECK (((`bnc_rank` is null) or (`bnc_rank` > 0)) and ((`frq_rank` is null) or (`frq_rank` > 0)))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `learning_data_sources`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;

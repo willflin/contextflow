@@ -16,6 +16,9 @@ dist/
 # Logs
 *.log
 
+# Local data imports
+data/*.csv
+
 # OS
 .DS_Store
 Thumbs.db
