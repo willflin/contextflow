@@ -273,3 +273,178 @@
 
 - 后端 Maven 编译仍无法写入 `backend/target/classes` 或临时 class 输出目录，当前机器存在正在运行的 Java/IDE 进程。 / Backend Maven compilation still cannot write to `backend/target/classes` or a temporary class output directory; Java/IDE processes are currently running on this machine.
   - 解决方案：本次不强制结束进程；网页验证前先重启后端，让 Flyway 执行 V7 迁移。 / Solution: do not force-stop processes in this step; restart the backend before browser verification so Flyway can run the V7 migration.
+
+## Phase 4.3：学习单元级学习事件 / Learning-Unit Learning Events
+
+### 操作 / Operations
+
+- 新增 `learning_units` 表迁移脚本。 / Added the `learning_units` table migration.
+- 新增 `learning_events` 表迁移脚本。 / Added the `learning_events` table migration.
+- 新增 DataGrip 检查用 SQL 副本。 / Added a SQL copy for DataGrip inspection.
+- 新增学习单元 Entity、Repository 和启动种子数据。 / Added learning unit entity, repository, and startup seed data.
+- 新增学习单元种子数据开关 `contextflow.content.seed-demo-units`。 / Added the learning unit seed toggle `contextflow.content.seed-demo-units`.
+- 新增学习事件 Entity、Repository 和事件记录服务。 / Added learning event entity, repository, and event recording service.
+- 在双 Agent 对话保存成功后，同一事务内按学习单元出现次数写入事件。 / After a dual-agent dialogue turn is saved, events are written in the same transaction by learning-unit occurrence count.
+- 修正文档中学习事件定义，明确学习事件不是对话轮次事件。 / Updated documentation to clarify that learning events are not dialogue-turn events.
+- 将 `scoringSignal.relatedLanguageUnits` 修正为 `relatedAbilityTags`，避免把能力标签误当学习单元。 / Renamed `scoringSignal.relatedLanguageUnits` to `relatedAbilityTags` to avoid treating ability tags as learning units.
+- 新增网页版 Codex 交接提示词文档。 / Added a Web Codex handoff prompt document.
+
+### 新增功能 / Added Features
+
+- 学习单元支持 `WORD`、`PHRASE` 和 `SENTENCE_PATTERN`。 / Learning units support `WORD`, `PHRASE`, and `SENTENCE_PATTERN`.
+- 用户输入命中学习单元时记录 `UNIT_ATTEMPTED`。 / Records `UNIT_ATTEMPTED` when learner input matches a learning unit.
+- Roleplay Agent 回复命中学习单元时记录 `UNIT_EXPOSED`。 / Records `UNIT_EXPOSED` when Roleplay Agent output matches a learning unit.
+- Mentor 纠错建议命中学习单元时记录 `UNIT_CORRECTED`。 / Records `UNIT_CORRECTED` when Mentor correction suggestions match a learning unit.
+- Mentor 自然表达建议命中学习单元时记录 `UNIT_RECOMMENDED`。 / Records `UNIT_RECOMMENDED` when Mentor natural-expression suggestions match a learning unit.
+- 同一句话中同一学习单元出现多次时，会写入多条事件。 / Multiple occurrences of the same learning unit in one sentence create multiple event rows.
+
+### 验证 / Verification
+
+- 前端 `npm run typecheck` 通过。 / Frontend `npm run typecheck` passed.
+- `git diff --check` 通过，仅有 Windows 换行提示。 / `git diff --check` passed with only Windows line-ending warnings.
+- 使用 JDK 21 `javac` 直接编译源码时，新增的学习单元和学习事件相关 class 已生成。 / Direct JDK 21 `javac` compilation generated the new learning unit and learning event classes.
+
+### 问题与解决方案 / Issues and Solutions
+
+- 最初容易把学习事件误建模为整轮对话事件，不符合“学习单元每出现一次就是一次事件”的需求。 / Learning events could be incorrectly modeled as whole dialogue-turn events, which does not match the requirement that each learning-unit occurrence is one event.
+  - 解决方案：新增 `learning_units`，并让 `learning_events.learning_unit_id` 指向具体学习单元；对话轮次只作为 `source_type/source_id`。 / Solution: added `learning_units` and made `learning_events.learning_unit_id` point to the specific unit; dialogue turns are only `source_type/source_id`.
+- 后端 Maven 编译第一次使用命令行 JDK 17，无法支持项目的 Java 21；切到 JDK 21 后仍因 `backend/target` 写入被拒绝而无法完成 Maven 编译。 / Backend Maven compilation first used CLI JDK 17, which cannot support Java 21; after switching to JDK 21, Maven still could not finish because writes to `backend/target` were denied.
+  - 解决方案：不强制结束本机 Java/IDE 进程；本次用 JDK 21 `javac` 做源码级验证，完整 Maven 验证需先释放 `backend/target`。 / Solution: did not force-stop local Java/IDE processes; used JDK 21 `javac` for source-level verification this time, and full Maven verification requires releasing `backend/target` first.
+
+## Phase 4.4 + Phase 4.6：语言单元分层模型与查询 / Layered Language Unit Model and Queries
+
+### 操作 / Operations
+
+- 新增 `V9__rebuild_learning_unit_model.sql`，重建语言单元分层表。 / Added `V9__rebuild_learning_unit_model.sql` to rebuild the layered language unit tables.
+- 将 `LearningUnitEntity` 从旧字段模型改为 `canonical_text`、`normalized_text`、`language_code` 模型。 / Changed `LearningUnitEntity` from the old field model to the `canonical_text`, `normalized_text`, and `language_code` model.
+- 新增词义、词形、数据来源、词义来源和用户词义掌握度 Entity。 / Added entities for senses, forms, data sources, sense sources, and user sense-level stats.
+- 新增对应 Repository、只读查询 Service 和 admin 查询 Controller。 / Added repositories, a read-only query service, and an admin query controller.
+- 将 `LearningEventService` 从旧 `match_text` 匹配改为基于 `learning_unit_forms.normalized_form` 匹配。 / Changed `LearningEventService` from old `match_text` matching to `learning_unit_forms.normalized_form` matching.
+- 更新 `docs/sql/phase4_learning_event_schema.sql`，新增完整建表文件 `docs/sql/contextflow_full_schema.sql`。 / Updated `docs/sql/phase4_learning_event_schema.sql` and added the full schema file `docs/sql/contextflow_full_schema.sql`.
+- 新增 `LearningUnitQueryServiceTest` 和 `LearningEventServiceTest`。 / Added `LearningUnitQueryServiceTest` and `LearningEventServiceTest`.
+- 使用 Flyway API 执行 V9，保持 `flyway_schema_history` 正常记录。 / Ran V9 through the Flyway API so `flyway_schema_history` remains consistent.
+- 重新导出完整数据库建表 SQL。 / Re-exported the full database schema SQL.
+
+### 新增功能 / Added Features
+
+- 支持 `go/goes/went/gone/going -> go` 的词形归一查询。 / Supports form normalization such as `go/goes/went/gone/going -> go`.
+- 支持 `better/best -> good` 的词形归一查询。 / Supports form normalization such as `better/best -> good`.
+- `bank` 支持多个词义：金融机构和河岸。 / `bank` supports multiple senses: financial institution and river side.
+- 新增 admin 只读接口：`GET /api/admin/learning-units/search`、`GET /api/admin/learning-units/{id}`、`GET /api/admin/learning-units/{id}/senses`。 / Added admin-only read APIs: `GET /api/admin/learning-units/search`, `GET /api/admin/learning-units/{id}`, and `GET /api/admin/learning-units/{id}/senses`.
+- `LearningEventService` 支持可选 `learningUnitSenseId`，并校验 sense 必须属于同一个 unit。 / `LearningEventService` supports an optional `learningUnitSenseId` and validates that the sense belongs to the same unit.
+
+### 问题与解决方案 / Issues and Solutions
+
+- 数据库已被手工调整到新版分层结构，但代码、Seeder 和 SQL 文档仍停留在旧模型。 / The database had been manually adjusted to the new layered structure, while code, seeders, and SQL docs still used the old model.
+  - 解决方案：当前语言单元相关表为空，因此新增 V9 迁移重建语言单元相关表，并同步修正代码和 SQL 文档。 / Solution: because the current language-unit tables are empty, added the V9 migration to rebuild language-unit tables and synchronized code and SQL docs.
+- `learning_events.learning_unit_sense_id` 只外键到 sense，不能保证 sense 属于同一个 unit。 / `learning_events.learning_unit_sense_id` only referenced the sense and did not ensure that the sense belongs to the same unit.
+  - 解决方案：新增 `(learning_unit_id, learning_unit_sense_id)` 复合外键约束。 / Solution: added a composite foreign key on `(learning_unit_id, learning_unit_sense_id)`.
+
+### 验证 / Verification
+
+- `git diff --check` 通过，仅有 Windows 换行提示。 / `git diff --check` passed with only Windows line-ending warnings.
+- JDK 21 `javac` 未输出语法错误，但本机仍出现“无法关闭编译器资源”的退出期错误。 / JDK 21 `javac` produced no syntax errors, but this machine still reported a compiler resource closing error at exit.
+- 新增后端类和测试类已由 JDK 21 `javac` 生成 class 文件。 / The new backend classes and test classes were generated as class files by JDK 21 `javac`.
+- 前端 `npm run typecheck` 通过。 / Frontend `npm run typecheck` passed.
+- 数据库 `flyway_schema_history` 已记录 V9 成功。 / Database `flyway_schema_history` recorded V9 as successful.
+- 当前种子数据包含 4 个 unit、5 个 sense、12 个 form 和 1 个 data source。 / Current seed data contains 4 units, 5 senses, 12 forms, and 1 data source.
+- Maven 编译仍被 `backend/target/classes/application.yml` 写入权限阻断。 / Maven compilation is still blocked by denied writes to `backend/target/classes/application.yml`.
+- Maven Flyway 插件无法使用：全局 Maven 仓库无写权限，项目内 `.m2` 又缺少 Flyway Maven 插件解析信息；本次改用项目依赖中的 Flyway API。 / The Maven Flyway plugin could not be used: the global Maven repository is not writable, and the project `.m2` lacks Flyway Maven plugin resolution metadata; this step used the Flyway API from project dependencies instead.
+
+## Phase 4.7：验收修复与开发轨道复位 / Acceptance Fixes and Development Track Reset
+
+### 操作 / Operations
+
+- 重新检查数据库迁移状态、语言单元种子数据、前端类型检查和后端测试。 / Rechecked database migration state, language-unit seed data, frontend typecheck, and backend tests.
+- 修复 `HealthControllerTest` 的 MVC 切片测试依赖缺口。 / Fixed the missing dependency in the `HealthControllerTest` MVC slice test.
+- 使用 JDK 21 临时编译目录完成后端源码和测试源码编译。 / Compiled backend main and test sources with JDK 21 into a temporary output directory.
+- 使用 JUnit Platform Launcher 执行完整后端测试集。 / Ran the full backend test suite through the JUnit Platform Launcher.
+
+### 新功能 / Added Features
+
+- 本阶段无新业务功能；只修复验收阻断问题。 / No new business feature in this phase; only acceptance blockers were fixed.
+
+### 问题与解决方案 / Issues and Solutions
+
+- `HealthControllerTest` 使用 `@WebMvcTest` 时仍会创建安全过滤器依赖，缺少 `JwtTokenService` 导致 Spring 测试上下文启动失败。 / `HealthControllerTest` still creates security-filter dependencies under `@WebMvcTest`; the missing `JwtTokenService` caused the Spring test context to fail.
+  - 解决方案：在该测试中添加 `JwtTokenService` mock，保持健康检查测试不启用过滤器。 / Solution: added a `JwtTokenService` mock while keeping filters disabled for the health endpoint test.
+- 常规 Maven 测试入口先后遇到 `无法关闭编译器资源` 和项目内 Maven 缓存损坏问题。 / The regular Maven test entrypoint first hit `unable to close compiler resource`, then a corrupted project-local Maven cache.
+  - 解决方案：在 `pom.xml` 中启用 fork 编译，并清理后重拉损坏的 `spring-boot-starter-jdbc` / `HikariCP` 缓存。 / Solution: enabled forked compilation in `pom.xml`, then cleared and re-fetched the corrupted `spring-boot-starter-jdbc` / `HikariCP` cache.
+
+### 验证 / Verification
+
+- 数据库 `flyway_schema_history` 显示 V1-V9 均成功。 / Database `flyway_schema_history` shows V1-V9 all successful.
+- 当前种子数据：4 个 `learning_units`、5 个 `learning_unit_senses`、12 个 `learning_unit_forms`、0 个 `learning_events`。 / Current seed data: 4 `learning_units`, 5 `learning_unit_senses`, 12 `learning_unit_forms`, and 0 `learning_events`.
+- 前端 `npm run typecheck` 通过。 / Frontend `npm run typecheck` passed.
+- 后端临时 JDK 21 编译通过。 / Backend temporary JDK 21 compilation passed.
+- 后端 JUnit Launcher 测试 16/16 通过。 / Backend JUnit Launcher tests passed: 16/16.
+- 后端 Maven 测试在清理损坏缓存后曾通过一次；当前机器仍需关注编译器资源关闭问题。 / Backend Maven tests passed once after clearing corrupted cache; this machine still needs attention for the compiler resource closing issue.
+
+## Phase 4.8：对话事件真实落库验收 / Dialogue Event Persistence Acceptance
+
+### 操作 / Operations
+
+- 新增双 Agent 对话到 `learning_events` 的后端集成测试。 / Added a backend integration test from dual-agent dialogue to `learning_events`.
+- 为 `LearningEventEntity` 补充只读 getter，便于测试和后续统计读取。 / Added read-only getters to `LearningEventEntity` for testing and future stats reads.
+- 为 `LearningEventRepository` 新增按 `source_type/source_id` 查询事件的方法。 / Added a repository method to query events by `source_type/source_id`.
+
+### 新功能 / Added Features
+
+- 验证真实 `LearningDialogueService.reply(...)` 调用后，会根据语言单元出现写入事件。 / Verified that a real `LearningDialogueService.reply(...)` call writes events by language-unit occurrence.
+- 验证 `bank account` 对话会产生 `UNIT_ATTEMPTED` 和 `UNIT_RECOMMENDED` 两类事件。 / Verified that a `bank account` dialogue creates `UNIT_ATTEMPTED` and `UNIT_RECOMMENDED` events.
+
+### 问题与解决方案 / Issues and Solutions
+
+- 测试最初使用了错误的响应字段 `id()`。 / The test initially used the wrong response field `id()`.
+  - 解决方案：改为 `turnId()`，与 `LearningDialogueResponse` 保持一致。 / Solution: changed it to `turnId()` to match `LearningDialogueResponse`.
+- Maven 常规入口在当前机器仍偶发 `无法关闭编译器资源`，但独立 JDK 21 编译和 JUnit Launcher 可以稳定验证代码。 / The regular Maven entrypoint still intermittently reports `unable to close compiler resource` on this machine, while standalone JDK 21 compilation and JUnit Launcher validate the code reliably.
+  - 解决方案：本阶段不保留无效 Maven 配置改动，继续记录该环境问题。 / Solution: did not keep ineffective Maven configuration changes and kept the environment issue documented.
+
+### 验证 / Verification
+
+- 后端 JDK 21 临时编译通过。 / Backend temporary JDK 21 compilation passed.
+- 后端 JUnit Launcher 测试 17/17 通过。 / Backend JUnit Launcher tests passed: 17/17.
+- 测试使用事务回滚，验收后 `learning_events` 仍为 0，不污染当前数据。 / The test rolls back its transaction; `learning_events` remains 0 after acceptance and does not pollute current data.
+- 数据库 `flyway_schema_history` 最新版本为 V9 且全部成功。 / Database `flyway_schema_history` latest version is V9 and all migrations are successful.
+
+## Phase 4.9 准备：新对话交接提示词 / Phase 4.9 Preparation: New Handoff Prompt
+
+### 操作 / Operations
+
+- 新增 `docs/web-codex-handoff-prompt-v2.md`。 / Added `docs/web-codex-handoff-prompt-v2.md`.
+- 将协作重点调整为业务开发优先、手动测试为主、自动化测试从轻。 / Adjusted collaboration focus toward business development, manual testing first, and lighter automated testing.
+
+### 新功能 / Added Features
+
+- 无业务功能变更；本次仅补充新对话交接文档。 / No business feature change; this update only adds a new handoff document.
+
+### 问题与解决方案 / Issues and Solutions
+
+- 旧交接提示词已落后于当前语言单元、学习事件和 Agent 接入前准备状态。 / The old handoff prompt was behind the current language-unit, learning-event, and pre-Agent integration state.
+  - 解决方案：新增 V2 提示词，明确当前完成项、约束、待办阶段和测试策略。 / Solution: added a V2 prompt with current completion status, constraints, next phases, and testing strategy.
+
+## Phase 4.9：语言单元匹配增强 / Language Unit Matching Enhancement
+
+### 操作 / Operations
+
+- 增强 `LearningEventService` 的本地匹配逻辑。 / Improved local matching in `LearningEventService`.
+- 匹配从简单字符串包含改为规范化 token 序列匹配。 / Changed matching from simple string containment to normalized token sequence matching.
+- 按 word-first 策略移除短语和句型种子数据，仅保留单词语言单元。 / Removed phrase and sentence-pattern seed data under the word-first strategy, keeping only word units for now.
+- 更新 `docs/work-plan.md`。 / Updated `docs/work-plan.md`.
+
+### 新增功能 / Added Features
+
+- 表结构继续保留 WORD / PHRASE / SENTENCE_PATTERN，但当前事件记录只启用 WORD。 / The schema still reserves WORD / PHRASE / SENTENCE_PATTERN, but current event recording only enables WORD.
+- 支持单词标点、大小写和词边界归一。 / Normalizes punctuation, case, and word boundaries for word units.
+- 避免明显词边界误匹配，例如 `goodbye` 不会命中 `good`。 / Avoids obvious word-boundary false positives, such as matching `good` inside `goodbye`.
+- 同一 learning unit 的重叠命中只保留更长匹配，减少明显重复事件。 / Keeps the longer match for overlapping hits within the same learning unit to reduce obvious duplicate events.
+- 事件 payload 保留 `occurrenceIndex`，并新增 token 范围字段，为后续位置追踪预留空间。 / Event payload keeps `occurrenceIndex` and adds token-range fields for later position tracking.
+
+### 问题与解决方案 / Issues and Solutions
+
+- 原匹配方式依赖空格包裹字符串，单词边界和标点处理较弱。 / The previous matcher relied on space-wrapped strings and was weak for word boundaries and punctuation.
+  - 解决方案：先只对 WORD 启用 token 匹配；短语和句型留到单词与词义闭环稳定后再启用。 / Solution: enable token matching for WORD only for now; phrases and sentence patterns will wait until the word and sense loop is stable.
+
+### 验证 / Verification
+
+- 增加轻量单元测试覆盖多次出现、词边界误匹配，以及非 WORD 单元暂不写事件。 / Added lightweight unit coverage for repeated occurrences, word-boundary false positives, and ignoring non-WORD units for now.

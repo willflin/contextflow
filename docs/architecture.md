@@ -61,6 +61,28 @@ Generates new-context review packages based on weak language units and `next_rev
 
 The first implementation should use one structured AI response instead of two model calls.
 
+## 学习单元与学习事件 / Learning Units and Learning Events
+
+学习单元是掌握度统计的入口对象，包括单词、词组和句型。
+
+Learning units are the entry objects for mastery tracking, including words, phrases, and sentence patterns.
+
+`learning_units` 只保存语言单元本体；`learning_unit_senses` 保存具体词义或用法；`learning_unit_forms` 保存词形，用于 `went -> go`、`better -> good` 这类匹配。
+
+`learning_units` stores only the language unit identity; `learning_unit_senses` stores concrete senses or usages; `learning_unit_forms` stores surface forms for matching cases such as `went -> go` and `better -> good`.
+
+学习事件不是一次对话轮次，而是某个学习单元在学习上下文中出现一次的记录。事件必须关联 `learning_unit_id`，能可靠确认具体词义时才填 `learning_unit_sense_id`。
+
+A learning event is not a dialogue turn. It records one occurrence of one learning unit in a learning context. Events must reference `learning_unit_id`; `learning_unit_sense_id` is filled only when the concrete sense can be reliably identified.
+
+第一版先用结构化学习单元表做匹配；RAG 和向量库等检索增强在数据规模证明必要后再加入。
+
+The first version uses structured learning-unit matching. RAG and vector search are added only after data volume justifies them.
+
+当前不做 AI 词义消歧、不做大词库导入、不自动更新词义掌握度统计。
+
+The current phase does not implement AI sense disambiguation, large vocabulary import, or automatic sense-level mastery updates.
+
 ## 后端模块 / Backend Modules
 
 ```text

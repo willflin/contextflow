@@ -19,9 +19,9 @@ Long-term goals:
 
 ## 当前范围 / Current Scope
 
-当前已完成到 Phase 4.2 双 Agent 对话骨架：
+当前已完成到 Phase 4.3 学习单元级事件基础：
 
-This repository currently includes the Phase 4.2 dual-agent dialogue foundation:
+This repository currently includes the Phase 4.3 learning-unit event foundation:
 
 - Spring Boot 后端 / Spring Boot backend
 - React + TypeScript + Vite 前端 / React + TypeScript + Vite frontend
@@ -40,6 +40,8 @@ This repository currently includes the Phase 4.2 dual-agent dialogue foundation:
 - 双 Agent 对话接口骨架 / dual-agent dialogue API foundation
 - 学习者网页双 Agent 对话界面 / learner web dual-agent dialogue UI
 - 对话轮次持久化 / dialogue turn persistence
+- 学习单元基础表 / learning unit foundation
+- 学习单元级事件落库 / learning-unit occurrence event persistence
 
 暂未加入：
 
@@ -330,6 +332,32 @@ Schema SQL is kept at:
 ```text
 backend/src/main/resources/db/migration/V7__create_learning_dialogue_turns.sql
 docs/sql/phase4_dual_agent_dialogue_schema.sql
+```
+
+## Phase 4.3 学习单元级事件 / Phase 4.3 Learning-Unit Events
+
+学习事件基于学习单元，而不是基于整轮对话。学习单元包括单词、词组和句型；用户输入或 Agent 输出中，每出现一次学习单元，就写入一条事件。
+
+Learning events are based on learning units, not whole dialogue turns. Learning units include words, phrases, and sentence patterns; every occurrence in learner input or Agent output creates one event row.
+
+当前双 Agent 对话会记录：
+
+The current dual-agent dialogue records:
+
+```text
+UNIT_ATTEMPTED     用户输入中出现 / appears in learner input
+UNIT_EXPOSED       Roleplay Agent 回复中出现 / appears in Roleplay Agent output
+UNIT_CORRECTED     Mentor 纠错建议中出现 / appears in Mentor correction suggestions
+UNIT_RECOMMENDED   Mentor 自然表达建议中出现 / appears in Mentor natural-expression suggestions
+```
+
+建表 SQL 保存位置：
+
+Schema SQL is kept at:
+
+```text
+backend/src/main/resources/db/migration/V8__create_learning_units_and_events.sql
+docs/sql/phase4_learning_event_schema.sql
 ```
 
 ## 前端调试入口 / Frontend Debug Entry

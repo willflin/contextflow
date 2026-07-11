@@ -33,3 +33,5 @@ contextflow:
     seed-demo-items: true
   scenario:
     seed-demo-templates: true
+  content:
+    seed-demo-units: true

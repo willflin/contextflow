@@ -35,17 +35,20 @@ public class LearningDialogueService {
     private final UserRepository userRepository;
     private final LearningPackageRepository learningPackageRepository;
     private final LearningDialogueTurnRepository learningDialogueTurnRepository;
+    private final LearningEventService learningEventService;
     private final ObjectMapper objectMapper;
 
     public LearningDialogueService(
             UserRepository userRepository,
             LearningPackageRepository learningPackageRepository,
             LearningDialogueTurnRepository learningDialogueTurnRepository,
+            LearningEventService learningEventService,
             ObjectMapper objectMapper
     ) {
         this.userRepository = userRepository;
         this.learningPackageRepository = learningPackageRepository;
         this.learningDialogueTurnRepository = learningDialogueTurnRepository;
+        this.learningEventService = learningEventService;
         this.objectMapper = objectMapper;
     }
 
@@ -82,6 +85,7 @@ public class LearningDialogueService {
                 naturalExpression,
                 serialize(scoringSignal)
         ));
+        learningEventService.recordDialogueTurnEvents(saved, scenarioCode, corrections, scoringSignal);
 
         return new LearningDialogueResponse(
                 saved.getId(),
@@ -214,7 +218,7 @@ public class LearningDialogueService {
                 "naturalnessScore", naturalnessScore,
                 "politenessDetected", features.polite(),
                 "needsReview", !corrections.isEmpty(),
-                "relatedLanguageUnits", List.of("polite_request", "complete_sentence")
+                "relatedAbilityTags", List.of("polite_request", "complete_sentence")
         );
     }
 

@@ -86,6 +86,10 @@ public class LearningDialogueTurnEntity {
         return learningPackageId;
     }
 
+    public Long getUserId() {
+        return userId;
+    }
+
     public Integer getTurnIndex() {
         return turnIndex;
     }

@@ -71,7 +71,10 @@ Phase 3.3.1 adds the web entry: learners use the normal flow, admins see debug t
 - 添加场景模板。 / Add scenario templates. ✅ Phase 4.1
 - 添加学习包。 / Add learning packages. ✅ Phase 4.1
 - 添加双 Agent 响应结构。 / Add dual-agent response structure. ✅ Phase 4.2
-- 记录学习事件。 / Record learning events.
+- 记录学习单元级学习事件。 / Record learning-unit learning events. ✅ Phase 4.3
+- 落地语言单元分层模型。 / Implement the layered language unit model. ✅ Phase 4.4
+- 增加基础语言单元只读查询。 / Add basic read-only language unit queries. ✅ Phase 4.6
+- 增强单词语言单元匹配：标点、大小写、词边界与同一 unit 重叠去重；短语和句型暂不启用。 / Improve word-unit matching for punctuation, case, word boundaries, and same-unit overlap deduplication; phrases and sentence patterns are not enabled yet. ✅ Phase 4.9
 
 Phase 4.1 先建立场景模板、READY 学习包和学习者网页入口，内容暂时用种子模板模拟未来 AI 预生成结果。
 
@@ -80,6 +83,22 @@ Phase 4.1 first adds scenario templates, READY learning packages, and the learne
 Phase 4.2 已把当前静态学习包展示替换为双 Agent 对话界面：Roleplay Agent 负责沉浸式英文场景对话，Mentor Agent 负责实时纠错、解释和更自然表达建议。当前使用本地规则模拟，后续替换为真实 AI 调用。
 
 Phase 4.2 replaced the current static learning package view with a dual-agent dialogue UI: the Roleplay Agent handles immersive English roleplay, and the Mentor Agent gives live corrections, explanations, and more natural expression suggestions. It currently uses local rules and will later be replaced by real AI calls.
+
+Phase 4.3 明确学习事件基于学习单元，而不是基于整轮对话。模型预留单词、词组和句型；当前业务先只启用单词，每出现一次单词语言单元，就写入一条 learning_events。
+
+Phase 4.3 defines learning events as learning-unit occurrences, not whole dialogue turns. The model reserves words, phrases, and sentence patterns; current business only enables word units, and every word-unit occurrence in learner input or Agent output creates one learning_events row.
+
+Phase 4.4 将语言单元拆为本体、词义、词形和来源：`learning_units`、`learning_unit_senses`、`learning_unit_forms`、`learning_data_sources`、`learning_unit_sense_sources`。用户词义掌握度表已建结构，但暂不实现掌握度算法。
+
+Phase 4.4 splits language units into identity, senses, forms, and sources: `learning_units`, `learning_unit_senses`, `learning_unit_forms`, `learning_data_sources`, and `learning_unit_sense_sources`. The user sense-level mastery table exists structurally, but the mastery algorithm is not implemented yet.
+
+Phase 4.6 增加 admin 只读查询接口，用于按标准文本或词形查询语言单元详情和词义。
+
+Phase 4.6 adds admin-only read APIs for querying language unit details and senses by canonical text or surface form.
+
+Phase 4.9 调整为 word-first：表结构仍保留 WORD / PHRASE / SENTENCE_PATTERN 扩展位，但当前事件记录只启用 WORD。单词按规范化 token 匹配，支持标点和大小写归一，避免 `goodbye` 误命中 `good`，并为每条事件 payload 保留 `occurrenceIndex` 与 token 范围。
+
+Phase 4.9 is now word-first: the schema still reserves WORD / PHRASE / SENTENCE_PATTERN, but current event recording only enables WORD. Words are matched by normalized tokens, punctuation and case are normalized, false matches such as `good` inside `goodbye` are avoided, and each event payload keeps `occurrenceIndex` plus token range.
 
 ## Phase 5：复习系统 / Review
 
