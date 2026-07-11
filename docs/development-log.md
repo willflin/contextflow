@@ -560,3 +560,25 @@
 - 前端 `npm run typecheck` 通过。 / Frontend `npm run typecheck` passed.
 - `git diff --check` 通过，仅有 Windows 换行提示。 / `git diff --check` passed with only Windows line-ending warnings.
 - JDK 21 临时 `javac` 未输出业务代码语法错误，但本机仍返回已知“无法关闭编译器资源”。 / Temporary JDK 21 `javac` produced no business-code syntax errors, but this machine still returns the known compiler-resource closing error.
+
+## Phase 6.1：Agent 对话契约 / Agent Dialogue Contract
+
+### 操作 / Operations
+
+- 新增 `agent-dialogue.v1` 对话输入/输出 DTO。 / Added `agent-dialogue.v1` dialogue input/output DTOs.
+- 新增 `AgentDialogueContractService`，用于生成本地模拟输出并校验真实 Agent 输出结构。 / Added `AgentDialogueContractService` to produce local mock output and validate real Agent output shape.
+- 新增 admin 示例接口 `GET /api/admin/agent-contract/dialogue/sample`。 / Added the admin sample endpoint `GET /api/admin/agent-contract/dialogue/sample`.
+- 将当前 `LearningDialogueService` 的本地规则输出包进统一 Agent 契约，再保存对话轮次与学习事件。 / Wrapped the current local-rule output in the unified Agent contract before saving dialogue turns and learning events.
+- 新增 `docs/agent-contract.md`，说明输入、输出、`unitMentions`、事件方向和 Agent 工具接口。 / Added `docs/agent-contract.md` documenting input, output, `unitMentions`, event directions, and Agent tools.
+- 更新 `docs/work-plan.md`。 / Updated `docs/work-plan.md`.
+
+### 新增功能 / Added Features
+
+- 固定真实 Agent 输出字段：`reply`、`feedback`、`corrections`、`naturalExpression`、`unitMentions`、`scoringSignal`。 / Fixed real Agent output fields: `reply`, `feedback`, `corrections`, `naturalExpression`, `unitMentions`, and `scoringSignal`.
+- `unitMentions` 要求可记录事件必须携带 `learningUnitId` 和 `learningUnitSenseId`，继续保持词义级掌握度。 / `unitMentions` requires recordable events to carry `learningUnitId` and `learningUnitSenseId`, preserving sense-level mastery.
+- 契约明确用户输出、用户输入、拼写/变形错误、乱输入、缺失词义反馈的处理边界。 / The contract clarifies handling boundaries for learner output, learner input, spelling/form errors, nonsense input, and missing-sense feedback.
+
+### 验证 / Verification
+
+- `git diff --check` 通过，仅有 Windows 换行提示。 / `git diff --check` passed with only Windows line-ending warnings.
+- 常规 Maven 入口仍使用 Java 17，报“不支持发行版本 21”；本机未找到可直接使用的 JDK 21，未继续绕环境。 / The regular Maven entry still uses Java 17 and reports unsupported release 21; no directly usable JDK 21 was found on this machine, so no further environment workaround was attempted.

@@ -136,10 +136,15 @@ Phase 5.3 changes `/api/review/plan` to read persisted `review_priority_score`; 
 
 ## Phase 6：AI 预生成 / AI Pre-generation
 
+- 固定 Agent 对话输入/输出 JSON 契约。 / Fix the Agent dialogue input/output JSON contract. ✅ Phase 6.1
 - 添加生成任务。 / Add generation jobs.
 - 添加 Prompt 模板。 / Add prompt templates.
 - 添加结构化 JSON 校验。 / Add structured JSON validation.
 - 添加 AI 使用日志。 / Add AI usage logs.
+
+Phase 6.1 固定 `agent-dialogue.v1`：输入包含用户画像、READY 学习包、目标词义、历史对话和 Agent 工具入口；输出包含 `reply`、`feedback`、`corrections`、`naturalExpression`、`unitMentions` 和 `scoringSignal`。当前仍使用本地规则模拟，不接真实 AI。
+
+Phase 6.1 fixes `agent-dialogue.v1`: input contains the learner profile, READY package, target senses, dialogue history, and Agent tool access; output contains `reply`, `feedback`, `corrections`, `naturalExpression`, `unitMentions`, and `scoringSignal`. The current implementation still uses local rules and does not call a real AI service.
 
 ## Phase 7：Redis
 

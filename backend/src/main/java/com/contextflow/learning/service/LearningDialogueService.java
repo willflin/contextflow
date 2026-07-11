@@ -1,5 +1,7 @@
 package com.contextflow.learning.service;
 
+import com.contextflow.ai.agent.dto.AgentDialogueOutput;
+import com.contextflow.ai.agent.service.AgentDialogueContractService;
 import com.contextflow.learning.domain.LearningDialogueTurnEntity;
 import com.contextflow.learning.domain.LearningPackageEntity;
 import com.contextflow.learning.domain.LearningPackageStatus;
@@ -36,6 +38,7 @@ public class LearningDialogueService {
     private final LearningPackageRepository learningPackageRepository;
     private final LearningDialogueTurnRepository learningDialogueTurnRepository;
     private final LearningEventService learningEventService;
+    private final AgentDialogueContractService agentDialogueContractService;
     private final ObjectMapper objectMapper;
 
     public LearningDialogueService(
@@ -43,12 +46,14 @@ public class LearningDialogueService {
             LearningPackageRepository learningPackageRepository,
             LearningDialogueTurnRepository learningDialogueTurnRepository,
             LearningEventService learningEventService,
+            AgentDialogueContractService agentDialogueContractService,
             ObjectMapper objectMapper
     ) {
         this.userRepository = userRepository;
         this.learningPackageRepository = learningPackageRepository;
         this.learningDialogueTurnRepository = learningDialogueTurnRepository;
         this.learningEventService = learningEventService;
+        this.agentDialogueContractService = agentDialogueContractService;
         this.objectMapper = objectMapper;
     }
 
@@ -73,19 +78,26 @@ public class LearningDialogueService {
         String mentorFeedback = mentorFeedback(corrections, features);
         String naturalExpression = naturalExpression(scenarioCode);
         Map<String, Object> scoringSignal = scoringSignal(scenarioCode, features, corrections, turnIndex);
+        AgentDialogueOutput agentOutput = agentDialogueContractService.localOutput(
+                roleplayReply,
+                mentorFeedback,
+                corrections,
+                naturalExpression,
+                scoringSignal
+        );
 
         LearningDialogueTurnEntity saved = learningDialogueTurnRepository.save(new LearningDialogueTurnEntity(
                 user.getId(),
                 packageId,
                 turnIndex,
                 userMessage,
-                roleplayReply,
-                mentorFeedback,
+                agentOutput.reply(),
+                agentOutput.feedback(),
                 serialize(corrections),
-                naturalExpression,
-                serialize(scoringSignal)
+                agentOutput.naturalExpression(),
+                serialize(agentOutput.scoringSignal())
         ));
-        learningEventService.recordDialogueTurnEvents(saved, scenarioCode, corrections, scoringSignal);
+        learningEventService.recordDialogueTurnEvents(saved, scenarioCode, corrections, agentOutput.scoringSignal());
 
         return new LearningDialogueResponse(
                 saved.getId(),
