@@ -448,3 +448,48 @@
 ### 验证 / Verification
 
 - 增加轻量单元测试覆盖多次出现、词边界误匹配，以及非 WORD 单元暂不写事件。 / Added lightweight unit coverage for repeated occurrences, word-boundary false positives, and ignoring non-WORD units for now.
+
+## Phase 4.9.1：Word-first 数据清理脚本 / Word-first Data Cleanup Script
+
+### 操作 / Operations
+
+- 新增 `docs/sql/phase4_word_first_cleanup.sql`。 / Added `docs/sql/phase4_word_first_cleanup.sql`.
+
+### 新增功能 / Added Features
+
+- 提供手动清理旧版 PHRASE / SENTENCE_PATTERN 语言单元数据的 SQL。 / Provides manual SQL to clean legacy PHRASE / SENTENCE_PATTERN language-unit data.
+- 脚本包含预览查询、事务删除和执行后检查。 / The script includes preview queries, transactional deletes, and post-check queries.
+
+### 问题与解决方案 / Issues and Solutions
+
+- 当前业务已收缩为 word-first，但本地数据库可能已种入旧版短语和句型数据。 / The current business scope is word-first, but the local database may already contain old phrase and sentence-pattern data.
+  - 解决方案：只清理非 WORD 语言单元及其关联事件，保留表结构和未来扩展位。 / Solution: clean only non-WORD units and their related events, while keeping the schema and future extension points.
+
+## Phase 5.1：词义级掌握度最小更新 / Minimal Sense-level Mastery Update
+
+### 操作 / Operations
+
+- 新增 `V10__add_event_direction_and_sense_feedback.sql`。 / Added `V10__add_event_direction_and_sense_feedback.sql`.
+- 为 `learning_events` 新增 `event_direction`，区分 `LEARNER_OUTPUT` 和 `LEARNER_INPUT`。 / Added `event_direction` to `learning_events` to distinguish `LEARNER_OUTPUT` and `LEARNER_INPUT`.
+- 新增 `learning_unit_sense_feedback`，用于记录 Agent 判断数据库缺失词义的反馈。 / Added `learning_unit_sense_feedback` for Agent feedback when a sense is missing from the database.
+- 新增 Agent 工具接口：`GET /api/learning/agent-tools/word-senses`、`POST /api/learning/agent-tools/events`、`POST /api/learning/agent-tools/sense-feedback`。 / Added Agent tool APIs: `GET /api/learning/agent-tools/word-senses`, `POST /api/learning/agent-tools/events`, and `POST /api/learning/agent-tools/sense-feedback`.
+- 新增 `LearningUnitSenseMasteryService`，把明确归属到 sense 的事件更新到 `user_learning_unit_sense_stats`。 / Added `LearningUnitSenseMasteryService` to update `user_learning_unit_sense_stats` from events with explicit senses.
+- 更新 `docs/sql/phase5_sense_mastery_schema.sql` 和 `docs/sql/contextflow_full_schema.sql`。 / Updated `docs/sql/phase5_sense_mastery_schema.sql` and `docs/sql/contextflow_full_schema.sql`.
+
+### 新增功能 / Added Features
+
+- 明确掌握度只属于 `learning_unit_senses`，不属于 `learning_units`。 / Mastery belongs only to `learning_unit_senses`, not `learning_units`.
+- 单义词事件会自动归属到唯一 active sense；多义词事件在 Agent 未明确 sense 前只保留事件，不更新掌握度。 / Single-sense word events are assigned to the only active sense; multi-sense events stay event-only until the Agent provides a sense.
+- `UNIT_EXPOSED`、`UNIT_ATTEMPTED`、`UNIT_CORRECTED`、`UNIT_RECOMMENDED` 会分别更新 exposure、attempt、correction、recommendation 计数。 / `UNIT_EXPOSED`, `UNIT_ATTEMPTED`, `UNIT_CORRECTED`, and `UNIT_RECOMMENDED` update exposure, attempt, correction, and recommendation counts respectively.
+- 预留缺失词义反馈流，供后续人工更新词义表。 / Reserved the missing-sense feedback flow for later manual sense table updates.
+
+### 问题与解决方案 / Issues and Solutions
+
+- 用户输出句子需要由 Agent 判断具体词义，不能靠本地字符串匹配乱猜。 / Learner output needs Agent judgment for the exact sense and cannot rely on local string matching guesses.
+  - 解决方案：本地只自动归属单义词；多义词等待 Agent 通过工具接口明确 `learningUnitSenseId`。 / Solution: local logic only assigns single-sense words; multi-sense words wait for the Agent to provide `learningUnitSenseId` through the tool API.
+- Agent 输入给学习者的句子也需要记录学习事件，方便后续复习优先级计算。 / Sentences provided by the Agent also need learning events for later review-priority calculation.
+  - 解决方案：新增 `event_direction`，把学习者输出与学习者输入稳定区分。 / Solution: added `event_direction` to distinguish learner output from learner input.
+
+### 验证 / Verification
+
+- 新增轻量单元测试覆盖 sense stats 更新与未归属事件不更新 stats。 / Added lightweight unit coverage for sense stats updates and skipping events without senses.

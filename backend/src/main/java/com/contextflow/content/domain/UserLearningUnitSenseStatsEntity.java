@@ -15,7 +15,9 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 @Entity
 @Table(name = "user_learning_unit_sense_stats")
@@ -78,6 +80,73 @@ public class UserLearningUnitSenseStatsEntity {
     protected UserLearningUnitSenseStatsEntity() {
     }
 
+    public UserLearningUnitSenseStatsEntity(Long userId, LearningUnitSenseEntity learningUnitSense) {
+        this.userId = userId;
+        this.learningUnitSense = learningUnitSense;
+        this.exposureCount = 0;
+        this.attemptCount = 0;
+        this.correctCount = 0;
+        this.incorrectCount = 0;
+        this.correctionCount = 0;
+        this.recommendationCount = 0;
+        this.masteryScore = BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP);
+        this.masteryLevel = MasteryLevel.UNSEEN;
+    }
+
+    public void recordExposure(Instant occurredAt) {
+        this.exposureCount++;
+        markSeen(occurredAt);
+        recalculateMastery(occurredAt.plus(7, ChronoUnit.DAYS));
+    }
+
+    public void recordAttempt(Instant occurredAt) {
+        this.attemptCount++;
+        this.lastAttemptAt = occurredAt;
+        markSeen(occurredAt);
+        recalculateMastery(occurredAt.plus(3, ChronoUnit.DAYS));
+    }
+
+    public void recordCorrection(Instant occurredAt) {
+        this.correctionCount++;
+        markSeen(occurredAt);
+        recalculateMastery(occurredAt.plus(1, ChronoUnit.DAYS));
+    }
+
+    public void recordRecommendation(Instant occurredAt) {
+        this.recommendationCount++;
+        markSeen(occurredAt);
+        recalculateMastery(occurredAt.plus(7, ChronoUnit.DAYS));
+    }
+
+    private void markSeen(Instant occurredAt) {
+        if (this.firstSeenAt == null) {
+            this.firstSeenAt = occurredAt;
+        }
+        this.lastSeenAt = occurredAt;
+    }
+
+    private void recalculateMastery(Instant suggestedNextReviewAt) {
+        double score = this.exposureCount * 0.05
+                + this.attemptCount * 0.12
+                + this.recommendationCount * 0.04
+                - this.correctionCount * 0.04;
+        score = Math.max(0.0, Math.min(1.0, score));
+        this.masteryScore = BigDecimal.valueOf(score).setScale(4, RoundingMode.HALF_UP);
+
+        if (this.attemptCount == 0 && this.correctionCount == 0 && this.recommendationCount == 0) {
+            this.masteryLevel = MasteryLevel.EXPOSED;
+        } else if (score >= 0.85) {
+            this.masteryLevel = MasteryLevel.MASTERED;
+        } else if (score >= 0.55) {
+            this.masteryLevel = MasteryLevel.FAMILIAR;
+        } else if (score > 0.0 || this.correctionCount > 0) {
+            this.masteryLevel = MasteryLevel.LEARNING;
+        } else {
+            this.masteryLevel = MasteryLevel.EXPOSED;
+        }
+        this.nextReviewAt = suggestedNextReviewAt;
+    }
+
     @PrePersist
     void prePersist() {
         Instant now = Instant.now();
@@ -88,5 +157,45 @@ public class UserLearningUnitSenseStatsEntity {
     @PreUpdate
     void preUpdate() {
         this.updatedAt = Instant.now();
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public Long getUserId() {
+        return userId;
+    }
+
+    public LearningUnitSenseEntity getLearningUnitSense() {
+        return learningUnitSense;
+    }
+
+    public Integer getExposureCount() {
+        return exposureCount;
+    }
+
+    public Integer getAttemptCount() {
+        return attemptCount;
+    }
+
+    public Integer getCorrectionCount() {
+        return correctionCount;
+    }
+
+    public Integer getRecommendationCount() {
+        return recommendationCount;
+    }
+
+    public BigDecimal getMasteryScore() {
+        return masteryScore;
+    }
+
+    public MasteryLevel getMasteryLevel() {
+        return masteryLevel;
+    }
+
+    public Instant getNextReviewAt() {
+        return nextReviewAt;
     }
 }

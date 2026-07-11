@@ -76,6 +76,7 @@ CREATE TABLE `learning_events` (
   `learning_unit_id` bigint NOT NULL,
   `learning_unit_sense_id` bigint DEFAULT NULL,
   `event_type` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `event_direction` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'LEARNER_INPUT',
   `source_type` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
   `source_id` bigint NOT NULL,
   `source_text` text COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -87,6 +88,7 @@ CREATE TABLE `learning_events` (
   KEY `fk_learning_events_sense` (`learning_unit_sense_id`),
   KEY `idx_learning_events_event_type_created` (`event_type`,`created_at`),
   KEY `idx_learning_events_source` (`source_type`,`source_id`),
+  KEY `idx_learning_events_user_direction_created` (`user_id`,`event_direction`,`created_at`),
   KEY `idx_learning_events_user_unit_created` (`user_id`,`learning_unit_id`,`created_at`),
   KEY `idx_learning_events_user_sense_created` (`user_id`,`learning_unit_sense_id`,`created_at`),
   KEY `fk_learning_events_unit_sense_pair` (`learning_unit_id`,`learning_unit_sense_id`),
@@ -94,6 +96,7 @@ CREATE TABLE `learning_events` (
   CONSTRAINT `fk_learning_events_unit` FOREIGN KEY (`learning_unit_id`) REFERENCES `learning_units` (`id`),
   CONSTRAINT `fk_learning_events_unit_sense_pair` FOREIGN KEY (`learning_unit_id`, `learning_unit_sense_id`) REFERENCES `learning_unit_senses` (`learning_unit_id`, `id`),
   CONSTRAINT `fk_learning_events_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`),
+  CONSTRAINT `ck_learning_events_direction` CHECK ((`event_direction` in (_utf8mb4'LEARNER_OUTPUT',_utf8mb4'LEARNER_INPUT'))),
   CONSTRAINT `ck_learning_events_source_type` CHECK ((`source_type` = _utf8mb4'LEARNING_DIALOGUE_TURN')),
   CONSTRAINT `ck_learning_events_type` CHECK ((`event_type` in (_utf8mb4'UNIT_ATTEMPTED',_utf8mb4'UNIT_EXPOSED',_utf8mb4'UNIT_CORRECTED',_utf8mb4'UNIT_RECOMMENDED')))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -159,6 +162,34 @@ CREATE TABLE `learning_unit_sense_sources` (
   CONSTRAINT `fk_learning_unit_sense_sources_source` FOREIGN KEY (`data_source_id`) REFERENCES `learning_data_sources` (`id`),
   CONSTRAINT `ck_learning_unit_sense_sources_attribute` CHECK ((`attribute_type` in (_utf8mb4'SENSE',_utf8mb4'DEFINITION',_utf8mb4'TRANSLATION',_utf8mb4'DIFFICULTY',_utf8mb4'FREQUENCY')))
 ) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `learning_unit_sense_feedback`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `learning_unit_sense_feedback` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `reported_by_user_id` bigint DEFAULT NULL,
+  `learning_unit_id` bigint DEFAULT NULL,
+  `surface_text` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `normalized_text` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `source_type` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `source_id` bigint DEFAULT NULL,
+  `source_text` text COLLATE utf8mb4_unicode_ci,
+  `suggested_definition_en` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `suggested_definition_zh` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `agent_reason` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'PENDING',
+  `payload` json DEFAULT NULL,
+  `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  `updated_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (`id`),
+  KEY `idx_learning_unit_sense_feedback_unit_status` (`learning_unit_id`,`status`),
+  KEY `idx_learning_unit_sense_feedback_normalized_status` (`normalized_text`,`status`),
+  KEY `idx_learning_unit_sense_feedback_user_created` (`reported_by_user_id`,`created_at`),
+  CONSTRAINT `fk_learning_unit_sense_feedback_unit` FOREIGN KEY (`learning_unit_id`) REFERENCES `learning_units` (`id`),
+  CONSTRAINT `fk_learning_unit_sense_feedback_user` FOREIGN KEY (`reported_by_user_id`) REFERENCES `users` (`id`),
+  CONSTRAINT `ck_learning_unit_sense_feedback_status` CHECK ((`status` in (_utf8mb4'PENDING',_utf8mb4'REVIEWED',_utf8mb4'RESOLVED',_utf8mb4'REJECTED')))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `learning_unit_senses`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -394,4 +425,3 @@ CREATE TABLE `users` (
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
-

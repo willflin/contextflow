@@ -7,6 +7,7 @@ import com.contextflow.content.domain.LearningUnitType;
 import com.contextflow.content.repository.LearningUnitFormRepository;
 import com.contextflow.content.repository.LearningUnitSenseRepository;
 import com.contextflow.learning.domain.LearningDialogueTurnEntity;
+import com.contextflow.learning.domain.LearningEventDirection;
 import com.contextflow.learning.domain.LearningEventEntity;
 import com.contextflow.learning.domain.LearningEventSourceType;
 import com.contextflow.learning.domain.LearningEventType;
@@ -31,17 +32,20 @@ public class LearningEventService {
     private final LearningUnitFormRepository learningUnitFormRepository;
     private final LearningUnitSenseRepository learningUnitSenseRepository;
     private final LearningEventRepository learningEventRepository;
+    private final LearningUnitSenseMasteryService learningUnitSenseMasteryService;
     private final ObjectMapper objectMapper;
 
     public LearningEventService(
             LearningUnitFormRepository learningUnitFormRepository,
             LearningUnitSenseRepository learningUnitSenseRepository,
             LearningEventRepository learningEventRepository,
+            LearningUnitSenseMasteryService learningUnitSenseMasteryService,
             ObjectMapper objectMapper
     ) {
         this.learningUnitFormRepository = learningUnitFormRepository;
         this.learningUnitSenseRepository = learningUnitSenseRepository;
         this.learningEventRepository = learningEventRepository;
+        this.learningUnitSenseMasteryService = learningUnitSenseMasteryService;
         this.objectMapper = objectMapper;
     }
 
@@ -56,19 +60,48 @@ public class LearningEventService {
             String occurrenceText,
             Map<String, Object> payload
     ) {
-        validateSenseBelongsToUnit(learningUnitId, learningUnitSenseId);
-
-        return learningEventRepository.save(new LearningEventEntity(
+        return recordUnitOccurrence(
                 userId,
                 learningUnitId,
                 learningUnitSenseId,
                 eventType,
+                inferDirection(eventType),
+                sourceType,
+                sourceId,
+                sourceText,
+                occurrenceText,
+                payload
+        );
+    }
+
+    public LearningEventEntity recordUnitOccurrence(
+            Long userId,
+            Long learningUnitId,
+            Long learningUnitSenseId,
+            LearningEventType eventType,
+            LearningEventDirection eventDirection,
+            LearningEventSourceType sourceType,
+            Long sourceId,
+            String sourceText,
+            String occurrenceText,
+            Map<String, Object> payload
+    ) {
+        validateSenseBelongsToUnit(learningUnitId, learningUnitSenseId);
+
+        LearningEventEntity saved = learningEventRepository.save(new LearningEventEntity(
+                userId,
+                learningUnitId,
+                learningUnitSenseId,
+                eventType,
+                eventDirection,
                 sourceType,
                 sourceId,
                 sourceText,
                 occurrenceText,
                 serializePayload(payload)
         ));
+        learningUnitSenseMasteryService.applyEvent(saved);
+        return saved;
     }
 
     public void recordDialogueTurnEvents(
@@ -85,21 +118,22 @@ public class LearningEventService {
         }
 
         List<LearningEventEntity> events = new ArrayList<>();
-        addEvents(events, activeForms, turn, LearningEventType.UNIT_ATTEMPTED, "userMessage",
+        addEvents(events, activeForms, turn, LearningEventType.UNIT_ATTEMPTED, LearningEventDirection.LEARNER_OUTPUT, "userMessage",
                 turn.getUserMessage(), scenarioCode, scoringSignal, null);
-        addEvents(events, activeForms, turn, LearningEventType.UNIT_EXPOSED, "roleplayReply",
+        addEvents(events, activeForms, turn, LearningEventType.UNIT_EXPOSED, LearningEventDirection.LEARNER_INPUT, "roleplayReply",
                 turn.getRoleplayReply(), scenarioCode, scoringSignal, null);
 
         for (CorrectionResponse correction : corrections) {
-            addEvents(events, activeForms, turn, LearningEventType.UNIT_CORRECTED, "correctionSuggestion",
+            addEvents(events, activeForms, turn, LearningEventType.UNIT_CORRECTED, LearningEventDirection.LEARNER_INPUT, "correctionSuggestion",
                     correction.suggestion(), scenarioCode, scoringSignal, correction.reason());
         }
 
-        addEvents(events, activeForms, turn, LearningEventType.UNIT_RECOMMENDED, "naturalExpression",
+        addEvents(events, activeForms, turn, LearningEventType.UNIT_RECOMMENDED, LearningEventDirection.LEARNER_INPUT, "naturalExpression",
                 turn.getNaturalExpression(), scenarioCode, scoringSignal, null);
 
         if (!events.isEmpty()) {
-            learningEventRepository.saveAll(events);
+            List<LearningEventEntity> savedEvents = learningEventRepository.saveAll(events);
+            learningUnitSenseMasteryService.applyEvents(savedEvents);
         }
     }
 
@@ -108,6 +142,7 @@ public class LearningEventService {
             List<LearningUnitFormEntity> activeForms,
             LearningDialogueTurnEntity turn,
             LearningEventType eventType,
+            LearningEventDirection eventDirection,
             String sourceField,
             String sourceText,
             String scenarioCode,
@@ -127,7 +162,9 @@ public class LearningEventService {
                 events.add(new LearningEventEntity(
                         turn.getUserId(),
                         match.form().getLearningUnit().getId(),
+                        resolveSingleActiveSenseId(match.form().getLearningUnit().getId()),
                         eventType,
+                        eventDirection,
                         LearningEventSourceType.LEARNING_DIALOGUE_TURN,
                         turn.getId(),
                         sourceText,
@@ -136,6 +173,18 @@ public class LearningEventService {
                 ));
             }
         }
+    }
+
+    private Long resolveSingleActiveSenseId(Long learningUnitId) {
+        List<LearningUnitSenseEntity> senses = learningUnitSenseRepository
+                .findByLearningUnitIdAndStatusOrderByIdAsc(learningUnitId, LearningUnitStatus.ACTIVE);
+        return senses.size() == 1 ? senses.getFirst().getId() : null;
+    }
+
+    private LearningEventDirection inferDirection(LearningEventType eventType) {
+        return eventType == LearningEventType.UNIT_ATTEMPTED
+                ? LearningEventDirection.LEARNER_OUTPUT
+                : LearningEventDirection.LEARNER_INPUT;
     }
 
     private Map<Long, List<OccurrenceMatch>> matchesByUnit(String sourceText, List<LearningUnitFormEntity> activeForms) {

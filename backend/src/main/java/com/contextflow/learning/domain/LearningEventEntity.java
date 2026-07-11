@@ -34,6 +34,10 @@ public class LearningEventEntity {
     private LearningEventType eventType;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "event_direction", nullable = false, length = 32)
+    private LearningEventDirection eventDirection;
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "source_type", nullable = false, length = 32)
     private LearningEventSourceType sourceType;
 
@@ -65,7 +69,7 @@ public class LearningEventEntity {
             String occurrenceText,
             String payload
     ) {
-        this(userId, learningUnitId, null, eventType, sourceType, sourceId, sourceText, occurrenceText, payload);
+        this(userId, learningUnitId, null, eventType, inferDirection(eventType), sourceType, sourceId, sourceText, occurrenceText, payload);
     }
 
     public LearningEventEntity(
@@ -79,10 +83,26 @@ public class LearningEventEntity {
             String occurrenceText,
             String payload
     ) {
+        this(userId, learningUnitId, learningUnitSenseId, eventType, inferDirection(eventType), sourceType, sourceId, sourceText, occurrenceText, payload);
+    }
+
+    public LearningEventEntity(
+            Long userId,
+            Long learningUnitId,
+            Long learningUnitSenseId,
+            LearningEventType eventType,
+            LearningEventDirection eventDirection,
+            LearningEventSourceType sourceType,
+            Long sourceId,
+            String sourceText,
+            String occurrenceText,
+            String payload
+    ) {
         this.userId = userId;
         this.learningUnitId = learningUnitId;
         this.learningUnitSenseId = learningUnitSenseId;
         this.eventType = eventType;
+        this.eventDirection = eventDirection;
         this.sourceType = sourceType;
         this.sourceId = sourceId;
         this.sourceText = sourceText;
@@ -93,6 +113,12 @@ public class LearningEventEntity {
     @PrePersist
     void prePersist() {
         this.createdAt = Instant.now();
+    }
+
+    private static LearningEventDirection inferDirection(LearningEventType eventType) {
+        return eventType == LearningEventType.UNIT_ATTEMPTED
+                ? LearningEventDirection.LEARNER_OUTPUT
+                : LearningEventDirection.LEARNER_INPUT;
     }
 
     public Long getId() {
@@ -113,6 +139,10 @@ public class LearningEventEntity {
 
     public LearningEventType getEventType() {
         return eventType;
+    }
+
+    public LearningEventDirection getEventDirection() {
+        return eventDirection;
     }
 
     public LearningEventSourceType getSourceType() {

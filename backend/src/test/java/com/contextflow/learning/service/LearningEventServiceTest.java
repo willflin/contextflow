@@ -37,6 +37,7 @@ class LearningEventServiceTest {
     private LearningUnitFormRepository formRepository;
     private LearningUnitSenseRepository senseRepository;
     private LearningEventRepository eventRepository;
+    private LearningUnitSenseMasteryService masteryService;
     private LearningEventService service;
 
     @BeforeEach
@@ -44,7 +45,8 @@ class LearningEventServiceTest {
         formRepository = mock(LearningUnitFormRepository.class);
         senseRepository = mock(LearningUnitSenseRepository.class);
         eventRepository = mock(LearningEventRepository.class);
-        service = new LearningEventService(formRepository, senseRepository, eventRepository, new ObjectMapper());
+        masteryService = mock(LearningUnitSenseMasteryService.class);
+        service = new LearningEventService(formRepository, senseRepository, eventRepository, masteryService, new ObjectMapper());
     }
 
     @Test
@@ -136,6 +138,41 @@ class LearningEventServiceTest {
     }
 
     @Test
+    void dialogueEventsShouldAttachSenseWhenUnitHasOnlyOneActiveSense() {
+        LearningUnitEntity go = unit(1L, "go");
+        LearningUnitFormEntity goForm = form(10L, go, "go");
+        LearningUnitSenseEntity goSense = sense(100L, go, "move-travel");
+        LearningDialogueTurnEntity turn = new LearningDialogueTurnEntity(
+                5L,
+                8L,
+                1,
+                "go",
+                "Sure.",
+                "Good.",
+                "[]",
+                "Try to go now.",
+                "{}"
+        );
+        setId(turn, 99L);
+
+        when(formRepository.findAllWithUnitByUnitStatus(LearningUnitStatus.ACTIVE))
+                .thenReturn(List.of(goForm));
+        when(senseRepository.findByLearningUnitIdAndStatusOrderByIdAsc(1L, LearningUnitStatus.ACTIVE))
+                .thenReturn(List.of(goSense));
+
+        service.recordDialogueTurnEvents(turn, "general", List.of(), Map.of());
+
+        verify(eventRepository).saveAll(argThat(events -> {
+            for (LearningEventEntity event : events) {
+                if (!Long.valueOf(100L).equals(event.getLearningUnitSenseId())) {
+                    return false;
+                }
+            }
+            return true;
+        }));
+    }
+
+    @Test
     void recordUnitOccurrenceShouldAllowNullSense() {
         when(eventRepository.save(any(LearningEventEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -206,6 +243,23 @@ class LearningEventServiceTest {
         LearningUnitFormEntity form = new LearningUnitFormEntity(unit, formText, formText, LearningUnitFormType.LEMMA);
         setId(form, id);
         return form;
+    }
+
+    private LearningUnitSenseEntity sense(Long id, LearningUnitEntity unit, String senseKey) {
+        LearningUnitSenseEntity sense = new LearningUnitSenseEntity(
+                unit,
+                senseKey,
+                PartOfSpeech.VERB,
+                "definition",
+                "释义",
+                null,
+                null,
+                null,
+                null,
+                LearningUnitStatus.ACTIVE
+        );
+        setId(sense, id);
+        return sense;
     }
 
     private void setId(Object target, Long id) {
