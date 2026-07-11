@@ -105,6 +105,9 @@ Phase 4.9 is now word-first: the schema still reserves WORD / PHRASE / SENTENCE_
 - 添加词义级掌握度最小更新。 / Add minimal sense-level mastery updates. ✅ Phase 5.1
 - 添加事件输入/输出方向，用于后续复习优先级。 / Add event input/output direction for later review priority. ✅ Phase 5.1
 - 添加 `next_review_at`。 / Add `next_review_at`. ✅ Phase 5.1 minimal version
+- 添加持久化复习优先级分数。 / Add persisted review priority score. ✅ Phase 5.2
+- 添加复习/新词义混合学习计划接口。 / Add mixed review/new-sense learning plan API. ✅ Phase 5.2
+- 添加遗忘曲线调度字段和定期优先级刷新。 / Add forgetting-curve scheduling fields and periodic priority refresh. ✅ Phase 5.3
 - 添加复习包。 / Add review packages.
 
 Phase 5.1 明确掌握度只存在于 `learning_unit_senses`，不存在“语言单元本体掌握度”。单义词事件可自动归属到唯一 active sense 并更新 `user_learning_unit_sense_stats`；多义词在 Agent 未明确 sense 前只保留事件，不更新掌握度。
@@ -114,6 +117,22 @@ Phase 5.1 defines mastery as sense-level only, never language-unit-level. Events
 Phase 5.1 预留 Agent 工具接口：查询某个单词的所有释义、记录 Agent 判定后的学习事件、提交数据库缺失词义反馈。
 
 Phase 5.1 reserves Agent tool APIs for listing all senses of a word, recording Agent-judged learning events, and submitting missing-sense feedback for manual content updates.
+
+Phase 5.2 新增 `review_priority_score`，它是已学词义进入复习队列的唯一优先级依据；高频简单词仍记录事件和掌握度，但通过频率反相关系数降低复习压力。
+
+Phase 5.2 adds `review_priority_score` as the only priority basis for learned senses entering the review queue; high-frequency simple words still record events and mastery, but frequency-inverse weighting reduces review pressure.
+
+Phase 5.2 的学习计划先按比例混合复习词义与新词义，再把目标词义分配到 `learning_unit_sense_scenario_tags` 对应的场景组，避免强行把一批词塞进单一场景。
+
+Phase 5.2 mixes review senses and new senses by ratio first, then assigns target senses into scenario groups through `learning_unit_sense_scenario_tags` instead of forcing one batch into one scenario.
+
+Phase 5.3 新增 `stability_score`、`difficulty_score`、`last_reviewed_at` 和 `review_interval_hours`，用简单遗忘曲线和事件类型更新词义复习间隔。
+
+Phase 5.3 adds `stability_score`, `difficulty_score`, `last_reviewed_at`, and `review_interval_hours`, using a simple forgetting curve and event type to update sense review intervals.
+
+Phase 5.3 将 `/api/review/plan` 调整为读取持久化 `review_priority_score`；事件写入和后端定时任务负责刷新该分数。
+
+Phase 5.3 changes `/api/review/plan` to read persisted `review_priority_score`; event writes and a backend scheduled job are responsible for refreshing the score.
 
 ## Phase 6：AI 预生成 / AI Pre-generation
 

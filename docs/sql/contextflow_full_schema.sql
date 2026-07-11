@@ -191,6 +191,23 @@ CREATE TABLE `learning_unit_sense_feedback` (
   CONSTRAINT `ck_learning_unit_sense_feedback_status` CHECK ((`status` in (_utf8mb4'PENDING',_utf8mb4'REVIEWED',_utf8mb4'RESOLVED',_utf8mb4'REJECTED')))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `learning_unit_sense_scenario_tags`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `learning_unit_sense_scenario_tags` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `learning_unit_sense_id` bigint NOT NULL,
+  `scenario_code` varchar(120) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `relevance_score` decimal(5,4) NOT NULL DEFAULT '1.0000',
+  `source` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'MANUAL',
+  `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_learning_unit_sense_scenario_tags` (`learning_unit_sense_id`,`scenario_code`),
+  KEY `idx_learning_unit_sense_scenario_tags_scenario` (`scenario_code`,`relevance_score`),
+  CONSTRAINT `fk_learning_unit_sense_scenario_tags_sense` FOREIGN KEY (`learning_unit_sense_id`) REFERENCES `learning_unit_senses` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `ck_learning_unit_sense_scenario_tags_score` CHECK ((`relevance_score` between 0 and 1))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `learning_unit_senses`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -359,15 +376,24 @@ CREATE TABLE `user_learning_unit_sense_stats` (
   `recommendation_count` int NOT NULL DEFAULT '0',
   `mastery_score` decimal(5,4) NOT NULL DEFAULT '0.0000',
   `mastery_level` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'UNSEEN',
+  `stability_score` decimal(8,4) NOT NULL DEFAULT '0.3000',
+  `difficulty_score` decimal(8,4) NOT NULL DEFAULT '0.5000',
   `first_seen_at` datetime(6) DEFAULT NULL,
   `last_seen_at` datetime(6) DEFAULT NULL,
   `last_attempt_at` datetime(6) DEFAULT NULL,
+  `last_reviewed_at` datetime(6) DEFAULT NULL,
   `next_review_at` datetime(6) DEFAULT NULL,
+  `review_interval_hours` int NOT NULL DEFAULT '24',
+  `review_priority_score` decimal(8,4) NOT NULL DEFAULT '0.0000',
+  `last_priority_calculated_at` datetime(6) DEFAULT NULL,
   `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   `updated_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_user_learning_unit_sense_stats` (`user_id`,`learning_unit_sense_id`),
   KEY `idx_user_learning_unit_sense_stats_sense` (`learning_unit_sense_id`),
+  KEY `idx_user_learning_unit_sense_stats_priority` (`user_id`,`review_priority_score`),
+  KEY `idx_user_learning_unit_sense_stats_next_priority` (`user_id`,`next_review_at`,`review_priority_score`),
+  KEY `idx_user_learning_unit_sense_stats_refresh` (`last_priority_calculated_at`,`review_priority_score`),
   KEY `idx_user_learning_unit_sense_stats_user_mastery` (`user_id`,`mastery_level`),
   KEY `idx_user_learning_unit_sense_stats_user_review` (`user_id`,`next_review_at`),
   CONSTRAINT `fk_user_learning_unit_sense_stats_sense` FOREIGN KEY (`learning_unit_sense_id`) REFERENCES `learning_unit_senses` (`id`) ON DELETE CASCADE,

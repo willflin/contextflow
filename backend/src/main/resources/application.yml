@@ -35,3 +35,7 @@ contextflow:
     seed-demo-templates: true
   content:
     seed-demo-units: true
+  review:
+    priority-refresh-enabled: true
+    priority-refresh-initial-delay-ms: 60000
+    priority-refresh-fixed-delay-ms: 3600000

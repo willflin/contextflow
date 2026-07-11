@@ -12,6 +12,8 @@ import com.contextflow.learning.domain.LearningEventDirection;
 import com.contextflow.learning.domain.LearningEventEntity;
 import com.contextflow.learning.domain.LearningEventSourceType;
 import com.contextflow.learning.domain.LearningEventType;
+import com.contextflow.review.service.ReviewPriorityCalculator;
+import com.contextflow.review.service.ReviewScheduleCalculator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -35,7 +37,12 @@ class LearningUnitSenseMasteryServiceTest {
     void setUp() {
         senseRepository = mock(LearningUnitSenseRepository.class);
         statsRepository = mock(UserLearningUnitSenseStatsRepository.class);
-        service = new LearningUnitSenseMasteryService(senseRepository, statsRepository);
+        service = new LearningUnitSenseMasteryService(
+                senseRepository,
+                statsRepository,
+                new ReviewPriorityCalculator(),
+                new ReviewScheduleCalculator()
+        );
     }
 
     @Test
@@ -65,6 +72,9 @@ class LearningUnitSenseMasteryServiceTest {
         verify(statsRepository).save(captor.capture());
         assertThat(captor.getValue().getAttemptCount()).isEqualTo(1);
         assertThat(captor.getValue().getLearningUnitSense().getId()).isEqualTo(100L);
+        assertThat(captor.getValue().getReviewIntervalHours()).isPositive();
+        assertThat(captor.getValue().getNextReviewAt()).isNotNull();
+        assertThat(captor.getValue().getReviewPriorityScore()).isNotNull();
     }
 
     @Test

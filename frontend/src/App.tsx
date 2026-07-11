@@ -17,6 +17,7 @@ import {
   PlacementTestItem,
   startAdaptivePlacement
 } from './api/placement';
+import { fetchReviewPlan, ReviewPlan } from './api/review';
 import { fetchUserLevelProfile, prettyJson, UserLevelProfile } from './api/userProfile';
 
 type LoadState = 'idle' | 'loading' | 'success' | 'error';
@@ -44,6 +45,9 @@ export default function App() {
   const [answerLog, setAnswerLog] = useState<string[]>([]);
   const [profile, setProfile] = useState<UserLevelProfile | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [reviewPlan, setReviewPlan] = useState<ReviewPlan | null>(null);
+  const [reviewBusy, setReviewBusy] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
   const [learningPackage, setLearningPackage] = useState<LearningPackage | null>(null);
   const [learningBusy, setLearningBusy] = useState(false);
   const [learningError, setLearningError] = useState<string | null>(null);
@@ -116,6 +120,7 @@ export default function App() {
       setAccessError(null);
       resetPlacement();
       resetLearning();
+      resetReviewPlan();
     } catch (exception) {
       setAuthError(exception instanceof Error ? exception.message : 'Login failed.');
       setCurrentUser(null);
@@ -131,6 +136,7 @@ export default function App() {
     setProfileError(null);
     resetPlacement();
     resetLearning();
+    resetReviewPlan();
   }
 
   async function checkProtectedEndpoint(path: '/api/learner/probe' | '/api/admin/probe') {
@@ -260,6 +266,34 @@ export default function App() {
     setAnswerLog([]);
   }
 
+  async function loadReviewPlan() {
+    const token = tokenOrNull();
+
+    if (!token) {
+      setReviewError('Please log in first.');
+      return;
+    }
+
+    setReviewBusy(true);
+    setReviewError(null);
+
+    try {
+      const result = await fetchReviewPlan(token);
+      setReviewPlan(result);
+    } catch (exception) {
+      setReviewPlan(null);
+      setReviewError(exception instanceof Error ? exception.message : 'Failed to load review plan.');
+    } finally {
+      setReviewBusy(false);
+    }
+  }
+
+  function resetReviewPlan() {
+    setReviewPlan(null);
+    setReviewBusy(false);
+    setReviewError(null);
+  }
+
   async function loadNextLearningPackage() {
     const token = tokenOrNull();
 
@@ -277,6 +311,7 @@ export default function App() {
       setDialogueTurns([]);
       setDialogueMessage('');
       setDialogueError(null);
+      await loadReviewPlan();
     } catch (exception) {
       setLearningPackage(null);
       setLearningError(exception instanceof Error ? exception.message : 'Failed to load learning package.');
@@ -699,6 +734,60 @@ export default function App() {
     );
   }
 
+  function renderReviewPlan() {
+    if (!profile) {
+      return <p className="hint">Finish the placement test first. Your plan will use your profile level.</p>;
+    }
+
+    if (reviewError) {
+      return <p className="error compact">Review plan failed: {reviewError}</p>;
+    }
+
+    if (!reviewPlan) {
+      return <p className="hint">Your learning plan will load automatically when the scenario starts.</p>;
+    }
+
+    if (reviewPlan.items.length === 0) {
+      return <p className="hint">No review or new sense targets are available yet.</p>;
+    }
+
+    return (
+      <div className="review-plan-content">
+        <div className="metrics-row">
+          <div>
+            <span className="label">Review</span>
+            <strong>{reviewPlan.reviewTargetCount}</strong>
+          </div>
+          <div>
+            <span className="label">New</span>
+            <strong>{reviewPlan.newTargetCount}</strong>
+          </div>
+          <div>
+            <span className="label">Overdue</span>
+            <strong>{reviewPlan.overdueReviewCount}</strong>
+          </div>
+        </div>
+
+        <div className="review-plan-window">
+          <div className="review-target-list">
+            {reviewPlan.items.map((item) => (
+              <article className="review-target" key={`${item.pool}-${item.learningUnitSenseId}`}>
+                <span className={`target-type ${item.pool.toLowerCase()}`}>{item.pool}</span>
+                <div>
+                  <strong>{item.canonicalText}</strong>
+                  <p>{item.definitionZh ?? item.definitionEn}</p>
+                  <small>
+                    {item.senseKey} · score {Number(item.score).toFixed(2)} · {item.frequencyBand ?? 'UNKNOWN'}
+                  </small>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   function renderLearningPackage() {
     if (!profile) {
       return <p className="hint">Finish the placement test first. Your learning scenario will use your profile.</p>;
@@ -805,6 +894,17 @@ export default function App() {
               </div>
             )}
           </aside>
+        </section>
+
+        <section className="learning-plan-section">
+          <div className="panel-heading compact-heading">
+            <div>
+              <p className="eyebrow">Learning plan</p>
+              <h2>Review and new senses</h2>
+            </div>
+            {reviewBusy && <span className="status-pill">Loading</span>}
+          </div>
+          {renderReviewPlan()}
         </section>
 
         {content.expressions && content.expressions.length > 0 && (

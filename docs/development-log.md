@@ -493,3 +493,70 @@
 ### 验证 / Verification
 
 - 新增轻量单元测试覆盖 sense stats 更新与未归属事件不更新 stats。 / Added lightweight unit coverage for sense stats updates and skipping events without senses.
+
+## Phase 5.2：复习优先级与学习计划 / Review Priority and Learning Plan
+
+### 操作 / Operations
+
+- 新增 `V11__add_review_priority_and_scenario_tags.sql`。 / Added `V11__add_review_priority_and_scenario_tags.sql`.
+- 为 `user_learning_unit_sense_stats` 新增 `review_priority_score` 和 `last_priority_calculated_at`。 / Added `review_priority_score` and `last_priority_calculated_at` to `user_learning_unit_sense_stats`.
+- 新增 `learning_unit_sense_scenario_tags`，用于把目标词义分配到合适场景。 / Added `learning_unit_sense_scenario_tags` for assigning target senses to suitable scenarios.
+- 新增 `GET /api/review/plan`。 / Added `GET /api/review/plan`.
+- 前端新增学习计划面板，展示复习词义、新词义和场景分组。 / Added a frontend learning plan panel showing review senses, new senses, and scenario groups.
+- 同步修复 `LearningUnitSenseMasteryServiceTest` 的构造器依赖。 / Updated `LearningUnitSenseMasteryServiceTest` for the new constructor dependency.
+- 调整前端 Learning plan：移动到对话区域下方，改为固定高度滚动窗口，并取消按场景分组展示。 / Adjusted the frontend Learning plan: moved it below the dialogue area, changed it to a fixed-height scroll window, and removed scenario-grouped display.
+- 点击 `Start learning` 成功加载场景后自动刷新 Learning plan，移除学习者手动刷新计划的操作。 / Automatically refresh the Learning plan after `Start learning` loads a scenario successfully, removing the learner-facing manual refresh step.
+- 更新 `docs/sql/phase5_review_priority_schema.sql`、`docs/sql/contextflow_full_schema.sql` 和 `docs/work-plan.md`。 / Updated `docs/sql/phase5_review_priority_schema.sql`, `docs/sql/contextflow_full_schema.sql`, and `docs/work-plan.md`.
+
+### 新增功能 / Added Features
+
+- `reviewPriorityScore` 成为复习候选唯一优先级依据；接口会按用户刷新并持久化该分数。 / `reviewPriorityScore` is now the only priority basis for review candidates; the API refreshes and persists it per user.
+- 复习优先级综合到期、掌握弱度、用户输出、纠错、仅曝光、时间衰减和高频词反相关系数。 / Review priority combines due status, weak mastery, learner output, corrections, exposure-only state, recency decay, and frequency-inverse weighting.
+- 新词义池按频率有用性和 `levelFitScore` 排序；高频新词义优先，但已学高频词义复习会被降权。 / The new-sense pool is ranked by frequency usefulness and `levelFitScore`; high-frequency new senses are prioritized, while learned high-frequency senses are dampened for review.
+- 学习计划按比例混合复习词义与新词义，并按场景标签分组，供后续 Agent 按多个场景生成内容。 / The learning plan mixes review and new senses by ratio and groups them by scenario tags for later multi-scenario Agent generation.
+
+### 问题与解决方案 / Issues and Solutions
+
+- 只做一个“复习词列表”会导致后续 Agent 难以把词义合理塞进场景。 / A single flat review list would make it hard for the later Agent to place senses into suitable scenarios.
+  - 解决方案：先选词义，再通过 `learning_unit_sense_scenario_tags` 分组到场景。 / Solution: select senses first, then group them into scenarios through `learning_unit_sense_scenario_tags`.
+- 高频简单词既要记录曝光，又不应频繁占用复习队列。 / High-frequency simple words should still record exposure but should not dominate review queues.
+  - 解决方案：事件和掌握度照常更新，复习调度阶段用频率反相关系数降低优先级。 / Solution: keep event and mastery updates unchanged, then reduce review priority through a frequency-inverse multiplier.
+
+### 验证 / Verification
+
+- 前端 `npm run typecheck` 通过。 / Frontend `npm run typecheck` passed.
+- `git diff --check` 通过，仅有 Windows 换行提示。 / `git diff --check` passed with only Windows line-ending warnings.
+- Maven 默认入口仍使用 Java 17，报“不支持发行版本 21”；切换 JDK 21 后又遇到已知 `target/classes/application.yml` 写入拒绝。 / The default Maven entry still uses Java 17 and reports unsupported release 21; after switching to JDK 21 it still hits the known denied write to `target/classes/application.yml`.
+- JDK 21 临时 `javac` 未输出业务代码语法错误，但本机仍返回已知“无法关闭编译器资源”。 / Temporary JDK 21 `javac` produced no business-code syntax errors, but this machine still returns the known compiler-resource closing error.
+- 登录失败排查发现后端未监听 8080，根因是 DataGrip/MySQL 连接导致 Flyway V10 的 `ALTER TABLE learning_events` 等待元数据锁；释放连接后 V10-V11 已成功应用。 / Login failure investigation found that the backend was not listening on 8080 because DataGrip/MySQL connections made Flyway V10 wait for a metadata lock on `ALTER TABLE learning_events`; after releasing the connections, V10-V11 applied successfully.
+- 使用临时 18080 后端验证 `/api/health` 和 `learner / learner123` 登录均成功。 / Verified `/api/health` and `learner / learner123` login successfully against a temporary backend on port 18080.
+
+## Phase 5.3：遗忘曲线与复习调度稳定化 / Forgetting Curve and Review Scheduling Stabilization
+
+### 操作 / Operations
+
+- 新增 `V12__add_review_schedule_fields.sql`。 / Added `V12__add_review_schedule_fields.sql`.
+- 为 `user_learning_unit_sense_stats` 新增 `stability_score`、`difficulty_score`、`last_reviewed_at` 和 `review_interval_hours`。 / Added `stability_score`, `difficulty_score`, `last_reviewed_at`, and `review_interval_hours` to `user_learning_unit_sense_stats`.
+- 新增 `ReviewScheduleCalculator`，在有明确词义的学习事件写入后更新复习间隔和 `next_review_at`。 / Added `ReviewScheduleCalculator` to update review intervals and `next_review_at` after learning events with explicit senses.
+- 扩展 `ReviewPriorityCalculator`，把遗忘风险和调度难度纳入 `reviewPriorityScore`。 / Extended `ReviewPriorityCalculator` to include forgetting risk and scheduling difficulty in `reviewPriorityScore`.
+- 新增 `ReviewPriorityRefreshService` 和定时刷新任务，周期性刷新已学词义优先级。 / Added `ReviewPriorityRefreshService` and a scheduled refresh job to periodically refresh learned-sense priorities.
+- 在 `application.yml` 显式配置复习优先级刷新开关、首次延迟和刷新间隔。 / Explicitly configured the review-priority refresh switch, initial delay, and refresh interval in `application.yml`.
+- 调整 `/api/review/plan`，只读取持久化 `reviewPriorityScore`，不在请求中重算并写库。 / Adjusted `/api/review/plan` to read persisted `reviewPriorityScore` without recalculating and writing during the request.
+- 新增 `docs/sql/phase5_review_schedule_schema.sql`，并更新完整 schema 和工作计划。 / Added `docs/sql/phase5_review_schedule_schema.sql`, and updated the full schema and work plan.
+
+### 新增功能 / Added Features
+
+- 词义复习间隔现在由事件类型、掌握度、稳定度和难度共同决定。 / Sense review intervals are now determined by event type, mastery, stability, and difficulty.
+- `reviewPriorityScore` 仍是复习候选唯一排序依据，但其刷新来源变为事件写入和定时任务。 / `reviewPriorityScore` remains the only ordering basis for review candidates, but it is now refreshed by event writes and scheduled jobs.
+- 高频词仍会被频率反相关系数降权；纠错事件仍可抬高复习压力。 / High-frequency words are still dampened by the frequency-inverse multiplier, while correction events can still raise review pressure.
+
+### 问题与解决方案 / Issues and Solutions
+
+- 请求时刷新所有用户词义优先级会把调度计算耦合到用户等待路径。 / Refreshing sense priorities during requests couples scheduling work to the learner waiting path.
+  - 解决方案：计划接口只读持久化分数；事件写入即时刷新当前词义，定时任务刷新全量已学词义。 / Solution: the plan API only reads persisted scores; event writes refresh the current sense immediately, and a scheduled job refreshes all learned senses.
+
+### 验证 / Verification
+
+- 前端 `npm run typecheck` 通过。 / Frontend `npm run typecheck` passed.
+- `git diff --check` 通过，仅有 Windows 换行提示。 / `git diff --check` passed with only Windows line-ending warnings.
+- JDK 21 临时 `javac` 未输出业务代码语法错误，但本机仍返回已知“无法关闭编译器资源”。 / Temporary JDK 21 `javac` produced no business-code syntax errors, but this machine still returns the known compiler-resource closing error.

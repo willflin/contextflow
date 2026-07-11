@@ -421,6 +421,73 @@ strong {
   gap: 18px;
 }
 
+.review-plan-content,
+.review-target-list {
+  display: grid;
+  gap: 14px;
+}
+
+.learning-plan-section {
+  display: grid;
+  gap: 14px;
+  margin-top: 6px;
+  border: 1px solid #d9e1e5;
+  border-radius: 8px;
+  background: #f8fafb;
+  padding: 16px;
+}
+
+.compact-heading {
+  margin-bottom: 0;
+}
+
+.review-plan-window {
+  max-height: 360px;
+  overflow-y: auto;
+  border: 1px solid #d9e1e5;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 12px;
+}
+
+.review-target {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  border: 1px solid #d9e1e5;
+  border-radius: 8px;
+  background: #f8fafb;
+  padding: 12px;
+}
+
+.review-target p {
+  margin: 6px 0;
+  color: #44535b;
+  line-height: 1.5;
+}
+
+.review-target small {
+  color: #6b7a83;
+}
+
+.target-type {
+  border-radius: 999px;
+  padding: 5px 8px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.target-type.review {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.target-type.new {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
 .learning-content h3 {
   margin: 0 0 10px;
   font-size: 18px;

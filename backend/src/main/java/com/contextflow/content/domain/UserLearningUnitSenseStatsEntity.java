@@ -17,7 +17,6 @@ import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 
 @Entity
 @Table(name = "user_learning_unit_sense_stats")
@@ -59,6 +58,12 @@ public class UserLearningUnitSenseStatsEntity {
     @Column(name = "mastery_level", nullable = false, length = 32)
     private MasteryLevel masteryLevel;
 
+    @Column(name = "stability_score", nullable = false, precision = 8, scale = 4)
+    private BigDecimal stabilityScore;
+
+    @Column(name = "difficulty_score", nullable = false, precision = 8, scale = 4)
+    private BigDecimal difficultyScore;
+
     @Column(name = "first_seen_at")
     private Instant firstSeenAt;
 
@@ -68,8 +73,20 @@ public class UserLearningUnitSenseStatsEntity {
     @Column(name = "last_attempt_at")
     private Instant lastAttemptAt;
 
+    @Column(name = "last_reviewed_at")
+    private Instant lastReviewedAt;
+
     @Column(name = "next_review_at")
     private Instant nextReviewAt;
+
+    @Column(name = "review_interval_hours", nullable = false)
+    private Integer reviewIntervalHours;
+
+    @Column(name = "review_priority_score", nullable = false, precision = 8, scale = 4)
+    private BigDecimal reviewPriorityScore;
+
+    @Column(name = "last_priority_calculated_at")
+    private Instant lastPriorityCalculatedAt;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -91,31 +108,35 @@ public class UserLearningUnitSenseStatsEntity {
         this.recommendationCount = 0;
         this.masteryScore = BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP);
         this.masteryLevel = MasteryLevel.UNSEEN;
+        this.stabilityScore = new BigDecimal("0.3000");
+        this.difficultyScore = new BigDecimal("0.5000");
+        this.reviewIntervalHours = 24;
+        this.reviewPriorityScore = BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP);
     }
 
     public void recordExposure(Instant occurredAt) {
         this.exposureCount++;
         markSeen(occurredAt);
-        recalculateMastery(occurredAt.plus(7, ChronoUnit.DAYS));
+        recalculateMastery();
     }
 
     public void recordAttempt(Instant occurredAt) {
         this.attemptCount++;
         this.lastAttemptAt = occurredAt;
         markSeen(occurredAt);
-        recalculateMastery(occurredAt.plus(3, ChronoUnit.DAYS));
+        recalculateMastery();
     }
 
     public void recordCorrection(Instant occurredAt) {
         this.correctionCount++;
         markSeen(occurredAt);
-        recalculateMastery(occurredAt.plus(1, ChronoUnit.DAYS));
+        recalculateMastery();
     }
 
     public void recordRecommendation(Instant occurredAt) {
         this.recommendationCount++;
         markSeen(occurredAt);
-        recalculateMastery(occurredAt.plus(7, ChronoUnit.DAYS));
+        recalculateMastery();
     }
 
     private void markSeen(Instant occurredAt) {
@@ -125,7 +146,7 @@ public class UserLearningUnitSenseStatsEntity {
         this.lastSeenAt = occurredAt;
     }
 
-    private void recalculateMastery(Instant suggestedNextReviewAt) {
+    private void recalculateMastery() {
         double score = this.exposureCount * 0.05
                 + this.attemptCount * 0.12
                 + this.recommendationCount * 0.04
@@ -144,7 +165,25 @@ public class UserLearningUnitSenseStatsEntity {
         } else {
             this.masteryLevel = MasteryLevel.EXPOSED;
         }
-        this.nextReviewAt = suggestedNextReviewAt;
+    }
+
+    public void updateReviewSchedule(
+            BigDecimal stabilityScore,
+            BigDecimal difficultyScore,
+            Instant lastReviewedAt,
+            Integer reviewIntervalHours,
+            Instant nextReviewAt
+    ) {
+        this.stabilityScore = stabilityScore.setScale(4, RoundingMode.HALF_UP);
+        this.difficultyScore = difficultyScore.setScale(4, RoundingMode.HALF_UP);
+        this.lastReviewedAt = lastReviewedAt;
+        this.reviewIntervalHours = reviewIntervalHours;
+        this.nextReviewAt = nextReviewAt;
+    }
+
+    public void updateReviewPriorityScore(BigDecimal reviewPriorityScore, Instant calculatedAt) {
+        this.reviewPriorityScore = reviewPriorityScore.setScale(4, RoundingMode.HALF_UP);
+        this.lastPriorityCalculatedAt = calculatedAt;
     }
 
     @PrePersist
@@ -183,6 +222,14 @@ public class UserLearningUnitSenseStatsEntity {
         return correctionCount;
     }
 
+    public Integer getCorrectCount() {
+        return correctCount;
+    }
+
+    public Integer getIncorrectCount() {
+        return incorrectCount;
+    }
+
     public Integer getRecommendationCount() {
         return recommendationCount;
     }
@@ -195,7 +242,43 @@ public class UserLearningUnitSenseStatsEntity {
         return masteryLevel;
     }
 
+    public BigDecimal getStabilityScore() {
+        return stabilityScore;
+    }
+
+    public BigDecimal getDifficultyScore() {
+        return difficultyScore;
+    }
+
     public Instant getNextReviewAt() {
         return nextReviewAt;
+    }
+
+    public Instant getFirstSeenAt() {
+        return firstSeenAt;
+    }
+
+    public Instant getLastSeenAt() {
+        return lastSeenAt;
+    }
+
+    public Instant getLastAttemptAt() {
+        return lastAttemptAt;
+    }
+
+    public Instant getLastReviewedAt() {
+        return lastReviewedAt;
+    }
+
+    public Integer getReviewIntervalHours() {
+        return reviewIntervalHours;
+    }
+
+    public BigDecimal getReviewPriorityScore() {
+        return reviewPriorityScore;
+    }
+
+    public Instant getLastPriorityCalculatedAt() {
+        return lastPriorityCalculatedAt;
     }
 }

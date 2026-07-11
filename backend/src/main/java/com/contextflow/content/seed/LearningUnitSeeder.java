@@ -7,6 +7,7 @@ import com.contextflow.content.domain.LearningUnitEntity;
 import com.contextflow.content.domain.LearningUnitFormEntity;
 import com.contextflow.content.domain.LearningUnitFormType;
 import com.contextflow.content.domain.LearningUnitSenseEntity;
+import com.contextflow.content.domain.LearningUnitSenseScenarioTagEntity;
 import com.contextflow.content.domain.LearningUnitStatus;
 import com.contextflow.content.domain.LearningUnitType;
 import com.contextflow.content.domain.PartOfSpeech;
@@ -16,6 +17,7 @@ import com.contextflow.content.repository.LearningDataSourceRepository;
 import com.contextflow.content.repository.LearningUnitFormRepository;
 import com.contextflow.content.repository.LearningUnitRepository;
 import com.contextflow.content.repository.LearningUnitSenseRepository;
+import com.contextflow.content.repository.LearningUnitSenseScenarioTagRepository;
 import com.contextflow.content.repository.LearningUnitSenseSourceRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
@@ -38,6 +40,7 @@ public class LearningUnitSeeder implements ApplicationRunner {
     private final LearningUnitFormRepository learningUnitFormRepository;
     private final LearningDataSourceRepository learningDataSourceRepository;
     private final LearningUnitSenseSourceRepository learningUnitSenseSourceRepository;
+    private final LearningUnitSenseScenarioTagRepository learningUnitSenseScenarioTagRepository;
 
     public LearningUnitSeeder(
             @Value("${contextflow.content.seed-demo-units:true}") boolean seedDemoUnits,
@@ -45,7 +48,8 @@ public class LearningUnitSeeder implements ApplicationRunner {
             LearningUnitSenseRepository learningUnitSenseRepository,
             LearningUnitFormRepository learningUnitFormRepository,
             LearningDataSourceRepository learningDataSourceRepository,
-            LearningUnitSenseSourceRepository learningUnitSenseSourceRepository
+            LearningUnitSenseSourceRepository learningUnitSenseSourceRepository,
+            LearningUnitSenseScenarioTagRepository learningUnitSenseScenarioTagRepository
     ) {
         this.seedDemoUnits = seedDemoUnits;
         this.learningUnitRepository = learningUnitRepository;
@@ -53,6 +57,7 @@ public class LearningUnitSeeder implements ApplicationRunner {
         this.learningUnitFormRepository = learningUnitFormRepository;
         this.learningDataSourceRepository = learningDataSourceRepository;
         this.learningUnitSenseSourceRepository = learningUnitSenseSourceRepository;
+        this.learningUnitSenseScenarioTagRepository = learningUnitSenseScenarioTagRepository;
     }
 
     @Override
@@ -78,29 +83,36 @@ public class LearningUnitSeeder implements ApplicationRunner {
         form(go, "went", LearningUnitFormType.PAST_TENSE);
         form(go, "gone", LearningUnitFormType.PAST_PARTICIPLE);
         form(go, "going", LearningUnitFormType.PRESENT_PARTICIPLE);
-        sense(source, go, "move-travel", PartOfSpeech.VERB, "to move or travel from one place to another",
+        LearningUnitSenseEntity goMoveTravel = sense(source, go, "move-travel", PartOfSpeech.VERB, "to move or travel from one place to another",
                 "去；移动；前往", DifficultyLevel.A1, FrequencyBand.VERY_COMMON);
+        scenarioTag(goMoveTravel, "hotel_check_in", "0.9000");
+        scenarioTag(goMoveTravel, "shopping_return", "0.7000");
 
         LearningUnitEntity bank = unit("bank");
         form(bank, "bank", LearningUnitFormType.LEMMA);
         form(bank, "banks", LearningUnitFormType.PLURAL);
-        sense(source, bank, "financial-institution", PartOfSpeech.NOUN, "an organization that keeps and lends money",
+        LearningUnitSenseEntity bankFinancial = sense(source, bank, "financial-institution", PartOfSpeech.NOUN, "an organization that keeps and lends money",
                 "银行", DifficultyLevel.A2, FrequencyBand.COMMON);
-        sense(source, bank, "river-side", PartOfSpeech.NOUN, "the land along the side of a river",
+        scenarioTag(bankFinancial, "bank_account", "1.0000");
+        LearningUnitSenseEntity bankRiverSide = sense(source, bank, "river-side", PartOfSpeech.NOUN, "the land along the side of a river",
                 "河岸", DifficultyLevel.B1, FrequencyBand.MEDIUM);
+        scenarioTag(bankRiverSide, "general", "0.5000");
 
         LearningUnitEntity book = unit("book");
         form(book, "book", LearningUnitFormType.LEMMA);
         form(book, "books", LearningUnitFormType.PLURAL);
-        sense(source, book, "printed-work", PartOfSpeech.NOUN, "a written or printed work with pages",
+        LearningUnitSenseEntity bookPrintedWork = sense(source, book, "printed-work", PartOfSpeech.NOUN, "a written or printed work with pages",
                 "书；书籍", DifficultyLevel.A1, FrequencyBand.VERY_COMMON);
+        scenarioTag(bookPrintedWork, "shopping_return", "0.8000");
 
         LearningUnitEntity good = unit("good");
         form(good, "good", LearningUnitFormType.LEMMA);
         form(good, "better", LearningUnitFormType.COMPARATIVE);
         form(good, "best", LearningUnitFormType.SUPERLATIVE);
-        sense(source, good, "positive-quality", PartOfSpeech.ADJECTIVE, "of high quality or pleasant",
+        LearningUnitSenseEntity goodPositiveQuality = sense(source, good, "positive-quality", PartOfSpeech.ADJECTIVE, "of high quality or pleasant",
                 "好的；优质的", DifficultyLevel.A1, FrequencyBand.VERY_COMMON);
+        scenarioTag(goodPositiveQuality, "hotel_check_in", "0.7000");
+        scenarioTag(goodPositiveQuality, "shopping_return", "0.7000");
     }
 
     private LearningUnitEntity unit(String canonicalText) {
@@ -128,7 +140,7 @@ public class LearningUnitSeeder implements ApplicationRunner {
                 )));
     }
 
-    private void sense(
+    private LearningUnitSenseEntity sense(
             LearningDataSourceEntity source,
             LearningUnitEntity unit,
             String senseKey,
@@ -165,6 +177,18 @@ public class LearningUnitSeeder implements ApplicationRunner {
                         source,
                         SenseSourceAttributeType.SENSE,
                         senseKey
+                )));
+        return sense;
+    }
+
+    private void scenarioTag(LearningUnitSenseEntity sense, String scenarioCode, String relevanceScore) {
+        learningUnitSenseScenarioTagRepository
+                .findByLearningUnitSenseIdAndScenarioCode(sense.getId(), scenarioCode)
+                .orElseGet(() -> learningUnitSenseScenarioTagRepository.save(new LearningUnitSenseScenarioTagEntity(
+                        sense,
+                        scenarioCode,
+                        new BigDecimal(relevanceScore),
+                        SOURCE_NAME
                 )));
     }
 
