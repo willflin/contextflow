@@ -12,6 +12,7 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Component
@@ -31,11 +32,12 @@ public class PlacementItemSeeder implements ApplicationRunner {
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
-        if (!seedDemoItems || placementItemRepository.count() > 0) {
+        if (!seedDemoItems) {
             return;
         }
 
-        placementItemRepository.saveAll(List.of(
+        if (placementItemRepository.count() == 0) {
+            placementItemRepository.saveAll(List.of(
                 new PlacementItemEntity(
                         PlacementItemType.SCENE_DIALOGUE_CHOICE,
                         CefrLevel.A2,
@@ -128,6 +130,89 @@ public class PlacementItemSeeder implements ApplicationRunner {
                                 }
                                 """
                 )
-        ));
+            ));
+        }
+
+        if (placementItemRepository.countByAbilityDimension("vocabulary_size") == 0) {
+            placementItemRepository.saveAll(List.of(
+                    vocabularyItem(PlacementItemType.ZH_MEANING_CHOICE, CefrLevel.A1, 18, 450, "TOP_1000",
+                            "What does 'water' mean?",
+                            List.of("水", "火", "空气", "纸"), 0),
+                    vocabularyItem(PlacementItemType.ZH_MEANING_CHOICE, CefrLevel.A1, 22, 900, "TOP_1000",
+                            "What does 'family' mean?",
+                            List.of("家庭", "城市", "工作", "价格"), 0),
+                    vocabularyItem(PlacementItemType.CONTEXT_MEANING, CefrLevel.A2, 35, 1450, "TOP_2000",
+                            "In 'Please check the address', what does 'address' mean?",
+                            List.of("地址", "年龄", "价格", "早餐"), 0),
+                    vocabularyItem(PlacementItemType.ZH_MEANING_CHOICE, CefrLevel.A2, 40, 1900, "TOP_2000",
+                            "What does 'arrive' mean?",
+                            List.of("到达", "忘记", "比较", "借出"), 0),
+                    vocabularyItem(PlacementItemType.CONTEXT_MEANING, CefrLevel.B1, 48, 2600, "TOP_3000",
+                            "In 'The service is available today', what does 'available' mean?",
+                            List.of("可获得的", "昂贵的", "安静的", "危险的"), 0),
+                    vocabularyItem(PlacementItemType.SYNONYM_CHOICE, CefrLevel.B1, 55, 3100, "TOP_5000",
+                            "Choose the closest meaning of 'request'.",
+                            List.of("ask for", "throw away", "pay back", "look after"), 0),
+                    vocabularyItem(PlacementItemType.ANTONYM_CHOICE, CefrLevel.B1, 62, 4300, "TOP_5000",
+                            "Choose the opposite of 'increase'.",
+                            List.of("decrease", "include", "improve", "describe"), 0),
+                    vocabularyItem(PlacementItemType.BEST_EXPRESSION_CHOICE, CefrLevel.B2, 68, 5600, "TOP_8000",
+                            "Which sentence is most natural?",
+                            List.of("Could you confirm the details?", "Can you sure the details?", "Please truth the details.", "Could you detail confirm?"), 0),
+                    vocabularyItem(PlacementItemType.CONTEXT_MEANING, CefrLevel.B2, 76, 7200, "TOP_8000",
+                            "In 'The policy applies to all customers', what does 'applies to' mean?",
+                            List.of("适用于", "申请成为", "涂在上面", "向上移动"), 0),
+                    vocabularyItem(PlacementItemType.SYNONYM_CHOICE, CefrLevel.C1, 84, 9200, "TOP_12000",
+                            "Choose the closest meaning of 'subtle'.",
+                            List.of("not obvious", "very loud", "fully finished", "easy to count"), 0),
+                    vocabularyItem(PlacementItemType.ANTONYM_CHOICE, CefrLevel.C1, 90, 10800, "TOP_12000",
+                            "Choose the opposite of 'reluctant'.",
+                            List.of("willing", "careful", "silent", "recent"), 0),
+                    vocabularyItem(PlacementItemType.BEST_EXPRESSION_CHOICE, CefrLevel.C1, 94, 11800, "TOP_12000",
+                            "Which expression best fits a formal clarification?",
+                            List.of("Could you elaborate on that point?", "Can you big say it?", "Tell more thing.", "Make that point loudly."), 0)
+            ));
+        }
+    }
+
+    private PlacementItemEntity vocabularyItem(
+            PlacementItemType itemType,
+            CefrLevel cefrLevel,
+            int difficultyScore,
+            int frequencyRank,
+            String frequencyBand,
+            String question,
+            List<String> options,
+            int answerIndex
+    ) {
+        PlacementItemEntity item = new PlacementItemEntity(
+                itemType,
+                cefrLevel,
+                difficultyScore,
+                "vocabulary_size",
+                "vocabulary_size",
+                "vocabulary_size",
+                PlacementItemStatus.READY,
+                PlacementItemGradingType.LOCAL_EXACT,
+                """
+                        {
+                          "question": "%s",
+                          "options": %s,
+                          "answerIndex": %d,
+                          "explanation": "Vocabulary-size calibration item."
+                        }
+                        """.formatted(question, optionsJson(options), answerIndex)
+        );
+        item.configureVocabularyMeasurement(
+                frequencyRank,
+                frequencyBand,
+                BigDecimal.ONE,
+                BigDecimal.valueOf(0.25)
+        );
+        return item;
+    }
+
+    private String optionsJson(List<String> options) {
+        return "[\"" + String.join("\",\"", options) + "\"]";
     }
 }

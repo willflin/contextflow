@@ -1277,3 +1277,23 @@
 ### 说明 / Notes
 
 - 未新增依赖，未新增 SQL 迁移。 / No dependency or SQL migration was added.
+
+## Phase 7.1：词汇量自适应测试与水平阶梯 / Vocabulary Adaptive Placement and Level Ladder
+
+### 问题 / Problem
+
+- 原水平测试主要基于少量场景题，无法稳定估计用户词汇量，也缺少与词频难度对应的测量字段。 / The previous placement test mainly used a few scenario items and could not stably estimate vocabulary size or map results to frequency-based difficulty.
+- 用户“你的水平”模块只显示 CEFR 标签，缺少直观的水平层级位置。 / The learner profile only displayed the CEFR label and did not show where that level sits in the full ladder.
+
+### 操作 / Operations
+
+- 选择“频率层分层自适应 + IRT 参数预留”作为第一版方案：按词频层动态选题，保留 `item_discrimination` 和 `guessing_factor` 供后续真实答题数据校准。 / Chose a first-version design of frequency-band adaptive testing with reserved IRT parameters: items are selected by frequency-band difficulty, while `item_discrimination` and `guessing_factor` are stored for later calibration.
+- `placement_items` 新增 `frequency_rank`、`frequency_band`、`item_discrimination`、`guessing_factor`。 / Added `frequency_rank`, `frequency_band`, `item_discrimination`, and `guessing_factor` to `placement_items`.
+- `user_level_profiles` 新增 `vocabulary_size_estimate`、`vocabulary_band`、`vocabulary_measurement_error`。 / Added `vocabulary_size_estimate`, `vocabulary_band`, and `vocabulary_measurement_error` to `user_level_profiles`.
+- 自适应测试优先使用 `vocabulary_size` 题库，最多 14 题，并按答题结果动态调整难度。 / Adaptive placement now prioritizes the `vocabulary_size` item pool, uses up to 14 items, and adjusts difficulty dynamically.
+- 新增一批覆盖 `TOP_1000` 到 `TOP_12000` 的词汇量校准样例题，包含中文释义、语境释义、近义/反义和最佳表达。 / Added seed calibration items from `TOP_1000` to `TOP_12000`, covering Chinese meaning, contextual meaning, synonym/antonym, and best-expression item types.
+- 前端“你的水平”模块新增 A1-C1 阶梯图，当前等级大字背景色与阶梯色一致，并展示词汇量估计、频率层和误差范围。 / Added an A1-C1 level ladder to the learner profile; the current level badge uses the same color as the ladder and shows vocabulary estimate, frequency band, and measurement error.
+
+### 说明 / Notes
+
+- 未新增依赖。新增 Flyway 迁移 `V16__add_vocabulary_placement_measurement.sql`，同步 SQL 位于 `docs/sql/phase7_vocabulary_placement_measurement_schema.sql`。 / No dependency was added. Added Flyway migration `V16__add_vocabulary_placement_measurement.sql`; synchronized SQL is in `docs/sql/phase7_vocabulary_placement_measurement_schema.sql`.

@@ -10,4 +10,6 @@ import java.util.List;
 public interface PlacementItemRepository extends JpaRepository<PlacementItemEntity, Long> {
 
     List<PlacementItemEntity> findByStatusOrderByIdAsc(PlacementItemStatus status, Pageable pageable);
+
+    long countByAbilityDimension(String abilityDimension);
 }

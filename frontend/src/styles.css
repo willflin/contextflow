@@ -487,10 +487,88 @@ strong {
   height: 104px;
   place-items: center;
   border-radius: 8px;
-  background: #172026;
+  background: #668fbd;
   color: #ffffff;
   font-size: 38px;
   font-weight: 800;
+}
+
+.level-badge.level-a1 {
+  background: #80b88b;
+}
+
+.level-badge.level-a2 {
+  background: #6aa7a7;
+}
+
+.level-badge.level-b1 {
+  background: #668fbd;
+}
+
+.level-badge.level-b2 {
+  background: #b47f8a;
+}
+
+.level-badge.level-c1 {
+  background: #9a80b8;
+}
+
+.profile-level-layout {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 18px;
+  align-items: stretch;
+}
+
+.level-ladder {
+  display: grid;
+  gap: 8px;
+}
+
+.level-step {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  border: 1px solid #d9e1e5;
+  border-radius: 8px;
+  background: #f8fafb;
+  padding: 8px 10px;
+}
+
+.level-step.active {
+  border-color: #8aa5b6;
+  background: #eef5f7;
+}
+
+.level-step-color {
+  width: 12px;
+  height: 100%;
+  min-height: 30px;
+  border-radius: 999px;
+}
+
+.level-step strong,
+.level-step small {
+  display: block;
+}
+
+.level-step small {
+  color: #64747c;
+}
+
+.profile-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.profile-metrics > div {
+  min-width: 0;
+  border: 1px solid #d9e1e5;
+  border-radius: 8px;
+  background: #f8fafb;
+  padding: 12px;
 }
 
 .learning-panel {
@@ -1117,6 +1195,11 @@ strong {
   }
 
   .metrics-row {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-level-layout,
+  .profile-metrics {
     grid-template-columns: 1fr;
   }
 

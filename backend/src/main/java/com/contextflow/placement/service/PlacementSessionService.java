@@ -50,9 +50,10 @@ import java.util.stream.Collectors;
 public class PlacementSessionService {
 
     private static final int SESSION_ITEM_COUNT = 5;
-    private static final int ADAPTIVE_MAX_ITEM_COUNT = 10;
-    private static final int INITIAL_DIFFICULTY_SCORE = 50;
-    private static final int DIFFICULTY_STEP = 12;
+    private static final int ADAPTIVE_MAX_ITEM_COUNT = 14;
+    private static final int INITIAL_DIFFICULTY_SCORE = 40;
+    private static final int DIFFICULTY_STEP = 10;
+    private static final String VOCABULARY_ABILITY = "vocabulary_size";
 
     private final UserRepository userRepository;
     private final PlacementItemRepository placementItemRepository;
@@ -183,15 +184,17 @@ public class PlacementSessionService {
         boolean finished = answeredCount >= session.getMaxItemCount() || nextItem.isEmpty();
 
         if (finished) {
+            Map<Long, PlacementItemEntity> answeredItems = itemMap(answerRows);
+            int vocabularySizeEstimate = estimateVocabularySize(answerRows, answeredItems, nextDifficulty);
+            CefrLevel estimatedLevel = estimateLevel(vocabularySizeEstimate, scorePercent(correctCount, answeredCount));
             BigDecimal scorePercent = scorePercent(correctCount, answeredCount);
-            CefrLevel estimatedLevel = estimateLevel(scorePercent);
             session.finishAdaptive(answeredCount, correctCount, scorePercent, estimatedLevel);
             userLevelProfileService.upsertFromPlacementResult(
                     user,
                     session,
                     estimatedLevel,
                     answerRows,
-                    itemMap(answerRows)
+                    answeredItems
             );
             return new AdaptivePlacementAnswerResponse(
                     session.getId(),
@@ -208,7 +211,10 @@ public class PlacementSessionService {
                             answeredCount,
                             correctCount,
                             scorePercent,
-                            estimatedLevel
+                            estimatedLevel,
+                            vocabularySizeEstimate,
+                            vocabularyBand(vocabularySizeEstimate),
+                            measurementError(answeredCount)
                     )
             );
         }
@@ -277,7 +283,8 @@ public class PlacementSessionService {
         }
 
         BigDecimal scorePercent = scorePercent(correctCount, answerRows.size());
-        CefrLevel estimatedLevel = estimateLevel(scorePercent);
+        int vocabularySizeEstimate = estimateVocabularySize(answerRows, itemMap, 50);
+        CefrLevel estimatedLevel = estimateLevel(vocabularySizeEstimate, scorePercent);
         session.submit(correctCount, scorePercent, estimatedLevel);
         userLevelProfileService.upsertFromPlacementResult(user, session, estimatedLevel, answerRows, itemMap);
 
@@ -287,7 +294,10 @@ public class PlacementSessionService {
                 submittedAnswers.size(),
                 correctCount,
                 scorePercent,
-                estimatedLevel
+                estimatedLevel,
+                vocabularySizeEstimate,
+                vocabularyBand(vocabularySizeEstimate),
+                measurementError(answerRows.size())
         );
     }
 
@@ -364,15 +374,29 @@ public class PlacementSessionService {
     }
 
     private Optional<PlacementItemEntity> nextAdaptiveItem(int targetDifficultyScore, Collection<Long> usedItemIds) {
-        return placementItemRepository
+        List<PlacementItemEntity> readyItems = placementItemRepository
                 .findByStatusOrderByIdAsc(PlacementItemStatus.READY, PageRequest.of(0, 100))
                 .stream()
                 .filter(item -> !usedItemIds.contains(item.getId()))
+                .toList();
+        boolean hasVocabularyPool = placementItemRepository.countByAbilityDimension(VOCABULARY_ABILITY) >= 8;
+        return readyItems.stream()
+                .filter(item -> !hasVocabularyPool || VOCABULARY_ABILITY.equals(item.getAbilityDimension()))
                 .min(Comparator
-                        .comparingInt((PlacementItemEntity item) ->
-                                Math.abs(item.getDifficultyScore() - targetDifficultyScore))
+                        .comparingInt((PlacementItemEntity item) -> Math.abs(item.getDifficultyScore() - targetDifficultyScore))
+                        .thenComparing(this::itemTypePriority)
                         .thenComparing(PlacementItemEntity::getDifficultyScore)
                         .thenComparing(PlacementItemEntity::getId));
+    }
+
+    private int itemTypePriority(PlacementItemEntity item) {
+        return switch (item.getItemType()) {
+            case ZH_MEANING_CHOICE -> 0;
+            case CONTEXT_MEANING -> 1;
+            case SYNONYM_CHOICE, ANTONYM_CHOICE -> 2;
+            case BEST_EXPRESSION_CHOICE, EXPRESSION_COMPLETION, CLOZE_TEXT -> 3;
+            default -> 4;
+        };
     }
 
     private Map<Long, PlacementItemEntity> itemMap(List<PlacementSessionAnswerEntity> answerRows) {
@@ -413,17 +437,112 @@ public class PlacementSessionService {
                 .divide(BigDecimal.valueOf(itemCount), 2, RoundingMode.HALF_UP);
     }
 
-    private CefrLevel estimateLevel(BigDecimal scorePercent) {
-        int score = scorePercent.intValue();
-        if (score >= 85) {
+    private int estimateVocabularySize(
+            List<PlacementSessionAnswerEntity> answerRows,
+            Map<Long, PlacementItemEntity> itemMap,
+            int fallbackDifficultyScore
+    ) {
+        Map<String, ScoreCounter> bandCounters = new java.util.LinkedHashMap<>();
+        for (PlacementSessionAnswerEntity answer : answerRows) {
+            PlacementItemEntity item = itemMap.get(answer.getItemId());
+            if (item == null || answer.getCorrect() == null || item.getFrequencyBand() == null) {
+                continue;
+            }
+            bandCounters.computeIfAbsent(item.getFrequencyBand(), ignored -> new ScoreCounter())
+                    .record(Boolean.TRUE.equals(answer.getCorrect()));
+        }
+        if (bandCounters.size() < 2) {
+            return vocabularyFromDifficulty(fallbackDifficultyScore);
+        }
+        int estimate = 0;
+        for (String band : List.of("TOP_1000", "TOP_2000", "TOP_3000", "TOP_5000", "TOP_8000", "TOP_12000")) {
+            ScoreCounter counter = bandCounters.get(band);
+            if (counter == null) {
+                continue;
+            }
+            double masteryProbability = (counter.correct + 0.5d) / (counter.total + 1.0d);
+            estimate += Math.round((float) (bandWidth(band) * masteryProbability));
+        }
+        return Math.max(500, Math.min(12000, estimate));
+    }
+
+    private int vocabularyFromDifficulty(int difficultyScore) {
+        if (difficultyScore >= 85) {
+            return 10000;
+        }
+        if (difficultyScore >= 70) {
+            return 8000;
+        }
+        if (difficultyScore >= 55) {
+            return 5000;
+        }
+        if (difficultyScore >= 40) {
+            return 3000;
+        }
+        if (difficultyScore >= 25) {
+            return 2000;
+        }
+        return 1000;
+    }
+
+    private int bandWidth(String band) {
+        return switch (band) {
+            case "TOP_1000", "TOP_2000", "TOP_3000" -> 1000;
+            case "TOP_5000" -> 2000;
+            case "TOP_8000" -> 3000;
+            case "TOP_12000" -> 4000;
+            default -> 0;
+        };
+    }
+
+    private CefrLevel estimateLevel(int vocabularySizeEstimate, BigDecimal scorePercent) {
+        if (vocabularySizeEstimate >= 8000) {
+            return CefrLevel.C1;
+        }
+        if (vocabularySizeEstimate >= 4000) {
             return CefrLevel.B2;
         }
-        if (score >= 65) {
+        if (vocabularySizeEstimate >= 2000) {
             return CefrLevel.B1;
         }
-        if (score >= 40) {
+        if (vocabularySizeEstimate >= 1000 || scorePercent.intValue() >= 40) {
             return CefrLevel.A2;
         }
         return CefrLevel.A1;
+    }
+
+    private String vocabularyBand(int vocabularySizeEstimate) {
+        if (vocabularySizeEstimate >= 8000) {
+            return "8000+";
+        }
+        if (vocabularySizeEstimate >= 5000) {
+            return "5000-8000";
+        }
+        if (vocabularySizeEstimate >= 3000) {
+            return "3000-5000";
+        }
+        if (vocabularySizeEstimate >= 2000) {
+            return "2000-3000";
+        }
+        if (vocabularySizeEstimate >= 1000) {
+            return "1000-2000";
+        }
+        return "0-1000";
+    }
+
+    private int measurementError(int answeredCount) {
+        return Math.max(600, 2600 - answeredCount * 140);
+    }
+
+    private static final class ScoreCounter {
+        private int total;
+        private int correct;
+
+        private void record(boolean isCorrect) {
+            total++;
+            if (isCorrect) {
+                correct++;
+            }
+        }
     }
 }

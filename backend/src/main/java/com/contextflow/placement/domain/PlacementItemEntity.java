@@ -12,6 +12,7 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
 import java.time.Instant;
+import java.math.BigDecimal;
 
 @Entity
 @Table(name = "placement_items")
@@ -31,6 +32,18 @@ public class PlacementItemEntity {
 
     @Column(name = "difficulty_score", nullable = false)
     private Integer difficultyScore;
+
+    @Column(name = "frequency_rank")
+    private Integer frequencyRank;
+
+    @Column(name = "frequency_band", length = 32)
+    private String frequencyBand;
+
+    @Column(name = "item_discrimination", nullable = false)
+    private BigDecimal itemDiscrimination;
+
+    @Column(name = "guessing_factor", nullable = false)
+    private BigDecimal guessingFactor;
 
     @Column(name = "scenario_tag", nullable = false, length = 64)
     private String scenarioTag;
@@ -96,6 +109,8 @@ public class PlacementItemEntity {
         this.itemType = itemType;
         this.cefrLevel = cefrLevel;
         this.difficultyScore = difficultyScore;
+        this.itemDiscrimination = BigDecimal.ONE;
+        this.guessingFactor = BigDecimal.valueOf(0.25);
         this.scenarioTag = scenarioTag;
         this.targetSkill = targetSkill;
         this.abilityDimension = abilityDimension;
@@ -140,6 +155,29 @@ public class PlacementItemEntity {
 
     public Integer getDifficultyScore() {
         return difficultyScore;
+    }
+
+    public Integer getFrequencyRank() {
+        return frequencyRank;
+    }
+
+    public String getFrequencyBand() {
+        return frequencyBand;
+    }
+
+    public BigDecimal getItemDiscrimination() {
+        return itemDiscrimination;
+    }
+
+    public BigDecimal getGuessingFactor() {
+        return guessingFactor;
+    }
+
+    public void configureVocabularyMeasurement(Integer frequencyRank, String frequencyBand, BigDecimal itemDiscrimination, BigDecimal guessingFactor) {
+        this.frequencyRank = frequencyRank;
+        this.frequencyBand = frequencyBand;
+        this.itemDiscrimination = itemDiscrimination == null ? BigDecimal.ONE : itemDiscrimination;
+        this.guessingFactor = guessingFactor == null ? BigDecimal.valueOf(0.25) : guessingFactor;
     }
 
     public String getScenarioTag() {

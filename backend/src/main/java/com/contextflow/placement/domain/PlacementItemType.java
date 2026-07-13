@@ -10,5 +10,7 @@ public enum PlacementItemType {
     TRUE_FALSE,
     SYNONYM_CHOICE,
     ANTONYM_CHOICE,
-    CLOZE_TEXT
+    CLOZE_TEXT,
+    ZH_MEANING_CHOICE,
+    BEST_EXPRESSION_CHOICE
 }

@@ -75,6 +75,11 @@ public class UserLevelProfileService {
                 snapshot.weakAbilitiesJson(),
                 session.getId()
         );
+        profile.updateVocabularyMeasurement(
+                snapshot.vocabularySizeEstimate(),
+                snapshot.vocabularyBand(),
+                snapshot.vocabularyMeasurementError()
+        );
         userLevelProfileRepository.save(profile);
     }
 
@@ -105,11 +110,104 @@ public class UserLevelProfileService {
         List<String> weakAbilities = weakKeys(abilityCounters);
         List<String> weakScenarios = weakKeys(scenarioCounters);
 
+        int vocabularySizeEstimate = estimateVocabularySize(answerRows, itemMap);
         return new ProfileSnapshot(
                 toJson(dimensionScores),
                 toJson(weakScenarios),
-                toJson(weakAbilities)
+                toJson(weakAbilities),
+                vocabularySizeEstimate,
+                vocabularyBand(vocabularySizeEstimate),
+                measurementError((int) answerRows.stream().filter(PlacementSessionAnswerEntity::isAnswered).count())
         );
+    }
+
+    private int estimateVocabularySize(
+            List<PlacementSessionAnswerEntity> answerRows,
+            Map<Long, PlacementItemEntity> itemMap
+    ) {
+        Map<String, ScoreCounter> bandCounters = new LinkedHashMap<>();
+        for (PlacementSessionAnswerEntity answer : answerRows) {
+            PlacementItemEntity item = itemMap.get(answer.getItemId());
+            if (item == null || answer.getCorrect() == null || item.getFrequencyBand() == null) {
+                continue;
+            }
+            bandCounters.computeIfAbsent(item.getFrequencyBand(), ignored -> new ScoreCounter())
+                    .record(Boolean.TRUE.equals(answer.getCorrect()));
+        }
+        if (bandCounters.size() < 2) {
+            return nullSafeDifficultyEstimate(answerRows);
+        }
+        int estimate = 0;
+        for (String band : List.of("TOP_1000", "TOP_2000", "TOP_3000", "TOP_5000", "TOP_8000", "TOP_12000")) {
+            ScoreCounter counter = bandCounters.get(band);
+            if (counter == null) {
+                continue;
+            }
+            double masteryProbability = (counter.correct + 0.5d) / (counter.total + 1.0d);
+            estimate += Math.round((float) (bandWidth(band) * masteryProbability));
+        }
+        return Math.max(500, Math.min(12000, estimate));
+    }
+
+    private int nullSafeDifficultyEstimate(List<PlacementSessionAnswerEntity> answerRows) {
+        int answered = 0;
+        int correct = 0;
+        for (PlacementSessionAnswerEntity answer : answerRows) {
+            if (answer.getCorrect() == null) {
+                continue;
+            }
+            answered++;
+            if (Boolean.TRUE.equals(answer.getCorrect())) {
+                correct++;
+            }
+        }
+        if (answered == 0) {
+            return 1000;
+        }
+        int percent = Math.round((correct * 100.0f) / answered);
+        if (percent >= 85) {
+            return 8000;
+        }
+        if (percent >= 65) {
+            return 5000;
+        }
+        if (percent >= 40) {
+            return 2500;
+        }
+        return 1000;
+    }
+
+    private int bandWidth(String band) {
+        return switch (band) {
+            case "TOP_1000", "TOP_2000", "TOP_3000" -> 1000;
+            case "TOP_5000" -> 2000;
+            case "TOP_8000" -> 3000;
+            case "TOP_12000" -> 4000;
+            default -> 0;
+        };
+    }
+
+    private String vocabularyBand(int vocabularySizeEstimate) {
+        if (vocabularySizeEstimate >= 8000) {
+            return "8000+";
+        }
+        if (vocabularySizeEstimate >= 5000) {
+            return "5000-8000";
+        }
+        if (vocabularySizeEstimate >= 3000) {
+            return "3000-5000";
+        }
+        if (vocabularySizeEstimate >= 2000) {
+            return "2000-3000";
+        }
+        if (vocabularySizeEstimate >= 1000) {
+            return "1000-2000";
+        }
+        return "0-1000";
+    }
+
+    private int measurementError(int answeredCount) {
+        return Math.max(600, 2600 - answeredCount * 140);
     }
 
     private Map<String, Integer> percentMap(Map<String, ScoreCounter> counters) {
@@ -139,7 +237,10 @@ public class UserLevelProfileService {
     private record ProfileSnapshot(
             String dimensionScoresJson,
             String weakScenariosJson,
-            String weakAbilitiesJson
+            String weakAbilitiesJson,
+            int vocabularySizeEstimate,
+            String vocabularyBand,
+            int vocabularyMeasurementError
     ) {
     }
 

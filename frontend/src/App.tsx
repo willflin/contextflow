@@ -1488,6 +1488,14 @@ export default function App() {
                 <span className="label">估计水平</span>
                 <strong>{placementResult.estimatedLevel}</strong>
               </div>
+              <div>
+                <span className="label">估计词汇量</span>
+                <strong>{placementResult.vocabularySizeEstimate} 词</strong>
+              </div>
+              <div>
+                <span className="label">频率层</span>
+                <strong>{placementResult.vocabularyBand}</strong>
+              </div>
             </div>
           </div>
         )}
@@ -1512,10 +1520,47 @@ export default function App() {
 
     return (
       <div className="profile-content">
-        <div className="level-badge">{profile.cefrLevel}</div>
-        <p className="hint">后续学习会使用你的水平和薄弱项。</p>
+        <div className="profile-level-layout">
+          <div className={`level-badge level-${profile.cefrLevel.toLowerCase()}`}>{profile.cefrLevel}</div>
+          <div className="level-ladder" aria-label="CEFR 水平阶梯">
+            {cefrLadder().map((level) => (
+              <div className={`level-step ${level.key === profile.cefrLevel ? 'active' : ''}`} key={level.key}>
+                <span className="level-step-color" style={{ background: level.color }} />
+                <div>
+                  <strong>{level.key}</strong>
+                  <small>{level.label}</small>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="profile-metrics">
+          <div>
+            <span className="label">估计词汇量</span>
+            <strong>{profile.vocabularySizeEstimate ? `${profile.vocabularySizeEstimate} 词` : '待测'}</strong>
+          </div>
+          <div>
+            <span className="label">频率层</span>
+            <strong>{profile.vocabularyBand ?? '待测'}</strong>
+          </div>
+          <div>
+            <span className="label">误差范围</span>
+            <strong>{profile.vocabularyMeasurementError ? `±${profile.vocabularyMeasurementError}` : '待校准'}</strong>
+          </div>
+        </div>
+        <p className="hint">后续学习会使用你的水平、词汇量和薄弱项。</p>
       </div>
     );
+  }
+
+  function cefrLadder() {
+    return [
+      { key: 'A1', label: '入门', color: '#80b88b' },
+      { key: 'A2', label: '基础', color: '#6aa7a7' },
+      { key: 'B1', label: '独立初级', color: '#668fbd' },
+      { key: 'B2', label: '独立高级', color: '#b47f8a' },
+      { key: 'C1', label: '熟练', color: '#9a80b8' }
+    ];
   }
 
   function renderAgentRuntimePanel() {

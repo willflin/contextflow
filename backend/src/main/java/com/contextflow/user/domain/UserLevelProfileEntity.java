@@ -29,6 +29,15 @@ public class UserLevelProfileEntity {
     @Column(name = "cefr_level", nullable = false, length = 16)
     private CefrLevel cefrLevel;
 
+    @Column(name = "vocabulary_size_estimate")
+    private Integer vocabularySizeEstimate;
+
+    @Column(name = "vocabulary_band", length = 32)
+    private String vocabularyBand;
+
+    @Column(name = "vocabulary_measurement_error")
+    private Integer vocabularyMeasurementError;
+
     @Column(name = "dimension_scores", nullable = false, columnDefinition = "json")
     private String dimensionScoresJson;
 
@@ -88,6 +97,12 @@ public class UserLevelProfileEntity {
         this.lastPlacementSessionId = lastPlacementSessionId;
     }
 
+    public void updateVocabularyMeasurement(Integer vocabularySizeEstimate, String vocabularyBand, Integer vocabularyMeasurementError) {
+        this.vocabularySizeEstimate = vocabularySizeEstimate;
+        this.vocabularyBand = vocabularyBand;
+        this.vocabularyMeasurementError = vocabularyMeasurementError;
+    }
+
     public Long getId() {
         return id;
     }
@@ -102,6 +117,18 @@ public class UserLevelProfileEntity {
 
     public String getDimensionScoresJson() {
         return dimensionScoresJson;
+    }
+
+    public Integer getVocabularySizeEstimate() {
+        return vocabularySizeEstimate;
+    }
+
+    public String getVocabularyBand() {
+        return vocabularyBand;
+    }
+
+    public Integer getVocabularyMeasurementError() {
+        return vocabularyMeasurementError;
     }
 
     public String getWeakScenariosJson() {

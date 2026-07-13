@@ -10,6 +10,9 @@ public record PlacementSessionResultResponse(
         int answeredCount,
         int correctCount,
         BigDecimal scorePercent,
-        CefrLevel estimatedLevel
+        CefrLevel estimatedLevel,
+        int vocabularySizeEstimate,
+        String vocabularyBand,
+        int vocabularyMeasurementError
 ) {
 }

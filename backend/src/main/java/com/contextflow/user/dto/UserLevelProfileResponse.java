@@ -7,6 +7,9 @@ import java.time.Instant;
 
 public record UserLevelProfileResponse(
         CefrLevel cefrLevel,
+        Integer vocabularySizeEstimate,
+        String vocabularyBand,
+        Integer vocabularyMeasurementError,
         String dimensionScoresJson,
         String weakScenariosJson,
         String weakAbilitiesJson,
@@ -16,6 +19,9 @@ public record UserLevelProfileResponse(
     public static UserLevelProfileResponse from(UserLevelProfileEntity entity) {
         return new UserLevelProfileResponse(
                 entity.getCefrLevel(),
+                entity.getVocabularySizeEstimate(),
+                entity.getVocabularyBand(),
+                entity.getVocabularyMeasurementError(),
                 entity.getDimensionScoresJson(),
                 entity.getWeakScenariosJson(),
                 entity.getWeakAbilitiesJson(),

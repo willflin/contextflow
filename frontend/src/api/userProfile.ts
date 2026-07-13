@@ -8,6 +8,9 @@ type ApiResponse<T> = {
 
 export type UserLevelProfile = {
   cefrLevel: string;
+  vocabularySizeEstimate: number | null;
+  vocabularyBand: string | null;
+  vocabularyMeasurementError: number | null;
   dimensionScoresJson: string;
   weakScenariosJson: string;
   weakAbilitiesJson: string;

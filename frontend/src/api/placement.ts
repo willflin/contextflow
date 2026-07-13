@@ -16,7 +16,9 @@ export type PlacementItemType =
   | 'TRUE_FALSE'
   | 'SYNONYM_CHOICE'
   | 'ANTONYM_CHOICE'
-  | 'CLOZE_TEXT';
+  | 'CLOZE_TEXT'
+  | 'ZH_MEANING_CHOICE'
+  | 'BEST_EXPRESSION_CHOICE';
 
 export type PlacementGradingType = 'LOCAL_EXACT' | 'LOCAL_ACCEPTED_ANSWERS' | 'AI_JUDGE';
 
@@ -25,6 +27,8 @@ export type PlacementTestItem = {
   itemType: PlacementItemType;
   cefrLevel: string;
   difficultyScore: number;
+  frequencyRank: number | null;
+  frequencyBand: string | null;
   scenarioTag: string;
   targetSkill: string;
   abilityDimension: string;
@@ -48,6 +52,9 @@ export type PlacementSessionResult = {
   correctCount: number;
   scorePercent: number;
   estimatedLevel: string;
+  vocabularySizeEstimate: number;
+  vocabularyBand: string;
+  vocabularyMeasurementError: number;
 };
 
 export type AdaptivePlacementAnswer = {
