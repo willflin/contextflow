@@ -2021,8 +2021,7 @@ export default function App() {
 
     const content = parseLearningPackageContent(learningPackage);
     const scenarioCode = content.scenario?.code;
-    const taskGoal = content.learningTask?.goal ?? fallbackTaskGoal(scenarioCode) ?? content.scenario?.description;
-    const expectedLearnerAction = content.learningTask?.expectedLearnerAction ?? fallbackExpectedLearnerAction(scenarioCode);
+    const taskGoal = fallbackTaskGoal(scenarioCode) ?? content.learningTask?.goal ?? content.scenario?.description;
     const registerNote = taskRegisterNote(content);
     const taskFacts = Object.entries(content.learningTask?.facts ?? fallbackTaskFacts(scenarioCode) ?? {});
     const taskChecklist = buildTaskChecklist(content);
@@ -2042,7 +2041,6 @@ export default function App() {
             <span className="label">任务目标</span>
             <p>{taskGoal}</p>
             <small>{registerNote}</small>
-            {expectedLearnerAction && <small>{expectedLearnerAction}</small>}
             {taskChecklist.length > 0 && (
               <div className="task-checklist" aria-label="待完成任务">
                 <span className="label">待完成任务</span>
@@ -2059,7 +2057,7 @@ export default function App() {
                 {taskFacts.map(([key, value]) => (
                   <div className="task-fact" key={key}>
                     <span>{formatTaskFactLabel(key)}</span>
-                    <strong>{value}</strong>
+                    <strong>{formatTaskFactValue(key, String(value))}</strong>
                   </div>
                 ))}
               </div>
@@ -2517,5 +2515,35 @@ export default function App() {
       tone: '语气'
     };
     return labels[value] ?? value;
+  }
+
+  function formatTaskFactValue(key: string, value: string) {
+    const normalized = value.toLowerCase();
+    const byKey: Record<string, string> = {
+      arrival: normalized === 'tonight' ? '今晚' : value,
+      reservation: normalized === 'two nights under alex chen' ? '已预订两晚，姓名 Alex Chen' : value,
+      roomPreference: normalized === 'quiet queen room' ? '安静的大床房' : value,
+      document: normalized === 'passport ready' ? '护照已准备好' : normalized === 'id is available' ? '已带身份证件' : value,
+      questionsToAsk: normalized === 'breakfast time and wi-fi'
+        ? '早餐时间、Wi-Fi 信息'
+        : normalized === 'monthly fees and required documents'
+          ? '月费、所需材料'
+          : normalized === 'why you were stopped and what to do next'
+            ? '被拦下原因、下一步做法'
+            : value,
+      item: normalized === 'wireless headphones' ? '无线耳机' : value,
+      purchaseTime: normalized === 'yesterday' ? '昨天' : value,
+      problem: normalized === 'the left side has no sound' ? '左边没有声音' : value,
+      receipt: normalized === 'available' ? '已带收据' : value,
+      payment: normalized === 'paid by card' ? '银行卡付款' : value,
+      desiredOutcome: normalized === 'refund or exchange' ? '退款或换货' : value,
+      accountType: normalized === 'savings account' ? '储蓄账户' : value,
+      documents: normalized === 'passport and proof of address' ? '护照和地址证明' : value,
+      requestedService: normalized === 'debit card' ? '借记卡' : value,
+      situation: normalized === 'walking to the subway at night' ? '晚上正走去地铁站' : value,
+      transport: normalized === 'not driving' ? '没有开车' : value,
+      tone: normalized === 'calm and polite' ? '冷静、礼貌' : value
+    };
+    return byKey[key] ?? value;
   }
 }

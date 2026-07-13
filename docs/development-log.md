@@ -1262,3 +1262,18 @@
 ### 说明 / Notes
 
 - 未新增依赖，未新增 SQL 迁移。 / No dependency or SQL migration was added.
+
+## Phase 6.3.27：学习任务背景去英文提示化 / Remove Early English Hints from Task Background
+
+### 问题 / Problem
+
+- 学习区背景信息直接展示英文 facts 或行动提示，可能让用户过早接触可套用表达，削弱对话学习效果。 / The learner task background directly showed English facts or action hints, which could expose usable wording too early and weaken the dialogue-learning effect.
+
+### 操作 / Operations
+
+- 前端学习任务卡片优先显示中文任务目标，不再直接展示 `expectedLearnerAction`。 / The frontend task card now prefers the Chinese task goal and no longer directly displays `expectedLearnerAction`.
+- 任务 facts 的可见值改为中文描述；原始结构化 facts 仍保留给 Agent、Mentor 提示和后端契约使用。 / Visible task fact values are now rendered as Chinese descriptions, while the original structured facts remain available to the Agent, Mentor hints, and backend contract.
+
+### 说明 / Notes
+
+- 未新增依赖，未新增 SQL 迁移。 / No dependency or SQL migration was added.
