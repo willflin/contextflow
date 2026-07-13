@@ -47,6 +47,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -95,8 +96,10 @@ public class PlacementSessionService {
     @Transactional
     public PlacementSessionResponse startSession(String username) {
         UserEntity user = activeUser(username);
-        List<PlacementItemEntity> items = placementItemRepository
-                .findByStatusOrderByIdAsc(PlacementItemStatus.READY, PageRequest.of(0, SESSION_ITEM_COUNT));
+        List<PlacementItemEntity> items = new ArrayList<>(placementItemRepository
+                .findByStatusOrderByIdAsc(PlacementItemStatus.READY, PageRequest.of(0, 50)));
+        Collections.shuffle(items);
+        items = items.stream().limit(SESSION_ITEM_COUNT).toList();
 
         if (items.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "No READY placement items are available.");
@@ -412,26 +415,52 @@ public class PlacementSessionService {
                 .filter(item -> !hasVocabularyPool || VOCABULARY_ABILITY.equals(item.getAbilityDimension()))
                 .toList();
 
-        Optional<PlacementItemEntity> targetBandItem = candidates.stream()
+        List<PlacementItemEntity> targetBandCandidates = candidates.stream()
                 .filter(item -> targetFrequencyBand != null && targetFrequencyBand.equals(item.getFrequencyBand()))
                 .filter(item -> bandCounts.getOrDefault(item.getFrequencyBand(), 0) < MAX_ITEMS_PER_BAND)
-                .min(Comparator
+                .toList();
+
+        Optional<PlacementItemEntity> targetBandItem = randomFromBestCandidates(
+                targetBandCandidates,
+                Comparator
                         .comparing(this::itemTypePriority)
                         .thenComparing(PlacementItemEntity::getDifficultyScore)
-                        .thenComparing(PlacementItemEntity::getId));
-
+                        .thenComparing(PlacementItemEntity::getId),
+                8
+        );
         if (targetBandItem.isPresent()) {
             return targetBandItem;
         }
 
-        return candidates.stream()
+        List<PlacementItemEntity> fallbackCandidates = candidates.stream()
                 .filter(item -> item.getFrequencyBand() == null
                         || bandCounts.getOrDefault(item.getFrequencyBand(), 0) < MAX_ITEMS_PER_BAND)
-                .min(Comparator
+                .toList();
+
+        return randomFromBestCandidates(
+                fallbackCandidates,
+                Comparator
                         .comparingInt((PlacementItemEntity item) -> Math.abs(item.getDifficultyScore() - targetDifficultyScore))
                         .thenComparing(this::itemTypePriority)
                         .thenComparing(PlacementItemEntity::getDifficultyScore)
-                        .thenComparing(PlacementItemEntity::getId));
+                        .thenComparing(PlacementItemEntity::getId),
+                8
+        );
+    }
+
+    private Optional<PlacementItemEntity> randomFromBestCandidates(
+            List<PlacementItemEntity> candidates,
+            Comparator<PlacementItemEntity> comparator,
+            int poolSize
+    ) {
+        List<PlacementItemEntity> bestCandidates = candidates.stream()
+                .sorted(comparator)
+                .limit(poolSize)
+                .toList();
+        if (bestCandidates.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(bestCandidates.get(ThreadLocalRandom.current().nextInt(bestCandidates.size())));
     }
 
     private int itemTypePriority(PlacementItemEntity item) {

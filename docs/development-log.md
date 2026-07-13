@@ -1369,3 +1369,20 @@
 ### 说明 / Notes
 
 - 未新增依赖，未新增数据库表；本次无新增 SQL 文件。 / No dependency or database table was added; no new SQL file was needed.
+## Phase 7.1.5：题库规模扩容与随机出题修正 / Question Bank Scale-Up and Random Item Order Fix
+
+### 问题 / Problem
+
+- 题库补充不能停留在每层少量样例，目标应达到每个频率难度层约 100 题的量级。 / The question bank should not stay at a few examples per band; the target is about 100 items per frequency-difficulty band.
+- 自适应选题如果固定取同层最小 ID，用户会感到出题顺序固定。 / If adaptive selection always takes the lowest-id item in a band, item order feels fixed.
+
+### 操作 / Operations
+
+- 新增 V19 批量种子迁移：从 `ecdict_clean_word_entries` 按 8 个频率层各抽取最多 100 个真实清洗单词生成中文释义选择题。 / Added V19 batch seed migration: it generates Chinese-meaning choice items from up to 100 cleaned ECDICT words per frequency band across 8 bands.
+- 选项干扰项从相邻频率词条释义生成，正确答案仍由 `answerIndex=0` 标记，前端展示时继续由 `option_order_json` 打乱。 / Distractors are generated from nearby frequency entries; the correct answer remains `answerIndex=0`, and display order is still randomized through `option_order_json`.
+- 出题逻辑改为从最佳候选池随机抽取，不再固定取同层最小 ID 题目。 / Item selection now randomly picks from the best candidate pool instead of always taking the lowest-id item in the same band.
+
+### 说明 / Notes
+
+- 未新增依赖，未新增数据库表；新增 Flyway 迁移 `V19__seed_more_vocabulary_placement_items.sql`，同步 SQL 位于 `docs/sql/phase7_seed_more_vocabulary_placement_items.sql`。 / No dependency or database table was added. Added Flyway migration `V19__seed_more_vocabulary_placement_items.sql`; synchronized SQL is in `docs/sql/phase7_seed_more_vocabulary_placement_items.sql`.
+- 实际每层数量取决于清洗词表中该频率层是否有足够词条；完整 ECDICT 清洗数据应能达到每层约 100 题。 / Actual per-band counts depend on enough cleaned entries in that frequency band; full cleaned ECDICT data should reach about 100 items per band.
