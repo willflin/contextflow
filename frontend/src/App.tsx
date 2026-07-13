@@ -518,6 +518,25 @@ export default function App() {
     }
   }
 
+  async function applyVocabularyStatusFilter(status: VocabularyStatusFilter) {
+    const token = tokenOrNull();
+    setVocabularyStatus(status);
+    if (!token) {
+      return;
+    }
+    setVocabularyBusy(true);
+    setVocabularyError(null);
+    try {
+      const result = await fetchVocabulary(token, status, vocabularyQuery, 500);
+      setVocabulary(result);
+    } catch (exception) {
+      setVocabulary(null);
+      setVocabularyError(exception instanceof Error ? exception.message : '词库加载失败。');
+    } finally {
+      setVocabularyBusy(false);
+    }
+  }
+
   async function searchAdminWordByQuery(event?: React.FormEvent<HTMLFormElement>) {
     event?.preventDefault();
     const token = tokenOrNull();
@@ -1406,6 +1425,11 @@ export default function App() {
   }
 
   function renderPlacementQuestion(showDebug: boolean) {
+    const placementProgressCurrent = placementSession ? Math.min(placementSession.answeredCount + 1, placementSession.maxItemCount) : 0;
+    const placementProgressTotal = placementSession?.maxItemCount ?? 0;
+    const placementProgressPercent = placementProgressTotal > 0
+      ? Math.round((placementProgressCurrent / placementProgressTotal) * 100)
+      : 0;
     return (
       <>
         {placementSession && showDebug && (
@@ -1431,6 +1455,19 @@ export default function App() {
 
         {currentItem && itemContent && (
           <div className="question-panel">
+            {placementSession && (
+              <div className="placement-progress" aria-label="测试进度">
+                <div className="placement-progress-header">
+                  <strong>
+                    {placementProgressCurrent}/{placementProgressTotal}
+                  </strong>
+                  <span>还剩 {Math.max(placementProgressTotal - placementProgressCurrent, 0)} 题</span>
+                </div>
+                <div className="placement-progress-track">
+                  <span style={{ width: `${placementProgressPercent}%` }} />
+                </div>
+              </div>
+            )}
             {showDebug && (
               <div className="question-meta">
                 <span>{currentItem.itemType}</span>
@@ -1555,11 +1592,12 @@ export default function App() {
 
   function cefrLadder() {
     return [
-      { key: 'A1', label: '入门', color: '#80b88b' },
-      { key: 'A2', label: '基础', color: '#6aa7a7' },
-      { key: 'B1', label: '独立初级', color: '#668fbd' },
-      { key: 'B2', label: '独立高级', color: '#b47f8a' },
-      { key: 'C1', label: '熟练', color: '#9a80b8' }
+      { key: 'C2', label: '精通', color: '#c89ce0' },
+      { key: 'C1', label: '熟练', color: '#b894d4' },
+      { key: 'B2', label: '独立高级', color: '#ca919c' },
+      { key: 'B1', label: '独立初级', color: '#7ca5d2' },
+      { key: 'A2', label: '基础', color: '#78bdbb' },
+      { key: 'A1', label: '入门', color: '#92c79b' }
     ];
   }
 
@@ -1694,6 +1732,19 @@ export default function App() {
             查询
           </button>
         </form>
+        <div className="quick-filter-row" aria-label="词库快捷筛选">
+          {(['ALL', 'LEARNED', 'UNLEARNED'] as VocabularyStatusFilter[]).map((status) => (
+            <button
+              className={`filter-chip ${vocabularyStatus === status ? 'active' : ''}`}
+              type="button"
+              key={status}
+              onClick={() => void applyVocabularyStatusFilter(status)}
+              disabled={vocabularyBusy}
+            >
+              {status === 'ALL' ? '全部' : status === 'LEARNED' ? '已学' : '未学'}
+            </button>
+          ))}
+        </div>
 
         <p className="hint">
           当前测试词库是按有效频率排名取前 500 个清洗候选，不是原始 CSV 的前 500 行。

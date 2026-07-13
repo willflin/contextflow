@@ -391,6 +391,38 @@ strong {
   line-height: 1.35;
 }
 
+.placement-progress {
+  display: grid;
+  gap: 8px;
+}
+
+.placement-progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #44535b;
+}
+
+.placement-progress-header strong {
+  color: #166534;
+}
+
+.placement-progress-track {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e5efe9;
+}
+
+.placement-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #54b56f;
+  transition: width 180ms ease;
+}
+
 .question-meta {
   display: flex;
   flex-wrap: wrap;
@@ -487,30 +519,34 @@ strong {
   height: 104px;
   place-items: center;
   border-radius: 8px;
-  background: #668fbd;
+  background: #7ca5d2;
   color: #ffffff;
   font-size: 38px;
   font-weight: 800;
 }
 
 .level-badge.level-a1 {
-  background: #80b88b;
+  background: #92c79b;
 }
 
 .level-badge.level-a2 {
-  background: #6aa7a7;
+  background: #78bdbb;
 }
 
 .level-badge.level-b1 {
-  background: #668fbd;
+  background: #7ca5d2;
 }
 
 .level-badge.level-b2 {
-  background: #b47f8a;
+  background: #ca919c;
 }
 
 .level-badge.level-c1 {
-  background: #9a80b8;
+  background: #b894d4;
+}
+
+.level-badge.level-c2 {
+  background: #c89ce0;
 }
 
 .profile-level-layout {

@@ -1297,3 +1297,39 @@
 ### 说明 / Notes
 
 - 未新增依赖。新增 Flyway 迁移 `V16__add_vocabulary_placement_measurement.sql`，同步 SQL 位于 `docs/sql/phase7_vocabulary_placement_measurement_schema.sql`。 / No dependency was added. Added Flyway migration `V16__add_vocabulary_placement_measurement.sql`; synchronized SQL is in `docs/sql/phase7_vocabulary_placement_measurement_schema.sql`.
+
+## Phase 7.1.1：水平阶梯方向与颜色微调 / Level Ladder Direction and Color Tuning
+
+### 问题 / Problem
+
+- CEFR 阶梯从上到下按低到高排列，视觉方向不符合“越往上越高”的直觉。 / The CEFR ladder listed lower levels at the top, which did not match the intuition that higher levels should appear higher.
+- 阶梯颜色略暗。 / The ladder colors were slightly too dark.
+
+### 操作 / Operations
+
+- 前端阶梯顺序改为 C1、B2、B1、A2、A1，从上到下由高到低。 / Reordered the frontend ladder to C1, B2, B1, A2, A1, so higher levels appear higher.
+- 颜色整体提亮，同时保持低饱和，避免刺眼。 / Brightened the palette while keeping saturation restrained to avoid glare.
+
+### 说明 / Notes
+
+- 未新增依赖，未新增 SQL。 / No dependency or SQL was added.
+
+## Phase 7.1.2：词库快捷筛选、测试进度与高难度题库 / Vocabulary Filters, Test Progress, and Hard Items
+
+### 问题 / Problem
+
+- 词库只能通过下拉框筛选已学/未学，缺少快速点击入口。 / Vocabulary learned/unlearned filtering only used a dropdown and lacked quick buttons.
+- 水平测试缺少 `x/x` 进度和可视化进度条，用户不知道还剩几题。 / Placement testing lacked `x/x` progress and a visible progress bar, so learners could not see how many items remained.
+- 现有词汇测试样例偏简单，高难度词汇和 C2 分级不足。 / Existing vocabulary calibration items were too easy and lacked enough high-difficulty and C2 coverage.
+
+### 操作 / Operations
+
+- 词库页新增“全部 / 已学 / 未学”快捷筛选按钮，点击后立即按当前搜索词加载结果。 / Added quick filter buttons for All / Learned / Unlearned; clicking immediately reloads results using the current query.
+- 水平测试题目上方新增 `当前题/总题数`、剩余题数和绿色进度条。 / Added current/total count, remaining item count, and a green progress bar above placement items.
+- Placement CEFR 支持扩展到 `C2`，并同步数据库 check 约束。 / Extended placement CEFR support to `C2` and synchronized database check constraints.
+- 新增 V17 迁移，插入 TOP_8000 到 TOP_20000 的高难度词汇量校准题，覆盖语境释义、近义词、反义词和最佳表达。 / Added V17 migration to insert hard vocabulary calibration items from TOP_8000 to TOP_20000, covering contextual meaning, synonym, antonym, and best-expression items.
+- 词汇量估算支持 `TOP_16000`、`TOP_20000` 和 `12000+` 档位。 / Vocabulary estimation now supports `TOP_16000`, `TOP_20000`, and the `12000+` band.
+
+### 说明 / Notes
+
+- 未新增依赖。新增 Flyway 迁移 `V17__extend_placement_to_c2_and_seed_hard_vocabulary.sql`，同步 SQL 位于 `docs/sql/phase7_extend_placement_to_c2_and_seed_hard_vocabulary.sql`。 / No dependency was added. Added Flyway migration `V17__extend_placement_to_c2_and_seed_hard_vocabulary.sql`; synchronized SQL is in `docs/sql/phase7_extend_placement_to_c2_and_seed_hard_vocabulary.sql`.

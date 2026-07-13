@@ -306,6 +306,7 @@ public class ReviewPlanService {
             case B1 -> 3;
             case B2 -> 4;
             case C1 -> 5;
+            case C2 -> 6;
         };
     }
 

@@ -138,7 +138,7 @@ public class UserLevelProfileService {
             return nullSafeDifficultyEstimate(answerRows);
         }
         int estimate = 0;
-        for (String band : List.of("TOP_1000", "TOP_2000", "TOP_3000", "TOP_5000", "TOP_8000", "TOP_12000")) {
+        for (String band : List.of("TOP_1000", "TOP_2000", "TOP_3000", "TOP_5000", "TOP_8000", "TOP_12000", "TOP_16000", "TOP_20000")) {
             ScoreCounter counter = bandCounters.get(band);
             if (counter == null) {
                 continue;
@@ -146,7 +146,7 @@ public class UserLevelProfileService {
             double masteryProbability = (counter.correct + 0.5d) / (counter.total + 1.0d);
             estimate += Math.round((float) (bandWidth(band) * masteryProbability));
         }
-        return Math.max(500, Math.min(12000, estimate));
+        return Math.max(500, Math.min(20000, estimate));
     }
 
     private int nullSafeDifficultyEstimate(List<PlacementSessionAnswerEntity> answerRows) {
@@ -182,14 +182,17 @@ public class UserLevelProfileService {
             case "TOP_1000", "TOP_2000", "TOP_3000" -> 1000;
             case "TOP_5000" -> 2000;
             case "TOP_8000" -> 3000;
-            case "TOP_12000" -> 4000;
+            case "TOP_12000", "TOP_16000", "TOP_20000" -> 4000;
             default -> 0;
         };
     }
 
     private String vocabularyBand(int vocabularySizeEstimate) {
+        if (vocabularySizeEstimate >= 12000) {
+            return "12000+";
+        }
         if (vocabularySizeEstimate >= 8000) {
-            return "8000+";
+            return "8000-12000";
         }
         if (vocabularySizeEstimate >= 5000) {
             return "5000-8000";

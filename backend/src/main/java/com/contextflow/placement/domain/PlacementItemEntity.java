@@ -126,6 +126,7 @@ public class PlacementItemEntity {
             case B1 -> 55;
             case B2 -> 75;
             case C1 -> 90;
+            case C2 -> 98;
         };
     }
 
