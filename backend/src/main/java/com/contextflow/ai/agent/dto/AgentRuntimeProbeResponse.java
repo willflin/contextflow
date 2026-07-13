@@ -13,7 +13,8 @@ public record AgentRuntimeProbeResponse(
         List<String> errors,
         Long elapsedMs,
         String errorMessage,
-        AgentDialogueOutput output
+        AgentDialogueOutput output,
+        AgentRuntimeDiagnosticsResponse diagnostics
 ) {
     public AgentRuntimeProbeResponse {
         errors = errors == null ? List.of() : List.copyOf(errors);

@@ -4,6 +4,7 @@ public record AgentRuntimeStatusResponse(
         String provider,
         boolean springAiClientAvailable,
         boolean fallbackToLocalOnError,
-        String contractVersion
+        String contractVersion,
+        AgentRuntimeDiagnosticsResponse diagnostics
 ) {
 }

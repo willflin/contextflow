@@ -10,13 +10,12 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
 @Service
-@ConditionalOnBean(ChatModel.class)
 public class SpringAiAgentModelClient implements AgentModelClient {
 
     private static final String SYSTEM_PROMPT = """
@@ -51,22 +50,31 @@ public class SpringAiAgentModelClient implements AgentModelClient {
             - If user text is nonsense, unrecognizable, or completely wrong usage, do not create a recordable mention; explain it in feedback.
             """;
 
-    private final ChatModel chatModel;
+    private final ObjectProvider<ChatModel> chatModelProvider;
     private final AgentDialogueContractService contractService;
     private final ObjectMapper objectMapper;
 
     public SpringAiAgentModelClient(
-            ChatModel chatModel,
+            ObjectProvider<ChatModel> chatModelProvider,
             AgentDialogueContractService contractService,
             ObjectMapper objectMapper
     ) {
-        this.chatModel = chatModel;
+        this.chatModelProvider = chatModelProvider;
         this.contractService = contractService;
         this.objectMapper = objectMapper;
     }
 
     @Override
+    public boolean isAvailable() {
+        return chatModelProvider.getIfAvailable() != null;
+    }
+
+    @Override
     public AgentDialogueOutput generateDialogue(AgentDialogueInput input) {
+        ChatModel chatModel = chatModelProvider.getIfAvailable();
+        if (chatModel == null) {
+            throw new IllegalStateException("Spring AI ChatModel is not available.");
+        }
         String inputJson = writeJson(input);
         ChatResponse response = chatModel.call(new Prompt(List.of(
                 new SystemMessage(SYSTEM_PROMPT),

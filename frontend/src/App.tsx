@@ -244,7 +244,8 @@ export default function App() {
         provider: result.provider,
         springAiClientAvailable: result.springAiClientAvailable,
         fallbackToLocalOnError: result.fallbackToLocalOnError,
-        contractVersion: result.contractVersion
+        contractVersion: result.contractVersion,
+        diagnostics: result.diagnostics
       });
     } catch (exception) {
       setAgentRuntimeProbe(null);
@@ -1119,6 +1120,11 @@ export default function App() {
             <span className="label">契约</span>
             <strong>{agentRuntime.contractVersion}</strong>
           </div>
+        </div>
+
+        <div className="agent-diagnostics">
+          <span className="label">Spring AI 诊断</span>
+          <pre>{JSON.stringify(agentRuntime.diagnostics, null, 2)}</pre>
         </div>
 
         {agentRuntimeProbeBusy && <p className="hint">正在探测 Agent 模型...</p>}

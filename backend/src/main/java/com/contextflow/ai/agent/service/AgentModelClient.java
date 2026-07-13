@@ -5,5 +5,9 @@ import com.contextflow.ai.agent.dto.AgentDialogueOutput;
 
 public interface AgentModelClient {
 
+    default boolean isAvailable() {
+        return true;
+    }
+
     AgentDialogueOutput generateDialogue(AgentDialogueInput input);
 }

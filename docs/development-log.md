@@ -746,3 +746,43 @@
 - 使用 JDK 21 和临时 Maven settings 执行 `mvn -q -DskipTests compile` 通过。 / Backend `mvn -q -DskipTests compile` passed with JDK 21 and a temporary Maven settings file.
 - `git diff --check` 通过，仅有 Windows 换行提示。 / `git diff --check` passed with only Windows line-ending warnings.
 - 已用本地 Spring AI 1.0.9 配置元数据核对 DeepSeek 相关配置名。 / DeepSeek property names were checked against the local Spring AI 1.0.9 configuration metadata.
+
+## Phase 6.3.2：Agent 运行时诊断 / Agent Runtime Diagnostics
+
+### 操作 / Operations
+
+- 扩展 Agent runtime status/probe 响应，返回 Spring AI 和 DeepSeek 自动配置诊断信息。 / Extended Agent runtime status/probe responses with Spring AI and DeepSeek auto-configuration diagnostics.
+- 诊断字段包含 `spring.ai.model.chat`、DeepSeek key 是否已配置、base URL、模型名、ChatModel bean 名称和 AgentModelClient bean 名称。 / Diagnostics include `spring.ai.model.chat`, whether the DeepSeek key is configured, base URL, model name, ChatModel bean names, and AgentModelClient bean names.
+- 前端 admin Agent 运行时面板展示诊断 JSON，便于判断 Spring AI 不可用的真实原因。 / The frontend admin Agent runtime panel now shows diagnostics JSON to identify the real cause when Spring AI is unavailable.
+
+### 说明 / Notes
+
+- 诊断只显示 key 是否存在，不返回 key 明文。 / Diagnostics show only whether the key exists and never return the key value.
+- 未新增依赖，未新增 SQL。 / No dependency or SQL change was added.
+
+### 验证 / Verification
+
+- 前端 `npm run typecheck` 通过。 / Frontend `npm run typecheck` passed.
+- 使用 JDK 21 和临时 Maven settings 执行 `mvn -q -DskipTests compile` 通过。 / Backend `mvn -q -DskipTests compile` passed with JDK 21 and a temporary Maven settings file.
+
+## Phase 6.3.3：Spring AI Client 注册修复 / Spring AI Client Registration Fix
+
+### 问题 / Problem
+
+- 运行时诊断显示 DeepSeek `ChatModel` 已创建，但 `AgentModelClient` bean 为空，导致真实模型未被尝试。 / Runtime diagnostics showed the DeepSeek `ChatModel` was created, but no `AgentModelClient` bean existed, so the real model was never attempted.
+
+### 操作 / Operations
+
+- 移除普通 `@Service` 上的 `@ConditionalOnBean(ChatModel.class)`，避免条件判断早于 Spring AI 自动配置。 / Removed `@ConditionalOnBean(ChatModel.class)` from the regular `@Service` to avoid evaluating the condition before Spring AI auto-configuration.
+- `SpringAiAgentModelClient` 改为通过 `ObjectProvider<ChatModel>` 延迟读取模型。 / `SpringAiAgentModelClient` now reads `ChatModel` lazily through `ObjectProvider<ChatModel>`.
+- `AgentRuntimeService` 改为用 `AgentModelClient.isAvailable()` 判断真实 Spring AI client 是否可用。 / `AgentRuntimeService` now uses `AgentModelClient.isAvailable()` to determine whether the real Spring AI client is usable.
+
+### 说明 / Notes
+
+- 本地 Agent 默认模式仍可启动；没有 `ChatModel` 时不会阻塞应用启动。 / The local Agent default mode can still start; missing `ChatModel` no longer blocks application startup.
+- 未新增依赖，未新增 SQL。 / No dependency or SQL change was added.
+
+### 验证 / Verification
+
+- 前端 `npm run typecheck` 通过。 / Frontend `npm run typecheck` passed.
+- 使用 JDK 21 和临时 Maven settings 执行 `mvn -q -DskipTests compile` 通过。 / Backend `mvn -q -DskipTests compile` passed with JDK 21 and a temporary Maven settings file.

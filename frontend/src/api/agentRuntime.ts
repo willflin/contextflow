@@ -6,11 +6,27 @@ type ApiResponse<T> = {
   timestamp: string;
 };
 
+export type AgentRuntimeDiagnostics = {
+  springAiModelChat: string | null;
+  deepSeekApiKeyConfigured: boolean;
+  deepSeekChatApiKeyConfigured: boolean;
+  deepSeekBaseUrl: string | null;
+  deepSeekChatBaseUrl: string | null;
+  deepSeekModel: string | null;
+  deepSeekChatEnabled: string | null;
+  deepSeekAutoConfigurationClassPresent: boolean;
+  deepSeekApiClassPresent: boolean;
+  chatModelBeanNames: string[];
+  agentModelClientBeanNames: string[];
+  activeProfiles: string[];
+};
+
 export type AgentRuntimeStatus = {
   provider: string;
   springAiClientAvailable: boolean;
   fallbackToLocalOnError: boolean;
   contractVersion: string;
+  diagnostics: AgentRuntimeDiagnostics;
 };
 
 export type AgentDialogueOutput = {

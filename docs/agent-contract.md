@@ -163,6 +163,7 @@ $env:DEEPSEEK_MODEL="deepseek-chat"
 - `fallback-to-local-on-error=true` 时模型失败会回退本地规则，避免阻断学习流程。 / With `fallback-to-local-on-error=true`, model failures fall back to local rules to avoid blocking learning.
 - `GET /api/admin/agent-contract/runtime` 可查看当前 provider、Spring AI client 是否可用和契约版本。 / `GET /api/admin/agent-contract/runtime` shows the current provider, Spring AI client availability, and contract version.
 - `POST /api/admin/agent-contract/dialogue/probe` 会实际走当前运行时；如果 Spring AI/DeepSeek 可用，会尝试真实模型调用，否则明确返回 fallback 或错误状态。 / `POST /api/admin/agent-contract/dialogue/probe` runs through the current runtime; when Spring AI/DeepSeek is available it attempts a real model call, otherwise it returns explicit fallback or error status.
+- runtime 和 probe 响应会返回诊断字段，但只暴露 key 是否已配置，不暴露 key 明文。 / Runtime and probe responses include diagnostics, but expose only whether the key is configured, never the key value.
 
 ## 接入真实词义数据前提 / Before Real Sense Data Import
 

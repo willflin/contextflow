@@ -4,11 +4,18 @@ import com.contextflow.ai.agent.config.AgentProperties;
 import com.contextflow.ai.agent.dto.AgentContractValidationResult;
 import com.contextflow.ai.agent.dto.AgentDialogueInput;
 import com.contextflow.ai.agent.dto.AgentDialogueOutput;
+import com.contextflow.ai.agent.dto.AgentRuntimeDiagnosticsResponse;
 import com.contextflow.ai.agent.dto.AgentRuntimeProbeResponse;
 import com.contextflow.ai.agent.dto.AgentRuntimeStatusResponse;
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.ApplicationContext;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
+import org.springframework.util.ClassUtils;
+import org.springframework.util.StringUtils;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Supplier;
 
@@ -18,15 +25,21 @@ public class AgentRuntimeService {
     private final AgentProperties agentProperties;
     private final ObjectProvider<AgentModelClient> agentModelClientProvider;
     private final AgentDialogueContractService contractService;
+    private final Environment environment;
+    private final ApplicationContext applicationContext;
 
     public AgentRuntimeService(
             AgentProperties agentProperties,
             ObjectProvider<AgentModelClient> agentModelClientProvider,
-            AgentDialogueContractService contractService
+            AgentDialogueContractService contractService,
+            Environment environment,
+            ApplicationContext applicationContext
     ) {
         this.agentProperties = agentProperties;
         this.agentModelClientProvider = agentModelClientProvider;
         this.contractService = contractService;
+        this.environment = environment;
+        this.applicationContext = applicationContext;
     }
 
     public AgentDialogueOutput generateDialogue(
@@ -55,6 +68,7 @@ public class AgentRuntimeService {
     ) {
         long startedAt = System.nanoTime();
         AgentModelClient client = agentModelClientProvider.getIfAvailable();
+        boolean clientAvailable = isClientAvailable(client);
 
         if (agentProperties.getProvider() != AgentProperties.Provider.SPRING_AI) {
             return probeFallback(
@@ -62,13 +76,15 @@ public class AgentRuntimeService {
                     startedAt,
                     false,
                     false,
-                    client != null,
+                    clientAvailable,
                     null
             );
         }
 
-        if (client == null) {
-            RuntimeException exception = new IllegalStateException("Spring AI Agent client is not available.");
+        if (!clientAvailable) {
+            RuntimeException exception = new IllegalStateException(client == null
+                    ? "Spring AI Agent client is not available."
+                    : "Spring AI ChatModel is not available.");
             if (agentProperties.isFallbackToLocalOnError()) {
                 return probeFallback(localFallback, startedAt, false, true, false, exception);
             }
@@ -82,7 +98,7 @@ public class AgentRuntimeService {
                     startedAt,
                     true,
                     false,
-                    true,
+                    clientAvailable,
                     validation.accepted(),
                     validation.errors(),
                     null,
@@ -90,18 +106,37 @@ public class AgentRuntimeService {
             );
         } catch (RuntimeException exception) {
             if (agentProperties.isFallbackToLocalOnError()) {
-                return probeFallback(localFallback, startedAt, true, true, true, exception);
+                return probeFallback(localFallback, startedAt, true, true, clientAvailable, exception);
             }
-            return probeFailure(startedAt, true, false, true, exception);
+            return probeFailure(startedAt, true, false, clientAvailable, exception);
         }
     }
 
     public AgentRuntimeStatusResponse status() {
+        AgentModelClient client = agentModelClientProvider.getIfAvailable();
         return new AgentRuntimeStatusResponse(
                 agentProperties.getProvider().name(),
-                agentModelClientProvider.getIfAvailable() != null,
+                isClientAvailable(client),
                 agentProperties.isFallbackToLocalOnError(),
-                AgentDialogueContractService.CONTRACT_VERSION
+                AgentDialogueContractService.CONTRACT_VERSION,
+                diagnostics()
+        );
+    }
+
+    public AgentRuntimeDiagnosticsResponse diagnostics() {
+        return new AgentRuntimeDiagnosticsResponse(
+                environment.getProperty("spring.ai.model.chat"),
+                hasText(environment.getProperty("spring.ai.deepseek.api-key")),
+                hasText(environment.getProperty("spring.ai.deepseek.chat.api-key")),
+                environment.getProperty("spring.ai.deepseek.base-url"),
+                environment.getProperty("spring.ai.deepseek.chat.base-url"),
+                environment.getProperty("spring.ai.deepseek.chat.options.model"),
+                environment.getProperty("spring.ai.deepseek.chat.enabled"),
+                isPresent("org.springframework.ai.model.deepseek.autoconfigure.DeepSeekChatAutoConfiguration"),
+                isPresent("org.springframework.ai.deepseek.api.DeepSeekApi"),
+                List.of(applicationContext.getBeanNamesForType(ChatModel.class)),
+                List.of(applicationContext.getBeanNamesForType(AgentModelClient.class)),
+                Arrays.asList(environment.getActiveProfiles())
         );
     }
 
@@ -177,7 +212,8 @@ public class AgentRuntimeService {
                 errors,
                 elapsedMs(startedAt),
                 errorMessage,
-                output
+                output,
+                diagnostics()
         );
     }
 
@@ -194,5 +230,17 @@ public class AgentRuntimeService {
             return exception.getClass().getSimpleName();
         }
         return message;
+    }
+
+    private boolean hasText(String value) {
+        return StringUtils.hasText(value);
+    }
+
+    private boolean isPresent(String className) {
+        return ClassUtils.isPresent(className, getClass().getClassLoader());
+    }
+
+    private boolean isClientAvailable(AgentModelClient client) {
+        return client != null && client.isAvailable();
     }
 }
