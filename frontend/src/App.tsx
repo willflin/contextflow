@@ -884,6 +884,12 @@ export default function App() {
       setLearningError('请先开始学习并加载任务。');
       return;
     }
+    if (learningPackage.status === 'COMPLETED') {
+      setCompletionPromptVisible(false);
+      setCompletionReason('');
+      await loadNextLearningPackage();
+      return;
+    }
     setCompleteBusy(true);
     setLearningError(null);
     try {
@@ -1258,9 +1264,9 @@ export default function App() {
               className="secondary-button"
               type="button"
               onClick={completeCurrentLearningPackage}
-              disabled={learningBusy || skipBusy || completeBusy || !learningPackage || learningPackage.status !== 'READY'}
+              disabled={learningBusy || skipBusy || completeBusy || !learningPackage || !['READY', 'COMPLETED'].includes(learningPackage.status)}
             >
-              结束当前对话
+              {learningPackage?.status === 'COMPLETED' ? '开始新任务' : '结束当前对话'}
             </button>
           </div>
           {renderLearningPackage()}

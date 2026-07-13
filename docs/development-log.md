@@ -1247,3 +1247,18 @@
 ### 说明 / Notes
 
 - 未新增依赖，未新增 SQL 迁移。 / No dependency or SQL migration was added.
+
+## Phase 6.3.26：完成后继续学习入口 / Continue-Learning Entry After Completion
+
+### 问题 / Problem
+
+- 用户完成本轮对话后点击“留在本轮”，顶部“结束当前对话”按钮因学习包状态变为 `COMPLETED` 而禁用，无法从该入口开始新任务。 / After a learner completed a dialogue and chose to stay in the current round, the top "end dialogue" button was disabled because the package status became `COMPLETED`, so it could not be used to start a new task.
+
+### 操作 / Operations
+
+- 前端允许该按钮在 `READY` 和 `COMPLETED` 两种状态下可用。 / The frontend now keeps the button enabled for both `READY` and `COMPLETED` statuses.
+- `READY` 状态下按钮仍执行“结束当前对话”；`COMPLETED` 状态下按钮文案改为“开始新任务”，点击后直接加载下一轮学习包。 / In `READY` status it still ends the current dialogue; in `COMPLETED` status the label changes to "开始新任务" and directly loads the next learning package.
+
+### 说明 / Notes
+
+- 未新增依赖，未新增 SQL 迁移。 / No dependency or SQL migration was added.
