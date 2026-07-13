@@ -1051,6 +1051,41 @@
 ## 说明 / Notes
 
 - 未新增依赖，未新增 SQL 迁移。/ No dependency or SQL migration was added.
+
+# Phase 6.3.17：Mentor 提示等待状态 / Mentor Hint Waiting State
+
+## 问题 / Problem
+
+- 用户请求 Mentor 提示后，如果提示尚未显示，界面缺少等待反馈。/ After requesting a Mentor hint, the UI had no waiting feedback before the hint appeared.
+
+## 操作 / Operations
+
+- Mentor 提示增加独立 `mentorHintBusy` 状态。/ Added an independent `mentorHintBusy` state for Mentor hints.
+- Mentor 面板在提示生成期间显示转圈等待气泡。/ The Mentor panel now shows a spinner waiting bubble while a hint is being prepared.
+- 提示等待期间禁用普通提示和精确提示按钮，避免重复请求。/ Hint buttons are disabled while a hint is pending to avoid duplicate requests.
+
+## 说明 / Notes
+
+- 未新增依赖，未新增 SQL 迁移。/ No dependency or SQL migration was added.
+
+# Phase 6.3.16：会话重开与输入体验 / Session Restart and Input UX
+
+## 问题 / Problem
+
+- 用户进入同一个 READY 学习任务时，前端看不到旧对话，但后端 Agent 仍读取旧对话历史。/ When the learner entered the same READY task, the frontend showed no old turns while the backend Agent still read old dialogue history.
+- 对话输入框按 Enter 会换行，不符合当前短句对话操作习惯。/ Pressing Enter in the dialogue textarea inserted a newline, which did not match the short-turn dialogue flow.
+- 学习模块标题“下一个场景”不符合当前任务会话定位。/ The "next scenario" title no longer matched the current task-session positioning.
+
+## 操作 / Operations
+
+- 进入 READY 学习包前清理该包已有 `learning_dialogue_turns` 和对应 `LEARNING_DIALOGUE_TURN` 来源的 `learning_events`。/ Before returning a READY learning package, existing `learning_dialogue_turns` and related `LEARNING_DIALOGUE_TURN` source `learning_events` are cleared.
+- 不回滚词义掌握度统计，避免破坏已累计的学习结果。/ Sense-level mastery stats are not rolled back, preserving accumulated learning progress.
+- 前端对话输入改为 Enter 发送，Shift+Enter 换行。/ The dialogue textarea now sends on Enter and keeps Shift+Enter for newlines.
+- 学习模块标题改为“场景会话”。/ The learning module title was changed to "场景会话".
+
+## 说明 / Notes
+
+- 未新增依赖，未新增 SQL 迁移。/ No dependency or SQL migration was added.
 # Phase 6.3.12：Agent 角色连续性与 Mentor 历史 / Agent Role Continuity and Mentor History
 
 ## 问题 / Problem

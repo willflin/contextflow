@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AccessProbe, fetchAccessProbe } from './api/access';
 import { AgentRuntimeProbe, AgentRuntimeStatus, fetchAgentRuntimeStatus, runAgentRuntimeProbe } from './api/agentRuntime';
 import {
@@ -142,10 +142,12 @@ export default function App() {
   const [dialogueError, setDialogueError] = useState<string | null>(null);
   const [mentorHints, setMentorHints] = useState<MentorHint[]>([]);
   const [mentorHintCount, setMentorHintCount] = useState(0);
+  const [mentorHintBusy, setMentorHintBusy] = useState(false);
   const [preciseHintPromptVisible, setPreciseHintPromptVisible] = useState(false);
   const [preciseHintUnlocked, setPreciseHintUnlocked] = useState(false);
   const [completionPromptVisible, setCompletionPromptVisible] = useState(false);
   const [completionReason, setCompletionReason] = useState('');
+  const mentorHintTimerRef = useRef<number | null>(null);
 
   const isAdmin = currentUser?.role === 'ADMIN';
   const itemContent = currentItem ? parsePlacementItemContent(currentItem) : null;
@@ -154,6 +156,8 @@ export default function App() {
   useEffect(() => {
     void restoreCurrentUser();
   }, []);
+
+  useEffect(() => () => clearMentorHintTimer(), []);
 
   useEffect(() => {
     if (currentUser) {
@@ -845,11 +849,38 @@ export default function App() {
     }
   }
 
+  function submitDialogueOnEnter(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) {
+      return;
+    }
+    event.preventDefault();
+    event.currentTarget.form?.requestSubmit();
+  }
+
   function resetMentorHints() {
+    clearMentorHintTimer();
     setMentorHints([]);
     setMentorHintCount(0);
+    setMentorHintBusy(false);
     setPreciseHintPromptVisible(false);
     setPreciseHintUnlocked(false);
+  }
+
+  function clearMentorHintTimer() {
+    if (mentorHintTimerRef.current !== null) {
+      window.clearTimeout(mentorHintTimerRef.current);
+      mentorHintTimerRef.current = null;
+    }
+  }
+
+  function enqueueMentorHint(hint: MentorHint) {
+    clearMentorHintTimer();
+    setMentorHintBusy(true);
+    mentorHintTimerRef.current = window.setTimeout(() => {
+      setMentorHints((previous) => [...previous, hint]);
+      setMentorHintBusy(false);
+      mentorHintTimerRef.current = null;
+    }, 250);
   }
 
   function isTaskComplete(scoringSignal: Record<string, unknown>) {
@@ -877,41 +908,32 @@ export default function App() {
     }
     const nextCount = mentorHintCount + 1;
     setMentorHintCount(nextCount);
-    setMentorHints((previous) => [
-      ...previous,
-      {
-        id: Date.now(),
-        level: 'HINT',
-        text: buildMentorHint(nextCount)
-      }
-    ]);
+    enqueueMentorHint({
+      id: Date.now(),
+      level: 'HINT',
+      text: buildMentorHint(nextCount)
+    });
   }
 
   function addPreciseHint() {
     setPreciseHintUnlocked(true);
     setPreciseHintPromptVisible(false);
-    setMentorHints((previous) => [
-      ...previous,
-      {
-        id: Date.now(),
-        level: 'PRECISE',
-        text: buildPreciseHint()
-      }
-    ]);
+    enqueueMentorHint({
+      id: Date.now(),
+      level: 'PRECISE',
+      text: buildPreciseHint()
+    });
   }
 
   function continueMentorHintAfterPrompt() {
     setPreciseHintPromptVisible(false);
     const nextCount = mentorHintCount + 1;
     setMentorHintCount(nextCount);
-    setMentorHints((previous) => [
-      ...previous,
-      {
-        id: Date.now(),
-        level: 'HINT',
-        text: buildMentorHint(nextCount)
-      }
-    ]);
+    enqueueMentorHint({
+      id: Date.now(),
+      level: 'HINT',
+      text: buildMentorHint(nextCount)
+    });
   }
 
   function buildMentorHint(step: number) {
@@ -1109,7 +1131,7 @@ export default function App() {
           <div className="panel-heading">
             <div>
               <p className="eyebrow">Learning</p>
-              <h2>下一个场景</h2>
+              <h2>场景会话</h2>
             </div>
             <button
               className="secondary-button"
@@ -1957,14 +1979,15 @@ export default function App() {
               <textarea
                 value={dialogueMessage}
                 onChange={(event) => setDialogueMessage(event.target.value)}
+                onKeyDown={submitDialogueOnEnter}
                 placeholder="Type your English reply..."
                 rows={3}
                 disabled={learningCompleted}
               />
-              <button className="secondary-button compact-button" type="button" onClick={requestMentorHint} disabled={dialogueBusy || learningCompleted}>
+              <button className="secondary-button compact-button" type="button" onClick={requestMentorHint} disabled={dialogueBusy || learningCompleted || mentorHintBusy}>
                 请求 Mentor 提示
               </button>
-              <button className="secondary-button compact-button" type="button" onClick={addPreciseHint} disabled={dialogueBusy || learningCompleted || !preciseHintUnlocked}>
+              <button className="secondary-button compact-button" type="button" onClick={addPreciseHint} disabled={dialogueBusy || learningCompleted || mentorHintBusy || !preciseHintUnlocked}>
                 精确提示
               </button>
               <button className="refresh-button compact-button" type="submit" disabled={dialogueBusy || learningCompleted}>
@@ -1983,7 +2006,7 @@ export default function App() {
             </div>
 
             <div className="dialogue-thread mentor-thread">
-              {dialogueTurns.length === 0 && mentorHints.length === 0 ? (
+              {dialogueTurns.length === 0 && mentorHints.length === 0 && !mentorHintBusy ? (
                 <p className="hint">Mentor feedback will appear after your first reply.</p>
               ) : (
                 <>
@@ -2026,6 +2049,17 @@ export default function App() {
                       </div>
                     </div>
                   ))}
+                  {mentorHintBusy && (
+                    <div className="message-row agent" aria-live="polite">
+                      <div className="message-bubble mentor-bubble waiting-bubble">
+                        <span>Mentor</span>
+                        <div className="waiting-indicator">
+                          <span className="loading-spinner" aria-hidden="true" />
+                          <p>Mentor 正在准备提示...</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -2038,10 +2072,10 @@ export default function App() {
               <h3 id="precise-hint-title">需要精确提示吗？</h3>
               <p>Mentor 可以直接给出可用单词、句型和参考表达。这样会降低自主思考比例。</p>
               <div className="hint-modal-actions">
-                <button className="secondary-button compact-button" type="button" onClick={continueMentorHintAfterPrompt}>
+                <button className="secondary-button compact-button" type="button" onClick={continueMentorHintAfterPrompt} disabled={mentorHintBusy}>
                   继续普通提示
                 </button>
-                <button className="refresh-button compact-button" type="button" onClick={addPreciseHint}>
+                <button className="refresh-button compact-button" type="button" onClick={addPreciseHint} disabled={mentorHintBusy}>
                   给我精确提示
                 </button>
               </div>

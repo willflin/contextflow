@@ -1,9 +1,13 @@
 package com.contextflow.learning.service;
 
+import com.contextflow.learning.domain.LearningDialogueTurnEntity;
+import com.contextflow.learning.domain.LearningEventSourceType;
 import com.contextflow.learning.domain.LearningPackageEntity;
 import com.contextflow.learning.domain.LearningPackageGenerationSource;
 import com.contextflow.learning.domain.LearningPackageStatus;
 import com.contextflow.learning.dto.LearningPackageResponse;
+import com.contextflow.learning.repository.LearningDialogueTurnRepository;
+import com.contextflow.learning.repository.LearningEventRepository;
 import com.contextflow.learning.repository.LearningPackageRepository;
 import com.contextflow.scenario.domain.ScenarioTemplateEntity;
 import com.contextflow.scenario.domain.ScenarioTemplateStatus;
@@ -33,6 +37,8 @@ public class LearningPackageService {
     private final UserLevelProfileRepository userLevelProfileRepository;
     private final ScenarioTemplateRepository scenarioTemplateRepository;
     private final LearningPackageRepository learningPackageRepository;
+    private final LearningDialogueTurnRepository learningDialogueTurnRepository;
+    private final LearningEventRepository learningEventRepository;
     private final ObjectMapper objectMapper;
 
     public LearningPackageService(
@@ -40,12 +46,16 @@ public class LearningPackageService {
             UserLevelProfileRepository userLevelProfileRepository,
             ScenarioTemplateRepository scenarioTemplateRepository,
             LearningPackageRepository learningPackageRepository,
+            LearningDialogueTurnRepository learningDialogueTurnRepository,
+            LearningEventRepository learningEventRepository,
             ObjectMapper objectMapper
     ) {
         this.userRepository = userRepository;
         this.userLevelProfileRepository = userLevelProfileRepository;
         this.scenarioTemplateRepository = scenarioTemplateRepository;
         this.learningPackageRepository = learningPackageRepository;
+        this.learningDialogueTurnRepository = learningDialogueTurnRepository;
+        this.learningEventRepository = learningEventRepository;
         this.objectMapper = objectMapper;
     }
 
@@ -61,6 +71,7 @@ public class LearningPackageService {
         LearningPackageEntity packageEntity = learningPackageRepository
                 .findFirstByUserIdAndStatusOrderByIdAsc(user.getId(), LearningPackageStatus.READY)
                 .orElseGet(() -> createSeededPackage(user, profile));
+        resetDialogueSession(packageEntity.getId());
 
         ScenarioTemplateEntity scenario = scenarioTemplateRepository.findById(packageEntity.getScenarioTemplateId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Scenario template not found."));
@@ -72,6 +83,18 @@ public class LearningPackageService {
         return userRepository.findByUsername(username)
                 .filter(UserEntity::isActive)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or missing token."));
+    }
+
+    private void resetDialogueSession(Long packageId) {
+        List<Long> turnIds = learningDialogueTurnRepository.findByLearningPackageIdOrderByIdAsc(packageId)
+                .stream()
+                .map(LearningDialogueTurnEntity::getId)
+                .toList();
+        if (turnIds.isEmpty()) {
+            return;
+        }
+        learningEventRepository.deleteBySourceTypeAndSourceIdIn(LearningEventSourceType.LEARNING_DIALOGUE_TURN, turnIds);
+        learningDialogueTurnRepository.deleteByLearningPackageId(packageId);
     }
 
     private LearningPackageEntity createSeededPackage(UserEntity user, UserLevelProfileEntity profile) {
