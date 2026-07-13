@@ -726,3 +726,23 @@
 - 前端 `npm run typecheck` 通过。 / Frontend `npm run typecheck` passed.
 - 使用 JDK 21 和临时 Maven settings 执行 `mvn -q -DskipTests compile` 通过；默认 Maven 仍会因 E 盘仓库权限失败。 / Backend `mvn -q -DskipTests compile` passed with JDK 21 and a temporary Maven settings file; the default Maven path still fails because the E drive repository is not writable.
 - `git diff --check` 通过，仅有 Windows 换行提示。 / `git diff --check` passed with only Windows line-ending warnings.
+
+## Phase 6.3.1：DeepSeek API 探测入口 / DeepSeek API Probe Entry
+
+### 操作 / Operations
+
+- 新增 admin-only `POST /api/admin/agent-contract/dialogue/probe`，使用 `agent-dialogue.v1` 样例输入探测当前 Agent 运行时。 / Added admin-only `POST /api/admin/agent-contract/dialogue/probe` to probe the current Agent runtime with the `agent-dialogue.v1` sample input.
+- `AgentRuntimeService` 新增 probe 结果，明确返回 provider、Spring AI client 状态、是否尝试模型、是否 fallback、契约校验、错误信息和示例输出。 / `AgentRuntimeService` now returns provider, Spring AI client status, model-attempted, fallback, contract validation, error, and sample output details for probes.
+- 前端 admin Agent 运行时面板新增“探测模型”按钮和 probe 结果展示。 / Added a "Probe model" action and result display to the frontend admin Agent runtime panel.
+
+### 说明 / Notes
+
+- 本阶段没有新增依赖；继续使用已接入的 Spring AI DeepSeek starter。 / No new dependency was added; this continues to use the existing Spring AI DeepSeek starter.
+- 未新增 SQL 变更。 / No SQL change was added.
+
+### 验证 / Verification
+
+- 前端 `npm run typecheck` 通过。 / Frontend `npm run typecheck` passed.
+- 使用 JDK 21 和临时 Maven settings 执行 `mvn -q -DskipTests compile` 通过。 / Backend `mvn -q -DskipTests compile` passed with JDK 21 and a temporary Maven settings file.
+- `git diff --check` 通过，仅有 Windows 换行提示。 / `git diff --check` passed with only Windows line-ending warnings.
+- 已用本地 Spring AI 1.0.9 配置元数据核对 DeepSeek 相关配置名。 / DeepSeek property names were checked against the local Spring AI 1.0.9 configuration metadata.

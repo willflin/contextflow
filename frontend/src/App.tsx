@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AccessProbe, fetchAccessProbe } from './api/access';
-import { AgentRuntimeStatus, fetchAgentRuntimeStatus } from './api/agentRuntime';
+import { AgentRuntimeProbe, AgentRuntimeStatus, fetchAgentRuntimeStatus, runAgentRuntimeProbe } from './api/agentRuntime';
 import {
   AdminSenseUpdatePayload,
   AdminWordPayload,
@@ -73,6 +73,9 @@ export default function App() {
   const [agentRuntime, setAgentRuntime] = useState<AgentRuntimeStatus | null>(null);
   const [agentRuntimeBusy, setAgentRuntimeBusy] = useState(false);
   const [agentRuntimeError, setAgentRuntimeError] = useState<string | null>(null);
+  const [agentRuntimeProbe, setAgentRuntimeProbe] = useState<AgentRuntimeProbe | null>(null);
+  const [agentRuntimeProbeBusy, setAgentRuntimeProbeBusy] = useState(false);
+  const [agentRuntimeProbeError, setAgentRuntimeProbeError] = useState<string | null>(null);
   const [placementSession, setPlacementSession] = useState<AdaptivePlacementSession | null>(null);
   const [currentItem, setCurrentItem] = useState<PlacementTestItem | null>(null);
   const [selectedOptionIndex, setSelectedOptionIndex] = useState<number | null>(null);
@@ -223,10 +226,41 @@ export default function App() {
     }
   }
 
+  async function probeAgentRuntime() {
+    const token = tokenOrNull();
+
+    if (!token) {
+      setAgentRuntimeProbeError('请先登录。');
+      return;
+    }
+
+    setAgentRuntimeProbeBusy(true);
+    setAgentRuntimeProbeError(null);
+
+    try {
+      const result = await runAgentRuntimeProbe(token);
+      setAgentRuntimeProbe(result);
+      setAgentRuntime({
+        provider: result.provider,
+        springAiClientAvailable: result.springAiClientAvailable,
+        fallbackToLocalOnError: result.fallbackToLocalOnError,
+        contractVersion: result.contractVersion
+      });
+    } catch (exception) {
+      setAgentRuntimeProbe(null);
+      setAgentRuntimeProbeError(exception instanceof Error ? exception.message : 'Agent 探测失败。');
+    } finally {
+      setAgentRuntimeProbeBusy(false);
+    }
+  }
+
   function resetAgentRuntime() {
     setAgentRuntime(null);
     setAgentRuntimeBusy(false);
     setAgentRuntimeError(null);
+    setAgentRuntimeProbe(null);
+    setAgentRuntimeProbeBusy(false);
+    setAgentRuntimeProbeError(null);
   }
 
   async function checkProtectedEndpoint(path: '/api/learner/probe' | '/api/admin/probe') {
@@ -858,9 +892,19 @@ export default function App() {
                 <p className="eyebrow">Agent</p>
                 <h2>运行时</h2>
               </div>
-              <button className="secondary-button" type="button" onClick={loadAgentRuntime} disabled={agentRuntimeBusy}>
-                刷新
-              </button>
+              <div className="button-row">
+                <button className="secondary-button" type="button" onClick={loadAgentRuntime} disabled={agentRuntimeBusy}>
+                  刷新
+                </button>
+                <button
+                  className="primary-button"
+                  type="button"
+                  onClick={probeAgentRuntime}
+                  disabled={agentRuntimeProbeBusy}
+                >
+                  探测模型
+                </button>
+              </div>
             </div>
             {renderAgentRuntimePanel()}
           </section>
@@ -1061,20 +1105,74 @@ export default function App() {
     }
 
     return (
-      <div className="metrics-row">
-        <div>
-          <span className="label">Provider</span>
-          <strong>{agentRuntime.provider}</strong>
+      <div className="stacked-panel">
+        <div className="metrics-row">
+          <div>
+            <span className="label">Provider</span>
+            <strong>{agentRuntime.provider}</strong>
+          </div>
+          <div>
+            <span className="label">Spring AI</span>
+            <strong>{agentRuntime.springAiClientAvailable ? '可用' : '不可用'}</strong>
+          </div>
+          <div>
+            <span className="label">契约</span>
+            <strong>{agentRuntime.contractVersion}</strong>
+          </div>
         </div>
-        <div>
-          <span className="label">Spring AI</span>
-          <strong>{agentRuntime.springAiClientAvailable ? '可用' : '不可用'}</strong>
+
+        {agentRuntimeProbeBusy && <p className="hint">正在探测 Agent 模型...</p>}
+        {agentRuntimeProbeError && <p className="error compact">Agent 探测失败：{agentRuntimeProbeError}</p>}
+
+        {agentRuntimeProbe && (
+          <div className="probe-result">
+            <div className="metrics-row">
+              <div>
+                <span className="label">模型调用</span>
+                <strong>{agentRuntimeProbe.modelAttempted ? '已尝试' : '未尝试'}</strong>
+              </div>
+              <div>
+                <span className="label">Fallback</span>
+                <strong>{agentRuntimeProbe.fallbackUsed ? '已使用' : '未使用'}</strong>
+              </div>
+              <div>
+                <span className="label">契约校验</span>
+                <strong>{agentRuntimeProbe.accepted ? '通过' : '未通过'}</strong>
+              </div>
+              <div>
+                <span className="label">耗时</span>
+                <strong>{agentRuntimeProbe.elapsedMs}ms</strong>
+              </div>
+            </div>
+
+            {agentRuntimeProbe.errorMessage && (
+              <p className="error compact">模型错误：{agentRuntimeProbe.errorMessage}</p>
+            )}
+            {agentRuntimeProbe.errors.length > 0 && (
+              <pre>{JSON.stringify(agentRuntimeProbe.errors, null, 2)}</pre>
+            )}
+            {agentRuntimeProbe.output && (
+              <div className="agent-probe-output">
+                <label>
+                  Roleplay 回复
+                  <pre>{agentRuntimeProbe.output.reply}</pre>
+                </label>
+                <label>
+                  Mentor 反馈
+                  <pre>{agentRuntimeProbe.output.feedback}</pre>
+                </label>
+                <label>
+                  unitMentions
+                  <pre>{JSON.stringify(agentRuntimeProbe.output.unitMentions, null, 2)}</pre>
+                </label>
+              </div>
+            )}
+          </div>
+        )}
+        {!agentRuntimeProbe && !agentRuntimeProbeBusy && !agentRuntimeProbeError && (
+          <p className="hint">启用 DeepSeek 配置后点击“探测模型”，确认是否真实调用并返回合规 JSON。</p>
+        )}
         </div>
-        <div>
-          <span className="label">契约</span>
-          <strong>{agentRuntime.contractVersion}</strong>
-        </div>
-      </div>
     );
   }
 

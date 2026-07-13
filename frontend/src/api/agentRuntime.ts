@@ -13,6 +13,26 @@ export type AgentRuntimeStatus = {
   contractVersion: string;
 };
 
+export type AgentDialogueOutput = {
+  contractVersion: string;
+  reply: string;
+  feedback: string;
+  corrections: unknown[];
+  naturalExpression: string;
+  unitMentions: unknown[];
+  scoringSignal: Record<string, unknown>;
+};
+
+export type AgentRuntimeProbe = AgentRuntimeStatus & {
+  modelAttempted: boolean;
+  fallbackUsed: boolean;
+  accepted: boolean;
+  errors: string[];
+  elapsedMs: number;
+  errorMessage: string | null;
+  output: AgentDialogueOutput | null;
+};
+
 async function readErrorMessage(response: Response, fallback: string): Promise<string> {
   try {
     const result = (await response.json()) as ApiResponse<unknown>;
@@ -34,5 +54,21 @@ export async function fetchAgentRuntimeStatus(token: string): Promise<AgentRunti
   }
 
   const result = (await response.json()) as ApiResponse<AgentRuntimeStatus>;
+  return result.data;
+}
+
+export async function runAgentRuntimeProbe(token: string): Promise<AgentRuntimeProbe> {
+  const response = await fetch('/api/admin/agent-contract/dialogue/probe', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, 'Failed to probe Agent runtime.'));
+  }
+
+  const result = (await response.json()) as ApiResponse<AgentRuntimeProbe>;
   return result.data;
 }

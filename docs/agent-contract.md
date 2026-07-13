@@ -125,6 +125,7 @@ Real dialogue requests read the user's current review/new-sense targets from `/a
 - `POST /api/learning/agent-tools/sense-feedback`：提交缺失词义反馈。 / Submit missing-sense feedback.
 - `GET /api/admin/agent-contract/dialogue/sample`：查看当前对话契约样例。 / View the current dialogue contract sample.
 - `GET /api/admin/agent-contract/runtime`：查看当前 Agent 运行时配置。 / View the current Agent runtime configuration.
+- `POST /api/admin/agent-contract/dialogue/probe`：用契约样例探测当前 Agent 运行时，返回是否尝试模型、是否 fallback、契约校验和示例输出。 / Probe the current Agent runtime with the contract sample and return model-attempted, fallback, contract validation, and sample output status.
 
 ## Spring AI / DeepSeek 运行时 / Spring AI / DeepSeek Runtime
 
@@ -161,6 +162,7 @@ $env:DEEPSEEK_MODEL="deepseek-chat"
 - `contextflow.agent.provider=spring-ai` 且 ChatModel 可用时，才通过 Spring AI 调 DeepSeek。 / Only when `contextflow.agent.provider=spring-ai` and ChatModel is available does the system call DeepSeek through Spring AI.
 - `fallback-to-local-on-error=true` 时模型失败会回退本地规则，避免阻断学习流程。 / With `fallback-to-local-on-error=true`, model failures fall back to local rules to avoid blocking learning.
 - `GET /api/admin/agent-contract/runtime` 可查看当前 provider、Spring AI client 是否可用和契约版本。 / `GET /api/admin/agent-contract/runtime` shows the current provider, Spring AI client availability, and contract version.
+- `POST /api/admin/agent-contract/dialogue/probe` 会实际走当前运行时；如果 Spring AI/DeepSeek 可用，会尝试真实模型调用，否则明确返回 fallback 或错误状态。 / `POST /api/admin/agent-contract/dialogue/probe` runs through the current runtime; when Spring AI/DeepSeek is available it attempts a real model call, otherwise it returns explicit fallback or error status.
 
 ## 接入真实词义数据前提 / Before Real Sense Data Import
 
