@@ -612,7 +612,37 @@ public class LearningDialogueService {
             ));
         }
 
-        return corrections;
+        return deduplicateCorrections(corrections);
+    }
+
+    private List<CorrectionResponse> deduplicateCorrections(List<CorrectionResponse> corrections) {
+        Map<String, CorrectionResponse> deduplicated = new java.util.LinkedHashMap<>();
+        for (CorrectionResponse correction : corrections) {
+            String key = correction.original().trim().toLowerCase(Locale.ROOT)
+                    + "->"
+                    + correction.suggestion().trim().toLowerCase(Locale.ROOT);
+            CorrectionResponse existing = deduplicated.get(key);
+            if (existing == null) {
+                deduplicated.put(key, correction);
+                continue;
+            }
+            deduplicated.put(key, new CorrectionResponse(
+                    existing.original(),
+                    existing.suggestion(),
+                    mergeReasons(existing.reason(), correction.reason())
+            ));
+        }
+        return List.copyOf(deduplicated.values());
+    }
+
+    private String mergeReasons(String first, String second) {
+        if (first == null || first.isBlank()) {
+            return second;
+        }
+        if (second == null || second.isBlank() || first.equals(second)) {
+            return first;
+        }
+        return first + " " + second;
     }
 
     private String roleplayReply(String scenarioCode, String userMessage, int turnIndex) {

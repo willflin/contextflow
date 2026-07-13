@@ -1,5 +1,20 @@
 # 开发日志 / Development Log
 
+## Phase 6.3.18：Mentor 纠错去重 / Mentor Correction Deduplication
+
+### 问题 / Problem
+
+- 本地 fallback Mentor 可能因为“句子不完整”和“不够礼貌”两个规则生成相同 `suggestion` 的重复 correction。 / The local fallback Mentor could generate duplicate corrections with the same `suggestion` from both incomplete-sentence and politeness rules.
+
+### 操作 / Operations
+
+- 对 correction 按 `original + suggestion` 去重。 / Deduplicated corrections by `original + suggestion`.
+- 重复项保留一条，并合并不同的 `reason`。 / Repeated items keep one correction and merge different reasons.
+
+### 说明 / Notes
+
+- 未新增依赖，未新增 SQL。 / No dependency or SQL was added.
+
 ## Phase 6.3.17：Mentor 提示拦截时机修正 / Mentor Hint Intercept Timing
 
 ### 问题 / Problem
