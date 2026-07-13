@@ -128,15 +128,16 @@ public class SpringAiAgentModelClient implements AgentModelClient {
             - If user text is nonsense, unrecognizable, or completely wrong usage, do not create a unitMention; explain it in feedback.
 
             Task completion policy:
-            - Treat learningPackage.taskProgress as the authoritative current checklist.
-            - If learningPackage.taskProgress.complete=true, you must close the roleplay immediately and set scoringSignal.taskComplete=true.
-            - If learningPackage.taskProgress.missing is not empty, ask only for the first missing checklist item. Do not ask about already completed items.
-            - When asking for a missing item, do not use a yes/no meta-question like "Would you like to ask about..."; prompt the learner to actually provide or ask that item.
+            - Treat learningPackage.taskProgress as an auxiliary navigation signal, not as the script for the next reply.
+            - The Roleplay Agent's first duty is to continue a fluent, in-character conversation from the full dialogueHistory plus current userMessage.
+            - If the learner asks, requests, confirms, corrects, or changes topic within taskFacts/taskConstraints, respond to that communicative act before guiding the next learning move.
+            - Use learningPackage.taskProgress.missing only to choose a natural next direction after the current userMessage has been handled.
+            - Do not ask yes/no meta-questions like "Would you like to ask about..."; make the next turn conversational and useful.
             - On every turn, before writing the final JSON, explicitly compare the full dialogueHistory plus current userMessage against learningPackage.expectedLearnerAction and learningPackage.taskFacts.
             - Set scoringSignal.taskComplete=true only when the learner has successfully achieved all required actions in learningPackage.expectedLearnerAction using the fixed facts in learningPackage.taskFacts.
             - Do not mark complete just because the learner sent one sentence; all task goals must be satisfied.
             - If all task goals are satisfied on this turn, you must immediately send a concise in-character closing reply and set scoringSignal.taskComplete=true in the same JSON.
-            - If any required action is still missing, keep scoringSignal.taskComplete=false and ask only for the next missing task-relevant item.
+            - If any required action is still missing, keep scoringSignal.taskComplete=false and guide naturally toward a missing task-relevant item without ignoring the learner's current message.
             - scoringSignal.completionReason must briefly state which objectives were completed.
             """;
 
@@ -204,10 +205,11 @@ public class SpringAiAgentModelClient implements AgentModelClient {
                 Keep Mentor feedback concise and actionable.
                 Use learningPackage.taskGoal as the task objective.
                 Treat learningPackage.taskFacts as the full available task card.
-                Treat learningPackage.taskProgress as authoritative. Never ask for items listed in taskProgress.completed.
-                If taskProgress.complete is true, close the roleplay now and set scoringSignal.taskComplete=true.
-                If taskProgress.missing is not empty, ask only for the first missing item.
-                Do not ask yes/no meta-questions for missing items; ask the learner to actually provide or ask the missing item.
+                Treat learningPackage.taskProgress as auxiliary navigation, not as a script.
+                First respond naturally to the learner's current userMessage using the full dialogueHistory.
+                If the learner asks a task-relevant question, answer it within learningPackage.taskFacts before guiding the next move.
+                Use taskProgress.missing only after handling the current message, and choose a conversational next direction.
+                Do not ask yes/no meta-questions for missing items.
                 Use learningPackage.taskRegister and learningPackage.registerGuidance to choose the right tone.
                 Mentor feedback must respect the task register; do not over-correct casual service dialogue into long formal sentences.
                 Do not ask for facts outside learningPackage.taskFacts.
@@ -226,7 +228,7 @@ public class SpringAiAgentModelClient implements AgentModelClient {
                 If no exact target sense is used in the turn, return unitMentions as an empty array.
                 Before returning, check whether expectedLearnerAction is now fully met by dialogueHistory plus userMessage.
                 If it is fully met, close the roleplay now and set scoringSignal.taskComplete=true.
-                If it is not fully met, set scoringSignal.taskComplete=false and continue with the next missing objective.
+                If it is not fully met, set scoringSignal.taskComplete=false and continue naturally toward a missing objective.
 
                 AgentDialogueInput:
                 """ + inputJson;

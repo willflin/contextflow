@@ -1229,3 +1229,21 @@
 ### 说明 / Notes
 
 - 未新增依赖，未新增 SQL 迁移。 / No dependency or SQL migration was added.
+
+## Phase 6.3.25：对话优先的任务进度使用 / Dialogue-First Task Progress Usage
+
+### 问题 / Problem
+
+- `taskProgress` 被提示词和后端兜底逻辑用得过强，可能导致 Roleplay Agent 忽略用户当前问题，机械跳到下一个 checklist 缺项。 / `taskProgress` was used too strongly by prompts and backend fallback logic, which could make the Roleplay Agent ignore the learner's current question and jump mechanically to the next checklist gap.
+- 任务完成检查应是辅助功能，不能取代完整上下文对话和目标词学习引导。 / Task completion checking should be auxiliary and must not replace full-context conversation or target-word learning guidance.
+
+### 操作 / Operations
+
+- Spring AI prompt 将 `taskProgress` 从权威脚本降级为辅助导航信号。 / The Spring AI prompt now treats `taskProgress` as auxiliary navigation instead of an authoritative script.
+- 明确要求 Roleplay Agent 先基于完整 `dialogueHistory + userMessage` 自然回应用户当前表达，再顺势推进学习目标。 / The Roleplay Agent is now instructed to first respond naturally to the current `dialogueHistory + userMessage`, then guide toward learning goals.
+- 后端 `alignWithTaskProgress` 不再用缺项提示覆盖 Roleplay 回复；只在 checklist 完成时补充 `taskComplete=true`，保留模型原始回复和 `unitMentions`。 / Backend `alignWithTaskProgress` no longer overwrites Roleplay replies with missing-item prompts; when the checklist is complete, it only adds `taskComplete=true` while preserving the model reply and `unitMentions`.
+- 删除未使用的机械缺项提示方法，避免后续误用。 / Removed unused mechanical missing-item prompt helpers to avoid future misuse.
+
+### 说明 / Notes
+
+- 未新增依赖，未新增 SQL 迁移。 / No dependency or SQL migration was added.

@@ -473,62 +473,15 @@ public class LearningDialogueService {
             scoringSignal.put("completionReason", "All task checklist items are complete: " + String.join(", ", taskProgress.completed()));
             return new AgentDialogueOutput(
                     output.contractVersion(),
-                    closingReply(scenarioCode),
+                    output.reply(),
                     output.feedback(),
                     output.corrections(),
                     output.naturalExpression(),
-                    List.of(),
+                    output.unitMentions(),
                     scoringSignal
             );
         }
-        if (sameMeaning(output.reply(), repairedRoleplayReply(scenarioCode, "", 2))
-                || repeatedGenericTaskQuestion(output.reply())) {
-            return new AgentDialogueOutput(
-                    output.contractVersion(),
-                    promptForMissingTaskItem(scenarioCode, taskProgress),
-                    output.feedback(),
-                    output.corrections(),
-                    output.naturalExpression(),
-                    List.of(),
-                    output.scoringSignal()
-            );
-        }
         return output;
-    }
-
-    private String closingReply(String scenarioCode) {
-        return switch (scenarioCode) {
-            case "hotel_check_in" -> "Great, Alex. Your quiet queen room is ready. Breakfast and Wi-Fi information will be provided at the front desk. Enjoy your stay.";
-            case "shopping_return" -> "Thanks. That covers the return request. We can process a refund or exchange for the headphones.";
-            case "bank_account" -> "Thanks. That covers the account opening details. We can continue with the savings account application.";
-            case "police_stop" -> "Thank you. That answers my questions. Please continue calmly and follow the next instructions.";
-            default -> "Thanks. That completes this task.";
-        };
-    }
-
-    private boolean repeatedGenericTaskQuestion(String reply) {
-        String lower = reply == null ? "" : reply.toLowerCase(Locale.ROOT);
-        return lower.contains("would you like to ask about")
-                && (lower.contains("room type")
-                || lower.contains("hotel services")
-                || lower.contains("check-in time")
-                || lower.contains("breakfast")
-                || lower.contains("wi-fi")
-                || lower.contains("wifi"));
-    }
-
-    private String promptForMissingTaskItem(String scenarioCode, TaskProgress taskProgress) {
-        String missing = taskProgress.missing().isEmpty() ? "the next detail" : taskProgress.missing().get(0);
-        if ("hotel_check_in".equals(scenarioCode)) {
-            return switch (missing) {
-                case "reservation" -> "Please tell me the reservation name or confirm the reservation details.";
-                case "roomPreference" -> "What kind of room would you prefer?";
-                case "breakfast" -> "Please ask me directly about breakfast time.";
-                case "wifi" -> "Please ask me directly about the Wi-Fi information.";
-                default -> "What else do you need for check-in?";
-            };
-        }
-        return "Could you give the next missing detail for this task?";
     }
 
     private TaskProgress taskProgress(Long packageId, String scenarioCode, String currentUserMessage) {
