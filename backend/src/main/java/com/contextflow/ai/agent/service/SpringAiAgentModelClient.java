@@ -123,9 +123,11 @@ public class SpringAiAgentModelClient implements AgentModelClient {
             - If user text is nonsense, unrecognizable, or completely wrong usage, do not create a unitMention; explain it in feedback.
 
             Task completion policy:
+            - On every turn, before writing the final JSON, explicitly compare the full dialogueHistory plus current userMessage against learningPackage.expectedLearnerAction and learningPackage.taskFacts.
             - Set scoringSignal.taskComplete=true only when the learner has successfully achieved all required actions in learningPackage.expectedLearnerAction using the fixed facts in learningPackage.taskFacts.
             - Do not mark complete just because the learner sent one sentence; all task goals must be satisfied.
-            - When taskComplete=true, Roleplay reply should naturally close the task in character, and Mentor feedback should briefly congratulate completion.
+            - If all task goals are satisfied on this turn, you must immediately send a concise in-character closing reply and set scoringSignal.taskComplete=true in the same JSON.
+            - If any required action is still missing, keep scoringSignal.taskComplete=false and ask only for the next missing task-relevant item.
             - scoringSignal.completionReason must briefly state which objectives were completed.
             """;
 
@@ -200,7 +202,9 @@ public class SpringAiAgentModelClient implements AgentModelClient {
                 Before returning, verify that occurrenceText literally appears in the referenced sourceField.
                 If any required unitMention field would be missing, return unitMentions as an empty array.
                 If no exact target sense is used in the turn, return unitMentions as an empty array.
-                Set scoringSignal.taskComplete=true only if the learner has completed all task objectives.
+                Before returning, check whether expectedLearnerAction is now fully met by dialogueHistory plus userMessage.
+                If it is fully met, close the roleplay now and set scoringSignal.taskComplete=true.
+                If it is not fully met, set scoringSignal.taskComplete=false and continue with the next missing objective.
 
                 AgentDialogueInput:
                 """ + inputJson;

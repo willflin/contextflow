@@ -36,6 +36,14 @@ public class LearningPackageController {
         return ApiResponse.ok(learningPackageService.skipPackage(currentUsername(authentication), packageId));
     }
 
+    @PostMapping("/{packageId}/complete")
+    public ApiResponse<LearningPackageResponse> complete(
+            @PathVariable Long packageId,
+            Authentication authentication
+    ) {
+        return ApiResponse.ok(learningPackageService.completePackage(currentUsername(authentication), packageId));
+    }
+
     private String currentUsername(Authentication authentication) {
         if (authentication == null || !(authentication.getPrincipal() instanceof CurrentUserResponse currentUser)) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or missing token.");

@@ -1073,6 +1073,24 @@
 
 - 新增 Flyway `V15__create_learning_unit_sense_deferrals.sql`，SQL 同步到 `docs/sql/phase6_learning_unit_sense_deferrals_schema.sql`。/ Added Flyway `V15__create_learning_unit_sense_deferrals.sql`, mirrored in `docs/sql/phase6_learning_unit_sense_deferrals_schema.sql`.
 
+# Phase 6.3.20：严格完成信号与手动结束 / Strict Completion Signal and Manual End
+
+## 问题 / Problem
+
+- 根据 Roleplay 结束语文本兜底标记完成不可靠，可能在中途对话或其他任务里误判。/ Inferring completion from Roleplay closing text is unreliable and can misfire in mid-dialogue or other task contexts.
+- 用户需要一个显式结束当前对话的入口，防止模型不稳定时卡住学习流程。/ Learners need an explicit way to end the current dialogue when the model becomes unstable.
+
+## 操作 / Operations
+
+- 删除后端结束语文本匹配兜底，只信任 `scoringSignal.taskComplete=true`。/ Removed backend closing-text fallback and now trust only `scoringSignal.taskComplete=true`.
+- 强化 Spring AI prompt：每轮都必须检查 `expectedLearnerAction` 是否全部满足，满足时立刻结束并返回 `taskComplete=true`。/ Strengthened the Spring AI prompt so every turn checks whether `expectedLearnerAction` is fully met and immediately returns `taskComplete=true` when it is.
+- 新增 `POST /api/learning/packages/{packageId}/complete`，用于用户手动结束当前 READY 包。/ Added `POST /api/learning/packages/{packageId}/complete` for manually ending the current READY package.
+- 前端新增“结束当前对话”按钮，完成后弹出本轮完成提示。/ Added an "end current dialogue" button in the frontend, showing the completion dialog afterward.
+
+## 说明 / Notes
+
+- 未新增依赖，未新增 SQL 迁移。/ No dependency or SQL migration was added.
+
 # Phase 6.3.17：Mentor 提示等待状态 / Mentor Hint Waiting State
 
 ## 问题 / Problem

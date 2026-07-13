@@ -139,6 +139,22 @@ export async function skipLearningPackage(token: string, packageId: number): Pro
   return result.data;
 }
 
+export async function completeLearningPackage(token: string, packageId: number): Promise<LearningPackage> {
+  const response = await fetch(`/api/learning/packages/${packageId}/complete`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, 'Failed to complete learning package.'));
+  }
+
+  const result = (await response.json()) as ApiResponse<LearningPackage>;
+  return result.data;
+}
+
 export function parseLearningPackageContent(learningPackage: LearningPackage): LearningPackageContent {
   try {
     return JSON.parse(learningPackage.contentJson) as LearningPackageContent;

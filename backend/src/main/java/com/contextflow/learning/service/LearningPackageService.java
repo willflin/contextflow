@@ -98,6 +98,21 @@ public class LearningPackageService {
         return deferredCount;
     }
 
+    @Transactional
+    public LearningPackageResponse completePackage(String username, Long packageId) {
+        UserEntity user = activeUser(username);
+        LearningPackageEntity packageEntity = learningPackageRepository.findByIdAndUserId(packageId, user.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Learning package not found."));
+        if (packageEntity.getStatus() != LearningPackageStatus.READY) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only READY packages can be completed.");
+        }
+        packageEntity.markCompleted();
+        LearningPackageEntity saved = learningPackageRepository.save(packageEntity);
+        ScenarioTemplateEntity scenario = scenarioTemplateRepository.findById(saved.getScenarioTemplateId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Scenario template not found."));
+        return LearningPackageResponse.from(saved, scenario.getName());
+    }
+
     private UserEntity activeUser(String username) {
         return userRepository.findByUsername(username)
                 .filter(UserEntity::isActive)

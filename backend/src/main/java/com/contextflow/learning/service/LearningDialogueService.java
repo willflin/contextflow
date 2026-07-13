@@ -111,7 +111,6 @@ public class LearningDialogueService {
                 )
         );
         agentOutput = guardRoleplayOutput(agentOutput, packageEntity.getId(), packageContent, scenarioCode, userMessage, turnIndex);
-        agentOutput = completeOnClosingReply(agentOutput);
         List<CorrectionResponse> outputCorrections = correctionResponses(agentOutput.corrections());
 
         LearningDialogueTurnEntity saved = learningDialogueTurnRepository.save(new LearningDialogueTurnEntity(
@@ -453,39 +452,6 @@ public class LearningDialogueService {
                     ? "Could you clarify what you mean?"
                     : "I understand. Could you tell me a little more?";
         };
-    }
-
-    private AgentDialogueOutput completeOnClosingReply(AgentDialogueOutput output) {
-        if (output == null || taskComplete(output.scoringSignal()) || !looksLikeClosingReply(output.reply())) {
-            return output;
-        }
-        Map<String, Object> scoringSignal = new java.util.LinkedHashMap<>(
-                output.scoringSignal() == null ? Map.of() : output.scoringSignal()
-        );
-        scoringSignal.put("taskComplete", true);
-        scoringSignal.putIfAbsent("completionReason", "The Roleplay Agent closed the task after the learner completed the interaction.");
-        return new AgentDialogueOutput(
-                output.contractVersion(),
-                output.reply(),
-                output.feedback(),
-                output.corrections(),
-                output.naturalExpression(),
-                output.unitMentions(),
-                scoringSignal
-        );
-    }
-
-    private boolean looksLikeClosingReply(String reply) {
-        String lower = reply == null ? "" : reply.toLowerCase(Locale.ROOT);
-        return lower.contains("thank you for staying")
-                || lower.contains("have a great night")
-                || lower.contains("have a good day")
-                || lower.contains("you're all set")
-                || lower.contains("you are all set")
-                || lower.contains("everything is complete")
-                || lower.contains("that completes")
-                || lower.contains("finished")
-                || lower.contains("completed");
     }
 
     private List<AgentTargetSenseContext> targetSenses(String username) {

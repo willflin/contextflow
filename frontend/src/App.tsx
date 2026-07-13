@@ -25,6 +25,7 @@ import {
   fetchNextLearningPackage,
   LearningDialogueTurn,
   LearningPackage,
+  completeLearningPackage,
   parseLearningPackageContent,
   sendLearningDialogueMessage,
   skipLearningPackage
@@ -137,6 +138,7 @@ export default function App() {
   const [learningPackage, setLearningPackage] = useState<LearningPackage | null>(null);
   const [learningBusy, setLearningBusy] = useState(false);
   const [skipBusy, setSkipBusy] = useState(false);
+  const [completeBusy, setCompleteBusy] = useState(false);
   const [learningError, setLearningError] = useState<string | null>(null);
   const [dialogueTurns, setDialogueTurns] = useState<LearningDialogueTurn[]>([]);
   const [dialogueMessage, setDialogueMessage] = useState('');
@@ -802,6 +804,7 @@ export default function App() {
     setLearningError(null);
     setLearningBusy(false);
     setSkipBusy(false);
+    setCompleteBusy(false);
     setDialogueTurns([]);
     setDialogueMessage('');
     setDialogueError(null);
@@ -867,6 +870,26 @@ export default function App() {
       setLearningError(exception instanceof Error ? exception.message : '跳过当前任务失败。');
     } finally {
       setSkipBusy(false);
+    }
+  }
+
+  async function completeCurrentLearningPackage() {
+    const token = tokenOrNull();
+    if (!token || !learningPackage) {
+      setLearningError('请先开始学习并加载任务。');
+      return;
+    }
+    setCompleteBusy(true);
+    setLearningError(null);
+    try {
+      const completedPackage = await completeLearningPackage(token, learningPackage.id);
+      setLearningPackage(completedPackage);
+      setCompletionReason('你已手动结束当前对话，可以进入下一轮学习。');
+      setCompletionPromptVisible(true);
+    } catch (exception) {
+      setLearningError(exception instanceof Error ? exception.message : '结束当前对话失败。');
+    } finally {
+      setCompleteBusy(false);
     }
   }
 
@@ -1222,9 +1245,17 @@ export default function App() {
               className="secondary-button"
               type="button"
               onClick={skipCurrentLearningPackage}
-              disabled={learningBusy || skipBusy || !learningPackage || learningPackage.status !== 'READY'}
+              disabled={learningBusy || skipBusy || completeBusy || !learningPackage || learningPackage.status !== 'READY'}
             >
               跳过当前任务
+            </button>
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={completeCurrentLearningPackage}
+              disabled={learningBusy || skipBusy || completeBusy || !learningPackage || learningPackage.status !== 'READY'}
+            >
+              结束当前对话
             </button>
           </div>
           {renderLearningPackage()}

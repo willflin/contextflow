@@ -50,8 +50,9 @@
 ## 任务完成 / Task Completion
 
 - Agent 只有在用户完成 `expectedLearnerAction` 的全部目标，并且没有超出 `taskFacts` 的固定事实时，才能设置 `scoringSignal.taskComplete=true`。/ The Agent may set `scoringSignal.taskComplete=true` only when the learner has completed all objectives in `expectedLearnerAction` without going beyond fixed `taskFacts`.
-- 后端收到完成信号后把当前学习包标记为 `COMPLETED`，后续点击“开始学习/开始下一轮”会进入新的 READY 任务。/ After receiving the completion signal, the backend marks the current learning package as `COMPLETED`; later "start learning/start next round" fetches a new READY task.
-- 前端只负责展示完成弹窗，不自行判断任务是否完成。/ The frontend only displays the completion dialog and does not decide task completion by itself.
+- 后端只信任结构化 `scoringSignal.taskComplete=true` 或用户显式点击“结束当前对话”，不会根据结束语文本猜测任务完成。/ The backend trusts only structured `scoringSignal.taskComplete=true` or the learner explicitly clicking "end current dialogue"; it does not infer completion from closing text.
+- 后端收到完成信号或手动结束请求后把当前学习包标记为 `COMPLETED`，后续点击“开始学习/开始下一轮”会进入新的 READY 任务。/ After receiving a completion signal or manual end request, the backend marks the current learning package as `COMPLETED`; later "start learning/start next round" fetches a new READY task.
+- 前端只负责展示完成弹窗和手动结束入口，不自行判断任务是否完成。/ The frontend only displays the completion dialog and manual end action; it does not decide task completion by itself.
 
 ## 跳过任务 / Skip Task
 
