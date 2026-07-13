@@ -7,6 +7,8 @@ import com.contextflow.learning.service.LearningPackageService;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
@@ -24,6 +26,14 @@ public class LearningPackageController {
     @GetMapping("/next")
     public ApiResponse<LearningPackageResponse> next(Authentication authentication) {
         return ApiResponse.ok(learningPackageService.getNextReadyPackage(currentUsername(authentication)));
+    }
+
+    @PostMapping("/{packageId}/skip")
+    public ApiResponse<Integer> skip(
+            @PathVariable Long packageId,
+            Authentication authentication
+    ) {
+        return ApiResponse.ok(learningPackageService.skipPackage(currentUsername(authentication), packageId));
     }
 
     private String currentUsername(Authentication authentication) {

@@ -26,7 +26,8 @@ import {
   LearningDialogueTurn,
   LearningPackage,
   parseLearningPackageContent,
-  sendLearningDialogueMessage
+  sendLearningDialogueMessage,
+  skipLearningPackage
 } from './api/learning';
 import {
   answerAdaptivePlacement,
@@ -135,6 +136,7 @@ export default function App() {
   const [adminDialogueError, setAdminDialogueError] = useState<string | null>(null);
   const [learningPackage, setLearningPackage] = useState<LearningPackage | null>(null);
   const [learningBusy, setLearningBusy] = useState(false);
+  const [skipBusy, setSkipBusy] = useState(false);
   const [learningError, setLearningError] = useState<string | null>(null);
   const [dialogueTurns, setDialogueTurns] = useState<LearningDialogueTurn[]>([]);
   const [dialogueMessage, setDialogueMessage] = useState('');
@@ -799,6 +801,7 @@ export default function App() {
     setLearningPackage(null);
     setLearningError(null);
     setLearningBusy(false);
+    setSkipBusy(false);
     setDialogueTurns([]);
     setDialogueMessage('');
     setDialogueError(null);
@@ -846,6 +849,24 @@ export default function App() {
       setDialogueError(exception instanceof Error ? exception.message : 'Dialogue failed.');
     } finally {
       setDialogueBusy(false);
+    }
+  }
+
+  async function skipCurrentLearningPackage() {
+    const token = tokenOrNull();
+    if (!token || !learningPackage) {
+      setLearningError('请先开始学习并加载任务。');
+      return;
+    }
+    setSkipBusy(true);
+    setLearningError(null);
+    try {
+      await skipLearningPackage(token, learningPackage.id);
+      await loadNextLearningPackage();
+    } catch (exception) {
+      setLearningError(exception instanceof Error ? exception.message : '跳过当前任务失败。');
+    } finally {
+      setSkipBusy(false);
     }
   }
 
@@ -939,6 +960,8 @@ export default function App() {
   function buildMentorHint(step: number) {
     const content = learningPackage ? parseLearningPackageContent(learningPackage) : {};
     const facts = content.learningTask?.facts ?? fallbackTaskFacts(content.scenario?.code) ?? {};
+    const registerNote = taskRegisterNote(content);
+    const currentQuestion = currentRoleplayQuestion(content);
     const targets = reviewPlan?.items ?? [];
     const newTargets = targets.filter((item) => item.pool === 'NEW');
     const reviewedTargets = targets.filter((item) => item.pool === 'REVIEW');
@@ -954,37 +977,91 @@ export default function App() {
           : reviewedTargets.length > 0
           ? `要用到的重点词你已经学过，先回忆和 ${reviewedTargets.slice(0, 2).map((item) => item.canonicalText).join('、')} 相关的表达。`
           : '先从任务卡里的已给信息开始，不需要编造新信息。';
-      return `先别急着写完整答案。看任务卡：${factSummary}。${wordNote}`;
+      return `先别急着写完整答案。当前对方在问：${currentQuestion}。${registerNote} 看任务卡：${factSummary}。${wordNote}`;
     }
 
     if (step === 2) {
-      return '先想这句话的功能：你是在提出请求、说明事实，还是询问信息？请先用一个礼貌开头，再接任务卡里的一个固定事实。';
+      return `先判断当前问题要你做什么：回答事实、提出请求，还是询问信息。${registerNote} 不一定要写长句，先用一个清楚的短句接住当前问题。`;
     }
 
     if (step === 3) {
-      return '可以先搭一个空框架，但不要直接套答案：I would like to ... / I have ... / Could you tell me ... ? 你需要自己把任务卡里的信息放进去。';
+      return '可以先搭一个空框架，但不要直接套完整答案：Yes, ... / I need ... / Could you tell me ... ? 你只需要把当前问题相关的任务卡信息放进去。';
     }
 
-    return '继续普通提示：先只写半句也可以。选择任务卡中的一个事实，把它接到一个礼貌开头后面；不要追求一次写完整。';
+    return `继续普通提示：只回答当前问题即可。${registerNote} 选择任务卡中的一个相关事实，先写短句，不要一次覆盖整个任务背景。`;
   }
 
   function buildPreciseHint() {
     const content = learningPackage ? parseLearningPackageContent(learningPackage) : {};
     const scenarioCode = content.scenario?.code;
+    const currentQuestion = currentRoleplayQuestion(content);
+    const question = currentQuestion.toLowerCase();
     const targets = reviewPlan?.items.slice(0, 4).map((item) => item.canonicalText).join('、');
-    const targetNote = targets ? `重点词可优先考虑：${targets}。` : '优先使用任务卡里的关键词。';
-    switch (scenarioCode) {
-      case 'hotel_check_in':
-        return `${targetNote} 可以使用结构：I'd like to check in. The reservation is under Alex Chen. Could I have a quiet queen room? Also, could you tell me the breakfast time and Wi-Fi information?`;
-      case 'shopping_return':
-        return `${targetNote} 可以使用结构：I'd like to return or exchange these wireless headphones. I bought them yesterday, but the left side has no sound. I have the receipt.`;
-      case 'bank_account':
-        return `${targetNote} 可以使用结构：I'd like to open a savings account. I have my passport and proof of address. Could you tell me about the debit card, monthly fees, and required documents?`;
-      case 'police_stop':
-        return `${targetNote} 可以使用结构：Could you explain why I was stopped? I am walking to the subway, and I have my ID with me. What should I do next?`;
-      default:
-        return `${targetNote} 可以先用：I'd like to ... / I have ... / Could you tell me ... ?`;
+    const targetNote = targets ? `可顺带考虑重点词：${targets}。` : '优先使用当前问题相关的信息。';
+    return `${taskRegisterNote(content)} 当前问题是：“${currentQuestion}” ${targetNote} ${preciseHintForCurrentQuestion(scenarioCode, question)}`;
+  }
+
+  function currentRoleplayQuestion(content: ReturnType<typeof parseLearningPackageContent>) {
+    const lastTurn = dialogueTurns[dialogueTurns.length - 1];
+    return lastTurn?.roleplayReply || content.roleplayAgent?.openingLine || '请根据当前任务继续回应。';
+  }
+
+  function preciseHintForCurrentQuestion(scenarioCode: string | undefined, question: string) {
+    if (scenarioCode === 'hotel_check_in') {
+      if (question.includes('reservation')) {
+        return '可以答：Yes, I have a two-night reservation under Alex Chen.';
+      }
+      if (question.includes('room') || question.includes('prefer')) {
+        return '可以答：Could I have a quiet queen room, please?';
+      }
+      if (question.includes('breakfast')) {
+        return '可以问：What time is breakfast?';
+      }
+      if (question.includes('wi-fi') || question.includes('wifi')) {
+        return '可以问：Could you tell me the Wi-Fi information?';
+      }
+      return '可以答：I would like to check in. My name is Alex Chen.';
     }
+    if (scenarioCode === 'shopping_return') {
+      if (question.includes('problem') || question.includes('wrong')) {
+        return '可以答：The left side has no sound.';
+      }
+      if (question.includes('receipt')) {
+        return '可以答：Yes, I have the receipt.';
+      }
+      if (question.includes('refund') || question.includes('exchange')) {
+        return '可以答：I would like a refund or an exchange.';
+      }
+      return '可以答：I bought these wireless headphones yesterday, but the left side has no sound.';
+    }
+    if (scenarioCode === 'bank_account') {
+      if (question.includes('kind') || question.includes('type')) {
+        return '可以答：I would like to open a savings account.';
+      }
+      if (question.includes('id') || question.includes('document') || question.includes('proof')) {
+        return '可以答：I have my passport and proof of address.';
+      }
+      if (question.includes('debit')) {
+        return '可以问：Can I apply for a debit card?';
+      }
+      if (question.includes('fee')) {
+        return '可以问：Are there any monthly fees?';
+      }
+      return '可以答：I would like to open a savings account.';
+    }
+    if (scenarioCode === 'police_stop') {
+      if (question.includes('why')) {
+        return '可以问：Could you explain why I was stopped?';
+      }
+      if (question.includes('where') || question.includes('going')) {
+        return '可以答：I am walking to the subway.';
+      }
+      if (question.includes('id')) {
+        return '可以答：Yes, I have my ID with me.';
+      }
+      return '可以问：What should I do next?';
+    }
+    return '可以先用一句短答回应当前问题：Yes, ... / I need ... / Could you tell me ... ?';
   }
 
   function tokenOrNull() {
@@ -1140,6 +1217,14 @@ export default function App() {
               disabled={learningBusy || !profile}
             >
               开始学习
+            </button>
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={skipCurrentLearningPackage}
+              disabled={learningBusy || skipBusy || !learningPackage || learningPackage.status !== 'READY'}
+            >
+              跳过当前任务
             </button>
           </div>
           {renderLearningPackage()}
@@ -1896,6 +1981,7 @@ export default function App() {
     const scenarioCode = content.scenario?.code;
     const taskGoal = content.learningTask?.goal ?? fallbackTaskGoal(scenarioCode) ?? content.scenario?.description;
     const expectedLearnerAction = content.learningTask?.expectedLearnerAction ?? fallbackExpectedLearnerAction(scenarioCode);
+    const registerNote = taskRegisterNote(content);
     const taskFacts = Object.entries(content.learningTask?.facts ?? fallbackTaskFacts(scenarioCode) ?? {});
     const learningCompleted = learningPackage.status === 'COMPLETED';
     return (
@@ -1912,6 +1998,7 @@ export default function App() {
           <section className="task-goal-panel">
             <span className="label">任务目标</span>
             <p>{taskGoal}</p>
+            <small>{registerNote}</small>
             {expectedLearnerAction && <small>{expectedLearnerAction}</small>}
             {taskFacts.length > 0 && (
               <div className="task-facts-grid">
@@ -2167,6 +2254,52 @@ export default function App() {
       default:
         return undefined;
     }
+  }
+
+  function taskRegisterNote(content: ReturnType<typeof parseLearningPackageContent>) {
+    const scenarioCode = content.scenario?.code;
+    const register = content.learningTask?.register ?? fallbackTaskRegister(scenarioCode);
+    const guidance = fallbackRegisterGuidance(scenarioCode);
+    return `语域：${formatTaskRegister(register)}。${guidance}`;
+  }
+
+  function fallbackTaskRegister(scenarioCode?: string) {
+    switch (scenarioCode) {
+      case 'hotel_check_in':
+      case 'shopping_return':
+        return 'daily_service';
+      case 'bank_account':
+        return 'business_service';
+      case 'police_stop':
+        return 'formal_sensitive';
+      default:
+        return 'daily_conversation';
+    }
+  }
+
+  function fallbackRegisterGuidance(scenarioCode?: string) {
+    switch (scenarioCode) {
+      case 'hotel_check_in':
+        return '日常服务场景，可以用自然、简短、礼貌的口语表达，不必强行写长句。';
+      case 'shopping_return':
+        return '日常服务场景，可以直接说明问题；清楚自然比复杂长句更重要。';
+      case 'bank_account':
+        return '商务服务场景，要礼貌清楚，但仍然可以保持句子简洁。';
+      case 'police_stop':
+        return '严肃敏感场景，要冷静、尊重、清楚，避免俚语和对抗性表达。';
+      default:
+        return '日常对话场景，意思清楚时可以使用口语化和简化表达。';
+    }
+  }
+
+  function formatTaskRegister(register: string) {
+    const labels: Record<string, string> = {
+      daily_service: '日常服务',
+      business_service: '商务服务',
+      formal_sensitive: '严肃敏感',
+      daily_conversation: '日常口语'
+    };
+    return labels[register] ?? register;
   }
 
   function fallbackTaskFacts(scenarioCode?: string): Record<string, string> | undefined {

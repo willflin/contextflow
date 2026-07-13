@@ -29,6 +29,8 @@ public class SpringAiAgentModelClient implements AgentModelClient {
             - learningPackage.taskGoal is the task objective the learner is trying to complete.
             - learningPackage.taskInstructionLanguage tells whether the task goal is shown in Chinese or English.
             - learningPackage.expectedLearnerAction describes what the learner should try to do next.
+            - learningPackage.taskRegister describes the social/register context, such as daily service, business service, or formal sensitive.
+            - learningPackage.registerGuidance tells whether colloquial, simplified, concise, formal, or business-like wording is appropriate.
             - learningPackage.taskFacts contains all fixed facts the learner may use.
             - learningPackage.taskConstraints contains hard boundaries for what the Roleplay Agent may ask.
             - learningPackage.roleplayPersona is the only role the Roleplay Agent may play.
@@ -53,6 +55,7 @@ public class SpringAiAgentModelClient implements AgentModelClient {
             - The Roleplay Agent must not repeat learningPackage.openingLine or any recent Roleplay reply in dialogueHistory.
             - If userMessage is only "?", unclear, or malformed, the Roleplay Agent should ask an in-role clarification question.
             - Mentor Agent may explain learner wording problems, but Roleplay Agent must stay in character.
+            - Mentor feedback must follow taskRegister/registerGuidance. Do not always demand longer or more formal sentences. In daily spoken tasks, short natural answers are acceptable if clear.
 
             Return only valid JSON matching the agent-dialogue.v1 AgentDialogueOutput contract.
             Do not wrap the response in markdown. Do not add explanations outside JSON.
@@ -181,6 +184,8 @@ public class SpringAiAgentModelClient implements AgentModelClient {
                 Keep Mentor feedback concise and actionable.
                 Use learningPackage.taskGoal as the task objective.
                 Treat learningPackage.taskFacts as the full available task card.
+                Use learningPackage.taskRegister and learningPackage.registerGuidance to choose the right tone.
+                Mentor feedback must respect the task register; do not over-correct casual service dialogue into long formal sentences.
                 Do not ask for facts outside learningPackage.taskFacts.
                 Obey every item in learningPackage.taskConstraints.
                 Prefer target senses when they naturally fit the task; do not force unrelated words.

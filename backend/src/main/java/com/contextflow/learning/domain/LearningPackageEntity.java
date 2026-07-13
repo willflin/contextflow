@@ -108,6 +108,11 @@ public class LearningPackageEntity {
         this.completedAt = Instant.now();
     }
 
+    public void markExpired() {
+        this.status = LearningPackageStatus.EXPIRED;
+        this.expiresAt = Instant.now();
+    }
+
     public String getTitle() {
         return title;
     }

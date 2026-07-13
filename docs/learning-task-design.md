@@ -5,6 +5,7 @@
 - `learningTask.goal` 是本轮学习的任务目标，Agent 必须以它作为对话推进依据。/ `learningTask.goal` is the learning task objective, and the Agent must use it as the basis for advancing the dialogue.
 - `learningTask.instructionLanguage` 控制任务目标给用户的语言：低水平优先中文，高水平可直接英文。/ `learningTask.instructionLanguage` controls the language shown to the learner: Chinese for lower levels, English for higher levels.
 - `learningTask.expectedLearnerAction` 描述用户下一步应尝试完成的英语行为。/ `learningTask.expectedLearnerAction` describes what the learner should try to do in English next.
+- `learningTask.register` 和 `learningTask.registerGuidance` 描述任务语域，例如日常口语、商务服务、严肃敏感场景。/ `learningTask.register` and `learningTask.registerGuidance` describe the task register, such as daily spoken, business service, or formal sensitive contexts.
 - `learningTask.facts` 必须给出用户完成任务所需的全部固定事实，不能要求用户临场编造姓名、房型、预订号、账户信息等。/ `learningTask.facts` must provide all fixed facts needed for the task, so the learner is never forced to invent names, room types, reservation codes, account information, or similar details.
 - `learningTask.constraints` 必须限制 Agent 后续提问只能围绕已给事实和学习目标展开。/ `learningTask.constraints` must restrict Agent follow-up questions to the given facts and learning goals.
 - `scenarioCode` 和 `scenarioName` 只保留为分类、标签和种子来源，不再代表完整学习场景。/ `scenarioCode` and `scenarioName` remain only as category, tag, and seed-source fields; they no longer represent the full learning scenario.
@@ -43,9 +44,16 @@
 - 用户超过三分钟未回复时，系统也会询问是否需要精确提示。/ If the learner does not reply for more than three minutes, the system also asks whether a precise hint is needed.
 - 精确提示按钮前三轮禁用；提示确认框出现后解锁。/ The precise-hint button is disabled during the first three ordinary hints and unlocks after the confirmation prompt appears.
 - 精确提示可以包含要用到的单词、句法和参考表达，但应明确这是降低自主思考比例的帮助。/ Precise hints may include words, syntax, and reference expressions, but should make clear that this reduces autonomous thinking.
+- 精确提示必须围绕当前 Roleplay Agent 正在问的问题，不应直接给完整任务背景答案。/ Precise hints must focus on the current Roleplay Agent question and should not provide a full background-level task answer.
+- Mentor 建议必须考虑任务语域；日常口语场景不应一概要求长句或商务化表达。/ Mentor suggestions must respect the task register; daily spoken contexts should not always be corrected into long or business-like sentences.
 
 ## 任务完成 / Task Completion
 
 - Agent 只有在用户完成 `expectedLearnerAction` 的全部目标，并且没有超出 `taskFacts` 的固定事实时，才能设置 `scoringSignal.taskComplete=true`。/ The Agent may set `scoringSignal.taskComplete=true` only when the learner has completed all objectives in `expectedLearnerAction` without going beyond fixed `taskFacts`.
 - 后端收到完成信号后把当前学习包标记为 `COMPLETED`，后续点击“开始学习/开始下一轮”会进入新的 READY 任务。/ After receiving the completion signal, the backend marks the current learning package as `COMPLETED`; later "start learning/start next round" fetches a new READY task.
 - 前端只负责展示完成弹窗，不自行判断任务是否完成。/ The frontend only displays the completion dialog and does not decide task completion by itself.
+
+## 跳过任务 / Skip Task
+
+- 用户跳过当前任务时，系统会把当前学习计划中的词义写入延后记录，并适度降低已有复习词义的 `reviewPriorityScore`。/ When the learner skips the current task, the system writes deferral records for the current plan senses and moderately lowers `reviewPriorityScore` for existing review senses.
+- 当前学习包标记为 `EXPIRED`，下一次进入学习会加载新的 READY 任务。/ The current learning package is marked `EXPIRED`, so the next learning entry loads a new READY task.

@@ -25,6 +25,8 @@ export type LearningPackageContent = {
     goal?: string;
     instructionLanguage?: string;
     expectedLearnerAction?: string;
+    register?: string;
+    registerGuidance?: string;
     facts?: Record<string, string>;
     constraints?: string[];
     source?: string;
@@ -118,6 +120,22 @@ export async function sendLearningDialogueMessage(
   }
 
   const result = (await response.json()) as ApiResponse<LearningDialogueTurn>;
+  return result.data;
+}
+
+export async function skipLearningPackage(token: string, packageId: number): Promise<number> {
+  const response = await fetch(`/api/learning/packages/${packageId}/skip`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, 'Failed to skip learning package.'));
+  }
+
+  const result = (await response.json()) as ApiResponse<number>;
   return result.data;
 }
 

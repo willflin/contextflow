@@ -1052,6 +1052,27 @@
 
 - 未新增依赖，未新增 SQL 迁移。/ No dependency or SQL migration was added.
 
+# Phase 6.3.19：任务语域、完成兜底与跳过任务 / Task Register, Completion Fallback, and Skip Task
+
+## 问题 / Problem
+
+- Agent 已输出明确结束语时，模型可能没有返回 `taskComplete=true`，导致前端不弹出完成提示。/ The model could produce a clear closing reply without returning `taskComplete=true`, so the frontend did not show the completion dialog.
+- 精确提示按整个任务背景给答案，不能聚焦当前 Roleplay 问题。/ Precise hints answered the whole task background instead of the current Roleplay question.
+- Mentor 建议缺少语域判断，容易把所有表达都纠成长句或商务化表达。/ Mentor guidance lacked register awareness and could over-correct all utterances into long or business-like sentences.
+- 用户需要跳过当前任务，并把当前批次词义推到学习队列后面。/ Learners need to skip the current task and push the current batch of senses later in the learning queue.
+
+## 操作 / Operations
+
+- `learningTask` 增加 `register` 和 `registerGuidance`，并传入 Agent 契约。/ Added `register` and `registerGuidance` to `learningTask` and the Agent contract.
+- 前端任务卡显示中文语域说明。/ The frontend task card now shows Chinese register guidance.
+- 精确提示改为读取当前最后一句 Roleplay 回复，只围绕当前问题给参考表达。/ Precise hints now read the latest Roleplay reply and provide a reference expression only for the current question.
+- 后端增加明确结束语兜底，将明显收尾回复补为 `taskComplete=true`。/ Added backend fallback that marks clear closing replies as `taskComplete=true`.
+- 新增 `user_learning_unit_sense_deferrals`，跳过任务时延后当前计划词义，并把当前包标记为 `EXPIRED`。/ Added `user_learning_unit_sense_deferrals`; skipping a task defers current plan senses and marks the package `EXPIRED`.
+
+## 说明 / Notes
+
+- 新增 Flyway `V15__create_learning_unit_sense_deferrals.sql`，SQL 同步到 `docs/sql/phase6_learning_unit_sense_deferrals_schema.sql`。/ Added Flyway `V15__create_learning_unit_sense_deferrals.sql`, mirrored in `docs/sql/phase6_learning_unit_sense_deferrals_schema.sql`.
+
 # Phase 6.3.17：Mentor 提示等待状态 / Mentor Hint Waiting State
 
 ## 问题 / Problem

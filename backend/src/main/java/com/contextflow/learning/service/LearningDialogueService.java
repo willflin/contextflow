@@ -111,6 +111,7 @@ public class LearningDialogueService {
                 )
         );
         agentOutput = guardRoleplayOutput(agentOutput, packageEntity.getId(), packageContent, scenarioCode, userMessage, turnIndex);
+        agentOutput = completeOnClosingReply(agentOutput);
         List<CorrectionResponse> outputCorrections = correctionResponses(agentOutput.corrections());
 
         LearningDialogueTurnEntity saved = learningDialogueTurnRepository.save(new LearningDialogueTurnEntity(
@@ -191,6 +192,8 @@ public class LearningDialogueService {
                         taskGoal(learningTask, scenario),
                         learningTask.path("instructionLanguage").asText("zh-CN"),
                         expectedLearnerAction(learningTask, scenario),
+                        taskRegister(learningTask, scenario),
+                        registerGuidance(learningTask, scenario),
                         taskFacts(learningTask, scenario),
                         taskConstraints(learningTask, scenario),
                         roleplayAgent.path("persona").asText(roleplayPersona(scenario.path("code").asText("general"))),
@@ -278,6 +281,41 @@ public class LearningDialogueService {
             case "bank_account" -> "用英语说明想开储蓄账户，提到护照和地址证明，询问借记卡、月费和所需材料。";
             case "police_stop" -> "用英语冷静询问原因，说明你正走去地铁站，如被要求则说明带了证件，并询问下一步该怎么做。";
             default -> "用英语回复，并推动任务继续。";
+        };
+    }
+
+    private String taskRegister(JsonNode learningTask, JsonNode scenario) {
+        String register = learningTask.path("register").asText("");
+        if (!register.isBlank()) {
+            return register;
+        }
+        return fallbackTaskRegister(scenario.path("code").asText("general"));
+    }
+
+    private String registerGuidance(JsonNode learningTask, JsonNode scenario) {
+        String guidance = learningTask.path("registerGuidance").asText("");
+        if (!guidance.isBlank()) {
+            return guidance;
+        }
+        return fallbackRegisterGuidance(scenario.path("code").asText("general"));
+    }
+
+    private String fallbackTaskRegister(String scenarioCode) {
+        return switch (scenarioCode) {
+            case "hotel_check_in", "shopping_return" -> "daily_service";
+            case "bank_account" -> "business_service";
+            case "police_stop" -> "formal_sensitive";
+            default -> "daily_conversation";
+        };
+    }
+
+    private String fallbackRegisterGuidance(String scenarioCode) {
+        return switch (scenarioCode) {
+            case "hotel_check_in" -> "Daily service conversation. Short, natural, polite phrases are acceptable; do not force long formal sentences.";
+            case "shopping_return" -> "Daily service conversation. Clear, direct spoken English is acceptable; polite does not mean overly long.";
+            case "bank_account" -> "Business service conversation. Use polite and clear wording, but keep sentences concise.";
+            case "police_stop" -> "Formal and sensitive conversation. Stay calm, respectful, and clear; avoid slang or confrontational wording.";
+            default -> "Daily conversation. Natural spoken English and simplified wording are acceptable when the meaning is clear.";
         };
     }
 
@@ -415,6 +453,39 @@ public class LearningDialogueService {
                     ? "Could you clarify what you mean?"
                     : "I understand. Could you tell me a little more?";
         };
+    }
+
+    private AgentDialogueOutput completeOnClosingReply(AgentDialogueOutput output) {
+        if (output == null || taskComplete(output.scoringSignal()) || !looksLikeClosingReply(output.reply())) {
+            return output;
+        }
+        Map<String, Object> scoringSignal = new java.util.LinkedHashMap<>(
+                output.scoringSignal() == null ? Map.of() : output.scoringSignal()
+        );
+        scoringSignal.put("taskComplete", true);
+        scoringSignal.putIfAbsent("completionReason", "The Roleplay Agent closed the task after the learner completed the interaction.");
+        return new AgentDialogueOutput(
+                output.contractVersion(),
+                output.reply(),
+                output.feedback(),
+                output.corrections(),
+                output.naturalExpression(),
+                output.unitMentions(),
+                scoringSignal
+        );
+    }
+
+    private boolean looksLikeClosingReply(String reply) {
+        String lower = reply == null ? "" : reply.toLowerCase(Locale.ROOT);
+        return lower.contains("thank you for staying")
+                || lower.contains("have a great night")
+                || lower.contains("have a good day")
+                || lower.contains("you're all set")
+                || lower.contains("you are all set")
+                || lower.contains("everything is complete")
+                || lower.contains("that completes")
+                || lower.contains("finished")
+                || lower.contains("completed");
     }
 
     private List<AgentTargetSenseContext> targetSenses(String username) {

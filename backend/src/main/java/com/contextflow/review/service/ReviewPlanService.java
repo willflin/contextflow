@@ -9,6 +9,7 @@ import com.contextflow.content.domain.LearningUnitType;
 import com.contextflow.content.domain.UserLearningUnitSenseStatsEntity;
 import com.contextflow.content.repository.LearningUnitSenseRepository;
 import com.contextflow.content.repository.LearningUnitSenseScenarioTagRepository;
+import com.contextflow.content.repository.UserLearningUnitSenseDeferralRepository;
 import com.contextflow.content.repository.UserLearningUnitSenseStatsRepository;
 import com.contextflow.placement.domain.CefrLevel;
 import com.contextflow.review.dto.ReviewPlanItemResponse;
@@ -41,10 +42,12 @@ public class ReviewPlanService {
     private static final String REVIEW_POOL = "REVIEW";
     private static final String NEW_POOL = "NEW";
     private static final String FALLBACK_SCENARIO_CODE = "general";
+    private static final BigDecimal SKIP_PENALTY = new BigDecimal("30.0000");
 
     private final UserRepository userRepository;
     private final UserLevelProfileRepository userLevelProfileRepository;
     private final UserLearningUnitSenseStatsRepository statsRepository;
+    private final UserLearningUnitSenseDeferralRepository deferralRepository;
     private final LearningUnitSenseRepository learningUnitSenseRepository;
     private final LearningUnitSenseScenarioTagRepository scenarioTagRepository;
 
@@ -52,12 +55,14 @@ public class ReviewPlanService {
             UserRepository userRepository,
             UserLevelProfileRepository userLevelProfileRepository,
             UserLearningUnitSenseStatsRepository statsRepository,
+            UserLearningUnitSenseDeferralRepository deferralRepository,
             LearningUnitSenseRepository learningUnitSenseRepository,
             LearningUnitSenseScenarioTagRepository scenarioTagRepository
     ) {
         this.userRepository = userRepository;
         this.userLevelProfileRepository = userLevelProfileRepository;
         this.statsRepository = statsRepository;
+        this.deferralRepository = deferralRepository;
         this.learningUnitSenseRepository = learningUnitSenseRepository;
         this.scenarioTagRepository = scenarioTagRepository;
     }
@@ -70,9 +75,10 @@ public class ReviewPlanService {
         CefrLevel userLevel = userLevelProfileRepository.findByUserId(user.getId())
                 .map(profile -> profile.getCefrLevel())
                 .orElse(CefrLevel.A1);
+        Map<Long, BigDecimal> activeDeferrals = activeDeferrals(user.getId(), now);
 
         List<UserLearningUnitSenseStatsEntity> statsRows = statsRepository.findByUserIdWithSenseAndUnit(user.getId());
-        List<Candidate> reviewCandidates = reviewCandidates(statsRows);
+        List<Candidate> reviewCandidates = reviewCandidates(statsRows, activeDeferrals);
         int overdueReviewCount = (int) statsRows.stream()
                 .filter(stats -> stats.getNextReviewAt() != null && !stats.getNextReviewAt().isAfter(now))
                 .count();
@@ -85,6 +91,8 @@ public class ReviewPlanService {
                 .stream()
                 .map(sense -> scoreNewSense(sense, userLevel))
                 .flatMap(Optional::stream)
+                .map(candidate -> applyDeferral(candidate, activeDeferrals))
+                .filter(candidate -> candidate.score().compareTo(BigDecimal.ZERO) > 0)
                 .sorted(candidateComparator())
                 .toList();
 
@@ -115,7 +123,42 @@ public class ReviewPlanService {
         );
     }
 
-    private List<Candidate> reviewCandidates(List<UserLearningUnitSenseStatsEntity> statsRows) {
+    @Transactional
+    public int deferCurrentPlan(String username, int hours) {
+        UserEntity user = activeUser(username);
+        ReviewPlanResponse currentPlan = plan(username, DEFAULT_LIMIT);
+        Instant deferredUntil = Instant.now().plusSeconds(Math.max(1, hours) * 3600L);
+        int deferredCount = 0;
+        for (ReviewPlanItemResponse item : currentPlan.items()) {
+            LearningUnitSenseEntity sense = learningUnitSenseRepository.findById(item.learningUnitSenseId()).orElse(null);
+            if (sense == null) {
+                continue;
+            }
+            deferralRepository.findByUserIdAndLearningUnitSenseId(user.getId(), sense.getId())
+                    .ifPresentOrElse(
+                            existing -> existing.update(SKIP_PENALTY, "TASK_SKIPPED", deferredUntil),
+                            () -> deferralRepository.save(new com.contextflow.content.domain.UserLearningUnitSenseDeferralEntity(
+                                    user.getId(),
+                                    sense,
+                                    SKIP_PENALTY,
+                                    "TASK_SKIPPED",
+                                    deferredUntil
+                            ))
+                    );
+            statsRepository.findByUserIdAndLearningUnitSenseId(user.getId(), sense.getId())
+                    .ifPresent(stats -> stats.updateReviewPriorityScore(
+                            stats.getReviewPriorityScore().multiply(new BigDecimal("0.6500")),
+                            Instant.now()
+                    ));
+            deferredCount++;
+        }
+        return deferredCount;
+    }
+
+    private List<Candidate> reviewCandidates(
+            List<UserLearningUnitSenseStatsEntity> statsRows,
+            Map<Long, BigDecimal> activeDeferrals
+    ) {
         return statsRows.stream()
                 .filter(stats -> stats.getReviewPriorityScore().compareTo(BigDecimal.ZERO) > 0)
                 .map(stats -> new Candidate(
@@ -124,8 +167,33 @@ public class ReviewPlanService {
                         stats.getReviewPriorityScore(),
                         reviewReasons(stats)
                 ))
+                .map(candidate -> applyDeferral(candidate, activeDeferrals))
+                .filter(candidate -> candidate.score().compareTo(BigDecimal.ZERO) > 0)
                 .sorted(candidateComparator())
                 .toList();
+    }
+
+    private Map<Long, BigDecimal> activeDeferrals(Long userId, Instant now) {
+        Map<Long, BigDecimal> result = new HashMap<>();
+        for (var deferral : deferralRepository.findByUserIdAndDeferredUntilAfter(userId, now)) {
+            result.put(deferral.getLearningUnitSense().getId(), deferral.getPenaltyScore());
+        }
+        return result;
+    }
+
+    private Candidate applyDeferral(Candidate candidate, Map<Long, BigDecimal> activeDeferrals) {
+        BigDecimal penalty = activeDeferrals.get(candidate.sense().getId());
+        if (penalty == null) {
+            return candidate;
+        }
+        List<String> reasons = new ArrayList<>(candidate.reasons());
+        reasons.add("TASK_SKIPPED_DEFERRED");
+        return new Candidate(
+                candidate.pool(),
+                candidate.sense(),
+                candidate.score().subtract(penalty).max(BigDecimal.ZERO).setScale(4, RoundingMode.HALF_UP),
+                reasons
+        );
     }
 
     private List<String> reviewReasons(UserLearningUnitSenseStatsEntity stats) {

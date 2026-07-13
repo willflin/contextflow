@@ -9,6 +9,7 @@ import com.contextflow.learning.dto.LearningPackageResponse;
 import com.contextflow.learning.repository.LearningDialogueTurnRepository;
 import com.contextflow.learning.repository.LearningEventRepository;
 import com.contextflow.learning.repository.LearningPackageRepository;
+import com.contextflow.review.service.ReviewPlanService;
 import com.contextflow.scenario.domain.ScenarioTemplateEntity;
 import com.contextflow.scenario.domain.ScenarioTemplateStatus;
 import com.contextflow.scenario.repository.ScenarioTemplateRepository;
@@ -39,6 +40,7 @@ public class LearningPackageService {
     private final LearningPackageRepository learningPackageRepository;
     private final LearningDialogueTurnRepository learningDialogueTurnRepository;
     private final LearningEventRepository learningEventRepository;
+    private final ReviewPlanService reviewPlanService;
     private final ObjectMapper objectMapper;
 
     public LearningPackageService(
@@ -48,6 +50,7 @@ public class LearningPackageService {
             LearningPackageRepository learningPackageRepository,
             LearningDialogueTurnRepository learningDialogueTurnRepository,
             LearningEventRepository learningEventRepository,
+            ReviewPlanService reviewPlanService,
             ObjectMapper objectMapper
     ) {
         this.userRepository = userRepository;
@@ -56,6 +59,7 @@ public class LearningPackageService {
         this.learningPackageRepository = learningPackageRepository;
         this.learningDialogueTurnRepository = learningDialogueTurnRepository;
         this.learningEventRepository = learningEventRepository;
+        this.reviewPlanService = reviewPlanService;
         this.objectMapper = objectMapper;
     }
 
@@ -77,6 +81,21 @@ public class LearningPackageService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Scenario template not found."));
 
         return LearningPackageResponse.from(packageEntity, scenario.getName());
+    }
+
+    @Transactional
+    public int skipPackage(String username, Long packageId) {
+        UserEntity user = activeUser(username);
+        LearningPackageEntity packageEntity = learningPackageRepository.findByIdAndUserId(packageId, user.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Learning package not found."));
+        if (packageEntity.getStatus() != LearningPackageStatus.READY) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only READY packages can be skipped.");
+        }
+        int deferredCount = reviewPlanService.deferCurrentPlan(username, 12);
+        resetDialogueSession(packageEntity.getId());
+        packageEntity.markExpired();
+        learningPackageRepository.save(packageEntity);
+        return deferredCount;
     }
 
     private UserEntity activeUser(String username) {
@@ -160,6 +179,8 @@ public class LearningPackageService {
                         "goal", taskGoal(scenario.getCode(), profile.getCefrLevel().name()),
                         "instructionLanguage", taskInstructionLanguage(profile.getCefrLevel().name()),
                         "expectedLearnerAction", expectedLearnerAction(scenario.getCode(), profile.getCefrLevel().name()),
+                        "register", taskRegister(scenario.getCode()),
+                        "registerGuidance", registerGuidance(scenario.getCode()),
                         "facts", taskFacts(scenario.getCode()),
                         "constraints", taskConstraints(scenario.getCode()),
                         "source", "scenario_template_seed"
@@ -256,6 +277,25 @@ public class LearningPackageService {
             default -> english
                     ? "Reply in English and move the task forward."
                     : "用英语回复，并推动任务继续。";
+        };
+    }
+
+    private String taskRegister(String scenarioCode) {
+        return switch (scenarioCode) {
+            case "hotel_check_in", "shopping_return" -> "daily_service";
+            case "bank_account" -> "business_service";
+            case "police_stop" -> "formal_sensitive";
+            default -> "daily_conversation";
+        };
+    }
+
+    private String registerGuidance(String scenarioCode) {
+        return switch (scenarioCode) {
+            case "hotel_check_in" -> "Daily service conversation. Short, natural, polite phrases are acceptable; do not force long formal sentences.";
+            case "shopping_return" -> "Daily service conversation. Clear, direct spoken English is acceptable; polite does not mean overly long.";
+            case "bank_account" -> "Business service conversation. Use polite and clear wording, but keep sentences concise.";
+            case "police_stop" -> "Formal and sensitive conversation. Stay calm, respectful, and clear; avoid slang or confrontational wording.";
+            default -> "Daily conversation. Natural spoken English and simplified wording are acceptable when the meaning is clear.";
         };
     }
 

@@ -9,6 +9,8 @@ public record AgentLearningPackageContext(
         String taskGoal,
         String taskInstructionLanguage,
         String expectedLearnerAction,
+        String taskRegister,
+        String registerGuidance,
         String taskFacts,
         String taskConstraints,
         String roleplayPersona,
