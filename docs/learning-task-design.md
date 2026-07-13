@@ -40,6 +40,12 @@
 - 普通提示最多三轮，只能给思考方向、任务事实、功能意图和空句型框架，不能直接给完整答案。/ Ordinary hints are limited to three rounds and may give thinking direction, task facts, communicative function, and blank sentence frames, but not full answers.
 - 如果提示中涉及用户可能不会的新词，Mentor 可以告诉用户词义；如果只涉及已学词，Mentor 应提示用户这些词已经学过并鼓励回忆。/ If hints involve likely unknown new words, Mentor may explain their meanings; if only learned words are needed, Mentor should tell the learner they have learned them and encourage recall.
 - 三轮普通提示后不立即打断；第 4 次请求提示时先拦截并询问是否需要精确提示。/ The system does not interrupt immediately after three ordinary hints; the fourth hint request is intercepted to ask whether a precise hint is needed.
-- 用户超过一分钟未回复时，系统也会询问是否需要精确提示。/ If the learner does not reply for more than one minute, the system also asks whether a precise hint is needed.
+- 用户超过三分钟未回复时，系统也会询问是否需要精确提示。/ If the learner does not reply for more than three minutes, the system also asks whether a precise hint is needed.
 - 精确提示按钮前三轮禁用；提示确认框出现后解锁。/ The precise-hint button is disabled during the first three ordinary hints and unlocks after the confirmation prompt appears.
 - 精确提示可以包含要用到的单词、句法和参考表达，但应明确这是降低自主思考比例的帮助。/ Precise hints may include words, syntax, and reference expressions, but should make clear that this reduces autonomous thinking.
+
+## 任务完成 / Task Completion
+
+- Agent 只有在用户完成 `expectedLearnerAction` 的全部目标，并且没有超出 `taskFacts` 的固定事实时，才能设置 `scoringSignal.taskComplete=true`。/ The Agent may set `scoringSignal.taskComplete=true` only when the learner has completed all objectives in `expectedLearnerAction` without going beyond fixed `taskFacts`.
+- 后端收到完成信号后把当前学习包标记为 `COMPLETED`，后续点击“开始学习/开始下一轮”会进入新的 READY 任务。/ After receiving the completion signal, the backend marks the current learning package as `COMPLETED`; later "start learning/start next round" fetches a new READY task.
+- 前端只负责展示完成弹窗，不自行判断任务是否完成。/ The frontend only displays the completion dialog and does not decide task completion by itself.

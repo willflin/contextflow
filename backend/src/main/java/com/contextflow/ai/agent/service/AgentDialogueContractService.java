@@ -196,7 +196,9 @@ public class AgentDialogueContractService {
                 Map.of(
                         "clarityScore", 88,
                         "naturalnessScore", 90,
-                        "needsReview", false
+                        "needsReview", false,
+                        "taskComplete", false,
+                        "completionReason", ""
                 )
         );
 

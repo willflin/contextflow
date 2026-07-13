@@ -1085,3 +1085,22 @@
 ## 说明 / Notes
 
 - 未新增依赖，未新增 SQL 迁移。/ No dependency or SQL migration was added.
+
+# Phase 6.3.15：学习任务完成闭环 / Learning Task Completion Loop
+
+## 问题 / Problem
+
+- 用户完成当前任务后，系统缺少明确结束点，继续点击学习也无法稳定进入下一轮任务。/ After the learner completed a task, the system lacked an explicit ending point, and starting learning again did not reliably move to a new round.
+- Mentor 精确提示等待时间过短，容易过早打断用户思考。/ The precise-hint idle prompt was too short and could interrupt learner thinking too early.
+
+## 操作 / Operations
+
+- Agent 输出契约的 `scoringSignal` 增加 `taskComplete` 和 `completionReason` 约定。/ Added `taskComplete` and `completionReason` conventions to Agent `scoringSignal`.
+- Spring AI prompt 要求只有完成 `expectedLearnerAction` 的全部目标后才能标记任务完成。/ Updated the Spring AI prompt so task completion is marked only after all `expectedLearnerAction` objectives are achieved.
+- 后端收到 `taskComplete=true` 后将当前 `learning_packages` 状态改为 `COMPLETED`。/ The backend now marks the current `learning_packages` row as `COMPLETED` after receiving `taskComplete=true`.
+- 前端收到完成信号后弹出“本轮学习已完成”，并提供“开始下一轮”入口。/ The frontend now shows a "task completed" dialog and provides a "start next round" action.
+- Mentor 精确提示自动询问从 1 分钟调整为 3 分钟。/ The automatic precise-hint prompt timeout changed from one minute to three minutes.
+
+## 说明 / Notes
+
+- 未新增依赖，未新增 SQL 迁移。/ No dependency or SQL migration was added.

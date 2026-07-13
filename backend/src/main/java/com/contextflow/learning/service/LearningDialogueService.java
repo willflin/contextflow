@@ -129,6 +129,10 @@ public class LearningDialogueService {
         if (!modelReturnedMentions) {
             learningEventService.recordDialogueTurnEvents(saved, scenarioCode, outputCorrections, agentOutput.scoringSignal());
         }
+        if (taskComplete(agentOutput.scoringSignal())) {
+            packageEntity.markCompleted();
+            learningPackageRepository.save(packageEntity);
+        }
 
         return new LearningDialogueResponse(
                 saved.getId(),
@@ -695,6 +699,8 @@ public class LearningDialogueService {
                 "naturalnessScore", naturalnessScore,
                 "politenessDetected", features.polite(),
                 "needsReview", !corrections.isEmpty(),
+                "taskComplete", false,
+                "completionReason", "",
                 "relatedAbilityTags", List.of("polite_request", "complete_sentence")
         );
     }
@@ -734,6 +740,14 @@ public class LearningDialogueService {
         } catch (JsonProcessingException exception) {
             return Map.of();
         }
+    }
+
+    private boolean taskComplete(Map<String, Object> scoringSignal) {
+        Object value = scoringSignal == null ? null : scoringSignal.get("taskComplete");
+        if (value instanceof Boolean completed) {
+            return completed;
+        }
+        return value instanceof String text && Boolean.parseBoolean(text);
     }
 
     private record MessageFeatures(

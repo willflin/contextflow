@@ -118,7 +118,9 @@ Real dialogue requests read the user's current review/new-sense targets from `/a
   "scoringSignal": {
     "clarityScore": 88,
     "naturalnessScore": 90,
-    "needsReview": false
+    "needsReview": false,
+    "taskComplete": false,
+    "completionReason": ""
   }
 }
 ```
@@ -137,6 +139,12 @@ Real dialogue requests read the user's current review/new-sense targets from `/a
 - Agent 输出给用户的句子属于用户输入，记录 `LEARNER_INPUT` 方向。 / Agent-generated sentences are learner input and use `LEARNER_INPUT`.
 - 数据库没有对应词义但语义合理时，调用 `sense-feedback`，等待人工维护词义库。 / If the sense is valid but absent from the database, call `sense-feedback` for manual sense maintenance.
 - 如果模型返回 non-recordable mention，系统不会再用本地字符串匹配补事件，避免误记学习事件。 / If the model returns a non-recordable mention, the system does not add fallback string-match events, avoiding false learning events.
+
+## 任务完成信号 / Task Completion Signal
+
+- Agent 只有在用户完成 `expectedLearnerAction` 的全部目标，并且使用的是 `taskFacts` 中给定事实时，才能返回 `scoringSignal.taskComplete=true`。 / The Agent may return `scoringSignal.taskComplete=true` only when the learner completes all objectives in `expectedLearnerAction` using the fixed facts in `taskFacts`.
+- `completionReason` 简要说明已完成哪些目标；后端据此把当前学习包标记为 `COMPLETED`。 / `completionReason` briefly states which objectives were completed; the backend then marks the current learning package as `COMPLETED`.
+- 前端收到完成信号后弹窗提示本轮学习完成；用户点击“开始下一轮”会重新获取新的 READY 任务。 / The frontend shows a completion dialog after receiving the completion signal; clicking "start next round" fetches a new READY task.
 
 ## 已预留工具 / Reserved Tools
 

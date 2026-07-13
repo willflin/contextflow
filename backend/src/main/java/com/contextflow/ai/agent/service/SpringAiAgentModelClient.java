@@ -65,7 +65,7 @@ public class SpringAiAgentModelClient implements AgentModelClient {
               "corrections": [{"original":"...","suggestion":"...","reason":"..."}],
               "naturalExpression": "...",
               "unitMentions": [],
-              "scoringSignal": {"clarityScore":0,"naturalnessScore":0,"needsReview":false}
+              "scoringSignal": {"clarityScore":0,"naturalnessScore":0,"needsReview":false,"taskComplete":false,"completionReason":""}
             }
 
             unitMentions rules:
@@ -118,6 +118,12 @@ public class SpringAiAgentModelClient implements AgentModelClient {
             - For natural expression suggestions use eventType UNIT_RECOMMENDED and sourceField naturalExpression.
             - If the exact sense is unknown, omit the mention.
             - If user text is nonsense, unrecognizable, or completely wrong usage, do not create a unitMention; explain it in feedback.
+
+            Task completion policy:
+            - Set scoringSignal.taskComplete=true only when the learner has successfully achieved all required actions in learningPackage.expectedLearnerAction using the fixed facts in learningPackage.taskFacts.
+            - Do not mark complete just because the learner sent one sentence; all task goals must be satisfied.
+            - When taskComplete=true, Roleplay reply should naturally close the task in character, and Mentor feedback should briefly congratulate completion.
+            - scoringSignal.completionReason must briefly state which objectives were completed.
             """;
 
     private final ObjectProvider<ChatModel> chatModelProvider;
@@ -189,6 +195,7 @@ public class SpringAiAgentModelClient implements AgentModelClient {
                 Before returning, verify that occurrenceText literally appears in the referenced sourceField.
                 If any required unitMention field would be missing, return unitMentions as an empty array.
                 If no exact target sense is used in the turn, return unitMentions as an empty array.
+                Set scoringSignal.taskComplete=true only if the learner has completed all task objectives.
 
                 AgentDialogueInput:
                 """ + inputJson;

@@ -103,6 +103,11 @@ public class LearningPackageEntity {
         return status;
     }
 
+    public void markCompleted() {
+        this.status = LearningPackageStatus.COMPLETED;
+        this.completedAt = Instant.now();
+    }
+
     public String getTitle() {
         return title;
     }

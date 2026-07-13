@@ -144,6 +144,8 @@ export default function App() {
   const [mentorHintCount, setMentorHintCount] = useState(0);
   const [preciseHintPromptVisible, setPreciseHintPromptVisible] = useState(false);
   const [preciseHintUnlocked, setPreciseHintUnlocked] = useState(false);
+  const [completionPromptVisible, setCompletionPromptVisible] = useState(false);
+  const [completionReason, setCompletionReason] = useState('');
 
   const isAdmin = currentUser?.role === 'ADMIN';
   const itemContent = currentItem ? parsePlacementItemContent(currentItem) : null;
@@ -171,7 +173,7 @@ export default function App() {
     const timeoutId = window.setTimeout(() => {
       setPreciseHintUnlocked(true);
       setPreciseHintPromptVisible(true);
-    }, 60000);
+    }, 180000);
     return () => window.clearTimeout(timeoutId);
   }, [learningPackage?.id, dialogueTurns.length, dialogueBusy, dialogueMessage]);
 
@@ -777,6 +779,8 @@ export default function App() {
       setDialogueTurns([]);
       setDialogueMessage('');
       setDialogueError(null);
+      setCompletionPromptVisible(false);
+      setCompletionReason('');
       resetMentorHints();
       await loadReviewPlan();
     } catch (exception) {
@@ -795,6 +799,8 @@ export default function App() {
     setDialogueMessage('');
     setDialogueError(null);
     setDialogueBusy(false);
+    setCompletionPromptVisible(false);
+    setCompletionReason('');
     resetMentorHints();
   }
 
@@ -806,6 +812,11 @@ export default function App() {
 
     if (!token || !learningPackage) {
       setDialogueError('请先开始学习并加载任务。');
+      return;
+    }
+
+    if (learningPackage.status === 'COMPLETED') {
+      setDialogueError('本轮学习已完成，请开始下一轮任务。');
       return;
     }
 
@@ -822,6 +833,11 @@ export default function App() {
       setDialogueTurns((previous) => [...previous, response]);
       setDialogueMessage('');
       resetMentorHints();
+      if (isTaskComplete(response.scoringSignal)) {
+        setLearningPackage((previous) => (previous ? { ...previous, status: 'COMPLETED' } : previous));
+        setCompletionReason(readCompletionReason(response.scoringSignal));
+        setCompletionPromptVisible(true);
+      }
     } catch (exception) {
       setDialogueError(exception instanceof Error ? exception.message : 'Dialogue failed.');
     } finally {
@@ -834,6 +850,20 @@ export default function App() {
     setMentorHintCount(0);
     setPreciseHintPromptVisible(false);
     setPreciseHintUnlocked(false);
+  }
+
+  function isTaskComplete(scoringSignal: Record<string, unknown>) {
+    return scoringSignal.taskComplete === true || scoringSignal.taskComplete === 'true';
+  }
+
+  function readCompletionReason(scoringSignal: Record<string, unknown>) {
+    return typeof scoringSignal.completionReason === 'string' ? scoringSignal.completionReason : '';
+  }
+
+  async function startNextRoundAfterCompletion() {
+    setCompletionPromptVisible(false);
+    setCompletionReason('');
+    await loadNextLearningPackage();
   }
 
   function requestMentorHint() {
@@ -1845,6 +1875,7 @@ export default function App() {
     const taskGoal = content.learningTask?.goal ?? fallbackTaskGoal(scenarioCode) ?? content.scenario?.description;
     const expectedLearnerAction = content.learningTask?.expectedLearnerAction ?? fallbackExpectedLearnerAction(scenarioCode);
     const taskFacts = Object.entries(content.learningTask?.facts ?? fallbackTaskFacts(scenarioCode) ?? {});
+    const learningCompleted = learningPackage.status === 'COMPLETED';
     return (
       <div className="learning-content">
         <div className="scenario-header">
@@ -1928,14 +1959,15 @@ export default function App() {
                 onChange={(event) => setDialogueMessage(event.target.value)}
                 placeholder="Type your English reply..."
                 rows={3}
+                disabled={learningCompleted}
               />
-              <button className="secondary-button compact-button" type="button" onClick={requestMentorHint} disabled={dialogueBusy}>
+              <button className="secondary-button compact-button" type="button" onClick={requestMentorHint} disabled={dialogueBusy || learningCompleted}>
                 请求 Mentor 提示
               </button>
-              <button className="secondary-button compact-button" type="button" onClick={addPreciseHint} disabled={dialogueBusy || !preciseHintUnlocked}>
+              <button className="secondary-button compact-button" type="button" onClick={addPreciseHint} disabled={dialogueBusy || learningCompleted || !preciseHintUnlocked}>
                 精确提示
               </button>
-              <button className="refresh-button compact-button" type="submit" disabled={dialogueBusy}>
+              <button className="refresh-button compact-button" type="submit" disabled={dialogueBusy || learningCompleted}>
                 发送
               </button>
             </form>
@@ -2011,6 +2043,23 @@ export default function App() {
                 </button>
                 <button className="refresh-button compact-button" type="button" onClick={addPreciseHint}>
                   给我精确提示
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {completionPromptVisible && (
+          <div className="hint-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="learning-complete-title">
+            <div className="hint-modal">
+              <h3 id="learning-complete-title">本轮学习已完成</h3>
+              <p>{completionReason || '你已经完成当前任务目标，可以进入下一轮学习。'}</p>
+              <div className="hint-modal-actions">
+                <button className="secondary-button compact-button" type="button" onClick={() => setCompletionPromptVisible(false)}>
+                  留在本轮
+                </button>
+                <button className="refresh-button compact-button" type="button" onClick={startNextRoundAfterCompletion} disabled={learningBusy}>
+                  开始下一轮
                 </button>
               </div>
             </div>
