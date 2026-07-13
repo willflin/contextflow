@@ -586,6 +586,7 @@ strong {
 
 .vocabulary-content,
 .admin-word-content,
+.admin-dialogue-content,
 .admin-edit-block,
 .vocabulary-list,
 .sense-list {
@@ -674,6 +675,49 @@ strong {
 .admin-form-grid h3 {
   margin: 0;
   font-size: 18px;
+}
+
+.admin-dialogue-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1.2fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.admin-dialogue-list {
+  display: grid;
+  max-height: 620px;
+  overflow-y: auto;
+  gap: 10px;
+}
+
+.dialogue-list-item {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  border: 1px solid #d9e1e5;
+  border-radius: 8px;
+  background: #f8fafb;
+  padding: 12px;
+  color: #172026;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dialogue-list-item.active {
+  border-color: #0f766e;
+  background: #ecfdf5;
+}
+
+.dialogue-list-item span,
+.dialogue-list-item small {
+  color: #5d6b73;
+  font-size: 12px;
+}
+
+.dialogue-list-item strong {
+  font-size: 14px;
+  line-height: 1.35;
 }
 
 .learning-content h3 {
@@ -1050,6 +1094,7 @@ strong {
   }
 
   .dual-agent-layout,
+  .admin-dialogue-layout,
   .dialogue-form,
   .inline-form {
     grid-template-columns: 1fr;

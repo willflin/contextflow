@@ -1,5 +1,23 @@
 # 开发日志 / Development Log
 
+## Phase 6.3.19：Admin 对话记录管理 / Admin Dialogue Record Management
+
+### 问题 / Problem
+
+- 管理员页面缺少直接查看、编辑和删除数据库对话记录的工具。 / The admin page lacked a tool for viewing, editing, and deleting dialogue records in the database.
+
+### 操作 / Operations
+
+- 新增 admin-only 接口：`GET /api/admin/dialogues`、`PUT /api/admin/dialogues/{id}`、`DELETE /api/admin/dialogues/{id}`。 / Added admin-only APIs: `GET /api/admin/dialogues`, `PUT /api/admin/dialogues/{id}`, and `DELETE /api/admin/dialogues/{id}`.
+- 支持按 `packageId` 查询，留空时返回最近 100 条。 / Supports filtering by `packageId`; when empty, returns the latest 100 records.
+- 编辑时校验 `corrections` 和 `scoringSignal` 必须是合法 JSON。 / Validates that `corrections` and `scoringSignal` are valid JSON when editing.
+- 删除对话时同步删除该 turn 对应的 `learning_events`，但不回滚掌握度统计。 / Deleting a dialogue also deletes related `learning_events` for that turn, but does not roll back mastery stats.
+- 前端 admin 页面新增“对话记录”管理模块。 / Added a "Dialogue Records" management module to the frontend admin page.
+
+### 说明 / Notes
+
+- 未新增依赖，未新增 SQL 迁移。 / No dependency or SQL migration was added.
+
 ## Phase 6.3.18：Mentor 纠错去重 / Mentor Correction Deduplication
 
 ### 问题 / Problem

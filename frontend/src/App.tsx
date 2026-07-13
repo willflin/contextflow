@@ -12,6 +12,13 @@ import {
   updateAdminSense,
   updateAdminWord
 } from './api/adminWords';
+import {
+  AdminDialogueTurn,
+  AdminDialogueTurnUpdatePayload,
+  deleteAdminDialogue,
+  fetchAdminDialogues,
+  updateAdminDialogue
+} from './api/adminDialogues';
 import { CurrentUser, fetchCurrentUser, login, register } from './api/auth';
 import { fetchHealth, HealthStatus } from './api/health';
 import {
@@ -64,6 +71,15 @@ const emptyAdminSenseForm: AdminSenseUpdatePayload = {
   status: 'ACTIVE'
 };
 
+const emptyAdminDialogueForm: AdminDialogueTurnUpdatePayload = {
+  userMessage: '',
+  roleplayReply: '',
+  mentorFeedback: '',
+  corrections: '[]',
+  naturalExpression: '',
+  scoringSignal: '{}'
+};
+
 export default function App() {
   const [state, setState] = useState<LoadState>('idle');
   const [health, setHealth] = useState<HealthStatus | null>(null);
@@ -111,6 +127,12 @@ export default function App() {
   const [adminSenseForm, setAdminSenseForm] = useState<AdminSenseUpdatePayload>(emptyAdminSenseForm);
   const [adminWordBusy, setAdminWordBusy] = useState(false);
   const [adminWordError, setAdminWordError] = useState<string | null>(null);
+  const [adminDialoguePackageId, setAdminDialoguePackageId] = useState('');
+  const [adminDialogues, setAdminDialogues] = useState<AdminDialogueTurn[]>([]);
+  const [adminDialogueSelected, setAdminDialogueSelected] = useState<AdminDialogueTurn | null>(null);
+  const [adminDialogueForm, setAdminDialogueForm] = useState<AdminDialogueTurnUpdatePayload>(emptyAdminDialogueForm);
+  const [adminDialogueBusy, setAdminDialogueBusy] = useState(false);
+  const [adminDialogueError, setAdminDialogueError] = useState<string | null>(null);
   const [learningPackage, setLearningPackage] = useState<LearningPackage | null>(null);
   const [learningBusy, setLearningBusy] = useState(false);
   const [learningError, setLearningError] = useState<string | null>(null);
@@ -203,6 +225,7 @@ export default function App() {
       resetReviewPlan();
       resetVocabulary();
       resetAdminWords();
+      resetAdminDialogues();
       resetAgentRuntime();
       setLearnerView('home');
     } catch (exception) {
@@ -220,6 +243,7 @@ export default function App() {
     setProfileError(null);
     resetVocabulary();
     resetAdminWords();
+    resetAdminDialogues();
     resetPlacement();
     resetLearning();
     resetReviewPlan();
@@ -638,6 +662,102 @@ export default function App() {
     setAdminSenseForm(emptyAdminSenseForm);
     setAdminWordBusy(false);
     setAdminWordError(null);
+  }
+
+  async function loadAdminDialogues() {
+    const token = tokenOrNull();
+
+    if (!token) {
+      setAdminDialogueError('请先登录。');
+      return;
+    }
+
+    setAdminDialogueBusy(true);
+    setAdminDialogueError(null);
+
+    try {
+      const result = await fetchAdminDialogues(token, adminDialoguePackageId);
+      setAdminDialogues(result);
+      if (adminDialogueSelected && !result.some((item) => item.id === adminDialogueSelected.id)) {
+        clearAdminDialogueSelection();
+      }
+    } catch (exception) {
+      setAdminDialogues([]);
+      setAdminDialogueError(exception instanceof Error ? exception.message : '对话记录加载失败。');
+    } finally {
+      setAdminDialogueBusy(false);
+    }
+  }
+
+  function selectAdminDialogue(turn: AdminDialogueTurn) {
+    setAdminDialogueSelected(turn);
+    setAdminDialogueForm({
+      userMessage: turn.userMessage,
+      roleplayReply: turn.roleplayReply,
+      mentorFeedback: turn.mentorFeedback,
+      corrections: turn.corrections,
+      naturalExpression: turn.naturalExpression,
+      scoringSignal: turn.scoringSignal
+    });
+    setAdminDialogueError(null);
+  }
+
+  function clearAdminDialogueSelection() {
+    setAdminDialogueSelected(null);
+    setAdminDialogueForm(emptyAdminDialogueForm);
+  }
+
+  async function saveAdminDialogue(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const token = tokenOrNull();
+
+    if (!token || !adminDialogueSelected) {
+      setAdminDialogueError('请先选择一条对话。');
+      return;
+    }
+
+    setAdminDialogueBusy(true);
+    setAdminDialogueError(null);
+
+    try {
+      const updated = await updateAdminDialogue(token, adminDialogueSelected.id, adminDialogueForm);
+      setAdminDialogueSelected(updated);
+      setAdminDialogues((previous) => previous.map((item) => (item.id === updated.id ? updated : item)));
+    } catch (exception) {
+      setAdminDialogueError(exception instanceof Error ? exception.message : '对话保存失败。');
+    } finally {
+      setAdminDialogueBusy(false);
+    }
+  }
+
+  async function deleteSelectedAdminDialogue() {
+    const token = tokenOrNull();
+
+    if (!token || !adminDialogueSelected) {
+      setAdminDialogueError('请先选择一条对话。');
+      return;
+    }
+
+    setAdminDialogueBusy(true);
+    setAdminDialogueError(null);
+
+    try {
+      await deleteAdminDialogue(token, adminDialogueSelected.id);
+      setAdminDialogues((previous) => previous.filter((item) => item.id !== adminDialogueSelected.id));
+      clearAdminDialogueSelection();
+    } catch (exception) {
+      setAdminDialogueError(exception instanceof Error ? exception.message : '对话删除失败。');
+    } finally {
+      setAdminDialogueBusy(false);
+    }
+  }
+
+  function resetAdminDialogues() {
+    setAdminDialoguePackageId('');
+    setAdminDialogues([]);
+    clearAdminDialogueSelection();
+    setAdminDialogueBusy(false);
+    setAdminDialogueError(null);
   }
 
   async function loadNextLearningPackage() {
@@ -1088,6 +1208,19 @@ export default function App() {
             </div>
             {renderAdminWordPanel()}
           </section>
+
+          <section className="tool-panel agent-runtime-panel">
+            <div className="panel-heading">
+              <div>
+                <p className="eyebrow">数据管理</p>
+                <h2>对话记录</h2>
+              </div>
+              <button className="secondary-button" type="button" onClick={loadAdminDialogues} disabled={adminDialogueBusy}>
+                刷新
+              </button>
+            </div>
+            {renderAdminDialoguePanel()}
+          </section>
         </section>
       </section>
     );
@@ -1513,6 +1646,111 @@ export default function App() {
         )}
 
         {adminWordError && <p className="error compact">单词管理失败：{adminWordError}</p>}
+      </div>
+    );
+  }
+
+  function renderAdminDialoguePanel() {
+    return (
+      <div className="admin-dialogue-content">
+        <div className="inline-form">
+          <input
+            value={adminDialoguePackageId}
+            onChange={(event) => setAdminDialoguePackageId(event.target.value)}
+            placeholder="按 packageId 查询；留空查最近 100 条"
+          />
+          <button className="secondary-button" type="button" onClick={loadAdminDialogues} disabled={adminDialogueBusy}>
+            查询
+          </button>
+        </div>
+
+        <p className="hint">删除对话会同步删除该 turn 对应的 learning_events，但不会回滚掌握度统计。</p>
+
+        <div className="admin-dialogue-layout">
+          <div className="admin-dialogue-list">
+            {adminDialogues.length === 0 ? (
+              <p className="hint">暂无对话记录，点击查询加载。</p>
+            ) : (
+              adminDialogues.map((turn) => (
+                <button
+                  className={adminDialogueSelected?.id === turn.id ? 'dialogue-list-item active' : 'dialogue-list-item'}
+                  type="button"
+                  key={turn.id}
+                  onClick={() => selectAdminDialogue(turn)}
+                >
+                  <span>#{turn.id} / package {turn.learningPackageId} / turn {turn.turnIndex}</span>
+                  <strong>{turn.userMessage}</strong>
+                  <small>events {turn.learningEventCount} · user {turn.userId}</small>
+                </button>
+              ))
+            )}
+          </div>
+
+          <form className="admin-form-grid" onSubmit={saveAdminDialogue}>
+            <h3>编辑对话</h3>
+            {!adminDialogueSelected && <p className="hint">先从左侧选择一条记录。</p>}
+            <textarea
+              value={adminDialogueForm.userMessage}
+              onChange={(event) => setAdminDialogueForm({ ...adminDialogueForm, userMessage: event.target.value })}
+              placeholder="用户输入"
+              rows={2}
+              disabled={!adminDialogueSelected}
+            />
+            <textarea
+              value={adminDialogueForm.roleplayReply}
+              onChange={(event) => setAdminDialogueForm({ ...adminDialogueForm, roleplayReply: event.target.value })}
+              placeholder="Roleplay 回复"
+              rows={3}
+              disabled={!adminDialogueSelected}
+            />
+            <textarea
+              value={adminDialogueForm.mentorFeedback}
+              onChange={(event) => setAdminDialogueForm({ ...adminDialogueForm, mentorFeedback: event.target.value })}
+              placeholder="Mentor 反馈"
+              rows={3}
+              disabled={!adminDialogueSelected}
+            />
+            <textarea
+              value={adminDialogueForm.naturalExpression}
+              onChange={(event) => setAdminDialogueForm({ ...adminDialogueForm, naturalExpression: event.target.value })}
+              placeholder="自然表达建议"
+              rows={2}
+              disabled={!adminDialogueSelected}
+            />
+            <textarea
+              value={adminDialogueForm.corrections}
+              onChange={(event) => setAdminDialogueForm({ ...adminDialogueForm, corrections: event.target.value })}
+              placeholder="corrections JSON"
+              rows={4}
+              disabled={!adminDialogueSelected}
+            />
+            <textarea
+              value={adminDialogueForm.scoringSignal}
+              onChange={(event) => setAdminDialogueForm({ ...adminDialogueForm, scoringSignal: event.target.value })}
+              placeholder="scoringSignal JSON"
+              rows={4}
+              disabled={!adminDialogueSelected}
+            />
+            <div className="button-row">
+              <button className="secondary-button" type="submit" disabled={adminDialogueBusy || !adminDialogueSelected}>
+                保存
+              </button>
+              <button
+                className="danger-button"
+                type="button"
+                onClick={deleteSelectedAdminDialogue}
+                disabled={adminDialogueBusy || !adminDialogueSelected}
+              >
+                删除
+              </button>
+              <button className="secondary-button" type="button" onClick={clearAdminDialogueSelection}>
+                清空选择
+              </button>
+            </div>
+          </form>
+        </div>
+
+        {adminDialogueError && <p className="error compact">对话管理失败：{adminDialogueError}</p>}
       </div>
     );
   }

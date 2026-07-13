@@ -13,5 +13,9 @@ public interface LearningEventRepository extends JpaRepository<LearningEventEnti
             Long sourceId
     );
 
+    long countBySourceTypeAndSourceId(LearningEventSourceType sourceType, Long sourceId);
+
+    long deleteBySourceTypeAndSourceId(LearningEventSourceType sourceType, Long sourceId);
+
     long countByLearningUnitId(Long learningUnitId);
 }

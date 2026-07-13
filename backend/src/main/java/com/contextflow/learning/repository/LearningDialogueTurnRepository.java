@@ -9,5 +9,9 @@ public interface LearningDialogueTurnRepository extends JpaRepository<LearningDi
 
     long countByLearningPackageId(Long learningPackageId);
 
+    List<LearningDialogueTurnEntity> findTop100ByOrderByIdDesc();
+
+    List<LearningDialogueTurnEntity> findTop100ByLearningPackageIdOrderByTurnIndexDesc(Long learningPackageId);
+
     List<LearningDialogueTurnEntity> findTop6ByLearningPackageIdOrderByTurnIndexDesc(Long learningPackageId);
 }

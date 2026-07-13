@@ -98,24 +98,48 @@ public class LearningDialogueTurnEntity {
         return userMessage;
     }
 
+    public void setUserMessage(String userMessage) {
+        this.userMessage = userMessage;
+    }
+
     public String getRoleplayReply() {
         return roleplayReply;
+    }
+
+    public void setRoleplayReply(String roleplayReply) {
+        this.roleplayReply = roleplayReply;
     }
 
     public String getMentorFeedback() {
         return mentorFeedback;
     }
 
+    public void setMentorFeedback(String mentorFeedback) {
+        this.mentorFeedback = mentorFeedback;
+    }
+
     public String getCorrections() {
         return corrections;
+    }
+
+    public void setCorrections(String corrections) {
+        this.corrections = corrections;
     }
 
     public String getNaturalExpression() {
         return naturalExpression;
     }
 
+    public void setNaturalExpression(String naturalExpression) {
+        this.naturalExpression = naturalExpression;
+    }
+
     public String getScoringSignal() {
         return scoringSignal;
+    }
+
+    public void setScoringSignal(String scoringSignal) {
+        this.scoringSignal = scoringSignal;
     }
 
     public Instant getCreatedAt() {
