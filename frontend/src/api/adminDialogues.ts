@@ -30,6 +30,14 @@ export type AdminDialogueTurnUpdatePayload = {
   scoringSignal: string;
 };
 
+export type PageResponse<T> = {
+  items: T[];
+  page: number;
+  size: number;
+  totalItems: number;
+  totalPages: number;
+};
+
 async function readErrorMessage(response: Response, fallback: string): Promise<string> {
   try {
     const result = (await response.json()) as ApiResponse<unknown>;
@@ -39,9 +47,20 @@ async function readErrorMessage(response: Response, fallback: string): Promise<s
   }
 }
 
-export async function fetchAdminDialogues(token: string, packageId?: string): Promise<AdminDialogueTurn[]> {
-  const query = packageId?.trim() ? `?packageId=${encodeURIComponent(packageId.trim())}` : '';
-  const response = await fetch(`/api/admin/dialogues${query}`, {
+export async function fetchAdminDialogues(
+  token: string,
+  packageId?: string,
+  page = 0,
+  size = 20
+): Promise<PageResponse<AdminDialogueTurn>> {
+  const search = new URLSearchParams();
+  if (packageId?.trim()) {
+    search.set('packageId', packageId.trim());
+  }
+  search.set('page', String(page));
+  search.set('size', String(size));
+
+  const response = await fetch(`/api/admin/dialogues?${search.toString()}`, {
     headers: {
       Authorization: `Bearer ${token}`
     }
@@ -51,7 +70,7 @@ export async function fetchAdminDialogues(token: string, packageId?: string): Pr
     throw new Error(await readErrorMessage(response, 'Failed to load dialogues.'));
   }
 
-  const result = (await response.json()) as ApiResponse<AdminDialogueTurn[]>;
+  const result = (await response.json()) as ApiResponse<PageResponse<AdminDialogueTurn>>;
   return result.data;
 }
 

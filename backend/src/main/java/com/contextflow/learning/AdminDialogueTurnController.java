@@ -1,6 +1,7 @@
 package com.contextflow.learning;
 
 import com.contextflow.common.api.ApiResponse;
+import com.contextflow.common.api.PageResponse;
 import com.contextflow.learning.dto.AdminDialogueTurnResponse;
 import com.contextflow.learning.dto.AdminDialogueTurnUpdateRequest;
 import com.contextflow.learning.service.AdminDialogueTurnService;
@@ -14,8 +15,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-
 @RestController
 @RequestMapping("/api/admin/dialogues")
 public class AdminDialogueTurnController {
@@ -27,10 +26,12 @@ public class AdminDialogueTurnController {
     }
 
     @GetMapping
-    public ApiResponse<List<AdminDialogueTurnResponse>> list(
-            @RequestParam(required = false) Long packageId
+    public ApiResponse<PageResponse<AdminDialogueTurnResponse>> list(
+            @RequestParam(required = false) Long packageId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
     ) {
-        return ApiResponse.ok(adminDialogueTurnService.list(packageId));
+        return ApiResponse.ok(adminDialogueTurnService.list(packageId, page, size));
     }
 
     @PutMapping("/{id}")

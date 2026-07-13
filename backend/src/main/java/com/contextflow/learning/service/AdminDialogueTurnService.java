@@ -1,5 +1,6 @@
 package com.contextflow.learning.service;
 
+import com.contextflow.common.api.PageResponse;
 import com.contextflow.learning.domain.LearningDialogueTurnEntity;
 import com.contextflow.learning.domain.LearningEventSourceType;
 import com.contextflow.learning.dto.AdminDialogueTurnResponse;
@@ -8,6 +9,9 @@ import com.contextflow.learning.repository.LearningDialogueTurnRepository;
 import com.contextflow.learning.repository.LearningEventRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,13 +37,21 @@ public class AdminDialogueTurnService {
     }
 
     @Transactional(readOnly = true)
-    public List<AdminDialogueTurnResponse> list(Long packageId) {
-        List<LearningDialogueTurnEntity> turns = packageId == null
-                ? learningDialogueTurnRepository.findTop100ByOrderByIdDesc()
-                : learningDialogueTurnRepository.findTop100ByLearningPackageIdOrderByTurnIndexDesc(packageId);
-        return turns.stream()
+    public PageResponse<AdminDialogueTurnResponse> list(Long packageId, int page, int size) {
+        int safePage = Math.max(0, page);
+        int safeSize = Math.max(1, Math.min(size, 100));
+        PageRequest pageRequest = PageRequest.of(
+                safePage,
+                safeSize,
+                packageId == null ? Sort.by(Sort.Direction.DESC, "id") : Sort.by(Sort.Direction.DESC, "turnIndex")
+        );
+        Page<LearningDialogueTurnEntity> turns = packageId == null
+                ? learningDialogueTurnRepository.findAll(pageRequest)
+                : learningDialogueTurnRepository.findByLearningPackageId(packageId, pageRequest);
+        List<AdminDialogueTurnResponse> items = turns.getContent().stream()
                 .map(this::response)
                 .toList();
+        return PageResponse.of(items, turns.getNumber(), turns.getSize(), turns.getTotalElements());
     }
 
     @Transactional

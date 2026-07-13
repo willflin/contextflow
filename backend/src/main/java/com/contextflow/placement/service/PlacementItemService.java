@@ -1,5 +1,6 @@
 package com.contextflow.placement.service;
 
+import com.contextflow.common.api.PageResponse;
 import com.contextflow.placement.domain.PlacementItemStatus;
 import com.contextflow.placement.dto.AdminPlacementItemResponse;
 import com.contextflow.placement.dto.PlacementItemResponse;
@@ -33,18 +34,20 @@ public class PlacementItemService {
     }
 
     @Transactional(readOnly = true)
-    public List<AdminPlacementItemResponse> searchAdminItems(
+    public PageResponse<AdminPlacementItemResponse> searchAdminItems(
             String abilityDimension,
             String status,
             String query,
-            int limit
+            int page,
+            int size
     ) {
         String normalizedAbility = normalize(abilityDimension);
         String normalizedStatus = normalize(status);
         String normalizedQuery = normalize(query);
-        int safeLimit = Math.max(1, Math.min(limit, 200));
+        int safePage = Math.max(0, page);
+        int safeSize = Math.max(1, Math.min(size, 100));
 
-        return placementItemRepository.findAll()
+        List<AdminPlacementItemResponse> filteredItems = placementItemRepository.findAll()
                 .stream()
                 .filter(item -> normalizedAbility == null || normalizedAbility.equals(normalize(item.getAbilityDimension())))
                 .filter(item -> normalizedStatus == null || normalizedStatus.equals(normalize(item.getStatus().name())))
@@ -56,9 +59,11 @@ public class PlacementItemService {
                         .comparing(PlacementItemResponseSort::statusRank)
                         .thenComparing(PlacementItemResponseSort::difficultyScore)
                         .thenComparing(PlacementItemResponseSort::id))
-                .limit(safeLimit)
                 .map(AdminPlacementItemResponse::from)
                 .toList();
+        int fromIndex = Math.min(safePage * safeSize, filteredItems.size());
+        int toIndex = Math.min(fromIndex + safeSize, filteredItems.size());
+        return PageResponse.of(filteredItems.subList(fromIndex, toIndex), safePage, safeSize, filteredItems.size());
     }
 
     private String normalize(String value) {

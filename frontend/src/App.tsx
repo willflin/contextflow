@@ -47,6 +47,7 @@ type LoadState = 'idle' | 'loading' | 'success' | 'error';
 type AuthMode = 'login' | 'register';
 type LearnerView = 'home' | 'vocabulary';
 type AdminView = 'home' | 'runtime' | 'words' | 'dialogues' | 'placementItems';
+const ADMIN_PAGE_SIZE = 20;
 type MentorHint = {
   id: number;
   level: 'HINT' | 'PRECISE';
@@ -139,11 +140,17 @@ export default function App() {
   const [adminWordError, setAdminWordError] = useState<string | null>(null);
   const [adminDialoguePackageId, setAdminDialoguePackageId] = useState('');
   const [adminDialogues, setAdminDialogues] = useState<AdminDialogueTurn[]>([]);
+  const [adminDialoguePage, setAdminDialoguePage] = useState(0);
+  const [adminDialogueTotalPages, setAdminDialogueTotalPages] = useState(0);
+  const [adminDialogueTotalItems, setAdminDialogueTotalItems] = useState(0);
   const [adminDialogueSelected, setAdminDialogueSelected] = useState<AdminDialogueTurn | null>(null);
   const [adminDialogueForm, setAdminDialogueForm] = useState<AdminDialogueTurnUpdatePayload>(emptyAdminDialogueForm);
   const [adminDialogueBusy, setAdminDialogueBusy] = useState(false);
   const [adminDialogueError, setAdminDialogueError] = useState<string | null>(null);
   const [adminPlacementItems, setAdminPlacementItems] = useState<AdminPlacementItem[]>([]);
+  const [adminPlacementPage, setAdminPlacementPage] = useState(0);
+  const [adminPlacementTotalPages, setAdminPlacementTotalPages] = useState(0);
+  const [adminPlacementTotalItems, setAdminPlacementTotalItems] = useState(0);
   const [adminPlacementQuery, setAdminPlacementQuery] = useState('');
   const [adminPlacementAbility, setAdminPlacementAbility] = useState('vocabulary_size');
   const [adminPlacementStatus, setAdminPlacementStatus] = useState('READY');
@@ -711,7 +718,7 @@ export default function App() {
     setAdminWordError(null);
   }
 
-  async function loadAdminDialogues() {
+  async function loadAdminDialogues(page = adminDialoguePage) {
     const token = tokenOrNull();
 
     if (!token) {
@@ -723,13 +730,18 @@ export default function App() {
     setAdminDialogueError(null);
 
     try {
-      const result = await fetchAdminDialogues(token, adminDialoguePackageId);
-      setAdminDialogues(result);
-      if (adminDialogueSelected && !result.some((item) => item.id === adminDialogueSelected.id)) {
+      const result = await fetchAdminDialogues(token, adminDialoguePackageId, page, ADMIN_PAGE_SIZE);
+      setAdminDialogues(result.items);
+      setAdminDialoguePage(result.page);
+      setAdminDialogueTotalPages(result.totalPages);
+      setAdminDialogueTotalItems(result.totalItems);
+      if (adminDialogueSelected && !result.items.some((item) => item.id === adminDialogueSelected.id)) {
         clearAdminDialogueSelection();
       }
     } catch (exception) {
       setAdminDialogues([]);
+      setAdminDialogueTotalPages(0);
+      setAdminDialogueTotalItems(0);
       setAdminDialogueError(exception instanceof Error ? exception.message : '对话记录加载失败。');
     } finally {
       setAdminDialogueBusy(false);
@@ -802,12 +814,15 @@ export default function App() {
   function resetAdminDialogues() {
     setAdminDialoguePackageId('');
     setAdminDialogues([]);
+    setAdminDialoguePage(0);
+    setAdminDialogueTotalPages(0);
+    setAdminDialogueTotalItems(0);
     clearAdminDialogueSelection();
     setAdminDialogueBusy(false);
     setAdminDialogueError(null);
   }
 
-  async function loadAdminPlacementItems() {
+  async function loadAdminPlacementItems(page = adminPlacementPage) {
     const token = tokenOrNull();
 
     if (!token) {
@@ -823,11 +838,17 @@ export default function App() {
         abilityDimension: adminPlacementAbility || undefined,
         status: adminPlacementStatus || undefined,
         query: adminPlacementQuery,
-        limit: 120
+        page,
+        size: ADMIN_PAGE_SIZE
       });
-      setAdminPlacementItems(result);
+      setAdminPlacementItems(result.items);
+      setAdminPlacementPage(result.page);
+      setAdminPlacementTotalPages(result.totalPages);
+      setAdminPlacementTotalItems(result.totalItems);
     } catch (exception) {
       setAdminPlacementItems([]);
+      setAdminPlacementTotalPages(0);
+      setAdminPlacementTotalItems(0);
       setAdminPlacementError(exception instanceof Error ? exception.message : '题库加载失败。');
     } finally {
       setAdminPlacementBusy(false);
@@ -836,6 +857,9 @@ export default function App() {
 
   function resetAdminPlacementItems() {
     setAdminPlacementItems([]);
+    setAdminPlacementPage(0);
+    setAdminPlacementTotalPages(0);
+    setAdminPlacementTotalItems(0);
     setAdminPlacementQuery('');
     setAdminPlacementAbility('vocabulary_size');
     setAdminPlacementStatus('READY');
@@ -1375,10 +1399,10 @@ export default function App() {
       return renderAdminSecondaryPage('单词管理', renderAdminWordPanel());
     }
     if (adminView === 'dialogues') {
-      return renderAdminSecondaryPage('对话记录', renderAdminDialoguePanel(), loadAdminDialogues, adminDialogueBusy);
+      return renderAdminSecondaryPage('对话记录', renderAdminDialoguePanel(), () => loadAdminDialogues(), adminDialogueBusy);
     }
     if (adminView === 'placementItems') {
-      return renderAdminSecondaryPage('题库管理', renderAdminPlacementItemPanel(), loadAdminPlacementItems, adminPlacementBusy);
+      return renderAdminSecondaryPage('题库管理', renderAdminPlacementItemPanel(), () => loadAdminPlacementItems(), adminPlacementBusy);
     }
 
     return (
@@ -1399,7 +1423,7 @@ export default function App() {
             type="button"
             onClick={() => {
               setAdminView('dialogues');
-              void loadAdminDialogues();
+              void loadAdminDialogues(0);
             }}
           >
             <span className="eyebrow">Dialogues</span>
@@ -1411,7 +1435,7 @@ export default function App() {
             type="button"
             onClick={() => {
               setAdminView('placementItems');
-              void loadAdminPlacementItems();
+              void loadAdminPlacementItems(0);
             }}
           >
             <span className="eyebrow">Placement</span>
@@ -1595,7 +1619,7 @@ export default function App() {
                 <p className="eyebrow">数据管理</p>
                 <h2>对话记录</h2>
               </div>
-              <button className="secondary-button" type="button" onClick={loadAdminDialogues} disabled={adminDialogueBusy}>
+                <button className="secondary-button" type="button" onClick={() => loadAdminDialogues(0)} disabled={adminDialogueBusy}>
                 刷新
               </button>
             </div>
@@ -1980,6 +2004,43 @@ export default function App() {
     );
   }
 
+  function renderAdminPagination(
+    page: number,
+    totalPages: number,
+    totalItems: number,
+    busy: boolean,
+    onPageChange: (page: number) => void
+  ) {
+    if (totalItems === 0) {
+      return null;
+    }
+    return (
+      <div className="pagination-row">
+        <span>
+          第 {page + 1}/{Math.max(totalPages, 1)} 页，共 {totalItems} 条
+        </span>
+        <div className="button-row">
+          <button
+            className="secondary-button compact-button"
+            type="button"
+            onClick={() => onPageChange(page - 1)}
+            disabled={busy || page <= 0}
+          >
+            上一页
+          </button>
+          <button
+            className="secondary-button compact-button"
+            type="button"
+            onClick={() => onPageChange(page + 1)}
+            disabled={busy || page + 1 >= totalPages}
+          >
+            下一页
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   function renderAdminPlacementItemPanel() {
     return (
       <div className="admin-placement-content">
@@ -1987,7 +2048,7 @@ export default function App() {
           className="inline-form"
           onSubmit={(event) => {
             event.preventDefault();
-            void loadAdminPlacementItems();
+            void loadAdminPlacementItems(0);
           }}
         >
           <select value={adminPlacementAbility} onChange={(event) => setAdminPlacementAbility(event.target.value)}>
@@ -2017,6 +2078,14 @@ export default function App() {
         {adminPlacementError && <p className="error compact">题库加载失败：{adminPlacementError}</p>}
         <p className="hint">当前只做题库查看与筛选；批量导入不放在管理员界面。</p>
 
+        {renderAdminPagination(
+          adminPlacementPage,
+          adminPlacementTotalPages,
+          adminPlacementTotalItems,
+          adminPlacementBusy,
+          (nextPage) => void loadAdminPlacementItems(nextPage)
+        )}
+
         <div className="placement-item-list">
           {adminPlacementItems.length === 0 ? (
             <p className="hint">暂无题目，点击查询加载。</p>
@@ -2026,7 +2095,7 @@ export default function App() {
               return (
                 <article className="placement-item-card" key={item.id}>
                   <div className="word-row">
-                    <strong>#{item.id} {item.itemType}</strong>
+                    <strong>ID #{item.id} / {item.itemType}</strong>
                     <span className="status-pill">{item.status}</span>
                   </div>
                   <div className="metrics-row compact-metrics">
@@ -2225,12 +2294,20 @@ export default function App() {
             onChange={(event) => setAdminDialoguePackageId(event.target.value)}
             placeholder="按 packageId 查询；留空查最近 100 条"
           />
-          <button className="secondary-button" type="button" onClick={loadAdminDialogues} disabled={adminDialogueBusy}>
+          <button className="secondary-button" type="button" onClick={() => loadAdminDialogues(0)} disabled={adminDialogueBusy}>
             查询
           </button>
         </div>
 
         <p className="hint">删除对话会同步删除该 turn 对应的 learning_events，但不会回滚掌握度统计。</p>
+
+        {renderAdminPagination(
+          adminDialoguePage,
+          adminDialogueTotalPages,
+          adminDialogueTotalItems,
+          adminDialogueBusy,
+          (nextPage) => void loadAdminDialogues(nextPage)
+        )}
 
         <div className="admin-dialogue-layout">
           <div className="admin-dialogue-list">
@@ -2244,7 +2321,7 @@ export default function App() {
                   key={turn.id}
                   onClick={() => selectAdminDialogue(turn)}
                 >
-                  <span>#{turn.id} / package {turn.learningPackageId} / turn {turn.turnIndex}</span>
+                  <span>ID #{turn.id} / package {turn.learningPackageId} / turn {turn.turnIndex}</span>
                   <strong>{turn.userMessage}</strong>
                   <small>events {turn.learningEventCount} · user {turn.userId}</small>
                 </button>

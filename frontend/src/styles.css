@@ -790,12 +790,27 @@ strong {
 }
 
 .placement-item-list {
-  max-height: 620px;
-  overflow-y: auto;
   border: 1px solid #d9e1e5;
   border-radius: 8px;
   background: #ffffff;
   padding: 12px;
+}
+
+.pagination-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #d9e1e5;
+  border-radius: 8px;
+  background: #f8fafb;
+  padding: 10px 12px;
+}
+
+.pagination-row span {
+  color: #44535b;
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .vocabulary-card,

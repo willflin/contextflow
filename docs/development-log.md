@@ -1386,3 +1386,26 @@
 
 - 未新增依赖，未新增数据库表；新增 Flyway 迁移 `V19__seed_more_vocabulary_placement_items.sql`，同步 SQL 位于 `docs/sql/phase7_seed_more_vocabulary_placement_items.sql`。 / No dependency or database table was added. Added Flyway migration `V19__seed_more_vocabulary_placement_items.sql`; synchronized SQL is in `docs/sql/phase7_seed_more_vocabulary_placement_items.sql`.
 - 实际每层数量取决于清洗词表中该频率层是否有足够词条；完整 ECDICT 清洗数据应能达到每层约 100 题。 / Actual per-band counts depend on enough cleaned entries in that frequency band; full cleaned ECDICT data should reach about 100 items per band.
+
+### 修正 / Fix
+
+- V19 初版使用大 CTE/相关子查询生成题目，在大词表上会导致 Flyway 启动阶段明显变慢；已改为临时表 + 8 个明确频率范围段，每段按索引取最多 100 个词，再在同层候选池中通过行号错位生成 3 个干扰项。 / The first V19 draft used a large CTE/correlated-query shape, which could slow down Flyway startup on large word tables; it now uses a temporary table plus eight explicit frequency-range inserts, each taking up to 100 indexed words, then generates three distractors inside the same band by row offsets.
+- MySQL 不允许在同一条查询中多次引用同一个临时表；V19 已改为 `target/d1/d2/d3` 四个临时表副本后再自连接。 / MySQL cannot reference the same temporary table multiple times in one query; V19 now creates four temporary-table copies named `target/d1/d2/d3` before joining.
+## Phase 7.1.6：管理员列表分页 / Admin List Pagination
+
+### 问题 / Problem
+
+- 管理员页面中对话记录和题库管理属于条目列表，数据量变大后只靠滚动或固定数量返回会显示不全。 / Dialogue records and question bank management are item lists; with larger data volumes, scroll-only or fixed-count results can miss entries.
+- 列表条目需要明确展示 ID，方便定位和后续管理。 / List items need explicit IDs for locating and managing records.
+
+### 操作 / Operations
+
+- 新增通用 `PageResponse<T>`，管理员对话记录和题库查询接口返回分页数据。 / Added generic `PageResponse<T>`; admin dialogue and placement-item list APIs now return paginated data.
+- 对话记录接口支持 `page` / `size`，按 ID 或 turnIndex 倒序分页。 / Dialogue records support `page` / `size`, sorted by ID or turnIndex descending.
+- 题库管理接口支持 `page` / `size`，前端每页显示 20 条。 / Question-bank management supports `page` / `size`, with 20 items per frontend page.
+- 前端新增上一页/下一页、总条数和当前页显示；题库列表取消固定高度滚动，避免条目内容被截断。 / Added previous/next controls, total count, and current page display; removed fixed-height scrolling from the question-bank list to avoid clipped content.
+- 对话记录和题库条目标题明确显示 `ID #...`。 / Dialogue and question-bank item headers now explicitly display `ID #...`.
+
+### 说明 / Notes
+
+- 未新增依赖，未新增数据库表；本次无新增 SQL 文件。 / No dependency or database table was added; no new SQL file was needed.

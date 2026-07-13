@@ -24,6 +24,14 @@ export type AdminPlacementItem = {
   createdAt: string;
 };
 
+export type PageResponse<T> = {
+  items: T[];
+  page: number;
+  size: number;
+  totalItems: number;
+  totalPages: number;
+};
+
 async function readErrorMessage(response: Response, fallback: string): Promise<string> {
   try {
     const result = (await response.json()) as ApiResponse<unknown>;
@@ -39,9 +47,10 @@ export async function fetchAdminPlacementItems(
     abilityDimension?: string;
     status?: string;
     query?: string;
-    limit?: number;
+    page?: number;
+    size?: number;
   }
-): Promise<AdminPlacementItem[]> {
+): Promise<PageResponse<AdminPlacementItem>> {
   const search = new URLSearchParams();
   if (params.abilityDimension) {
     search.set('abilityDimension', params.abilityDimension);
@@ -52,7 +61,8 @@ export async function fetchAdminPlacementItems(
   if (params.query?.trim()) {
     search.set('query', params.query.trim());
   }
-  search.set('limit', String(params.limit ?? 100));
+  search.set('page', String(params.page ?? 0));
+  search.set('size', String(params.size ?? 20));
 
   const response = await fetch(`/api/admin/placement-items?${search.toString()}`, {
     headers: {
@@ -64,6 +74,6 @@ export async function fetchAdminPlacementItems(
     throw new Error(await readErrorMessage(response, 'Failed to load placement items.'));
   }
 
-  const result = (await response.json()) as ApiResponse<AdminPlacementItem[]>;
+  const result = (await response.json()) as ApiResponse<PageResponse<AdminPlacementItem>>;
   return result.data;
 }
