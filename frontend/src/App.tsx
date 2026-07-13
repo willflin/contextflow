@@ -2314,6 +2314,7 @@ export default function App() {
   function buildTaskChecklist(content: ReturnType<typeof parseLearningPackageContent>): TaskChecklistItem[] {
     const scenarioCode = content.scenario?.code;
     const transcript = dialogueTurns.map((turn) => turn.userMessage).join(' ').toLowerCase();
+    const affirmedPrompt = (...signals: string[]) => affirmedInDialogueContext(dialogueTurns, signals);
     switch (scenarioCode) {
       case 'hotel_check_in':
         return [
@@ -2325,22 +2326,24 @@ export default function App() {
           {
             key: 'reservation',
             label: '确认预订或给出 Alex Chen',
-            done: containsAnyText(transcript, 'reservation', 'reserved', 'booked', 'yes', 'here you are', 'alex')
+            done: containsAnyText(transcript, 'reservation', 'reserved', 'booked', 'here you are', 'alex')
+              || affirmedPrompt('reservation')
           },
           {
             key: 'roomPreference',
             label: '说明想要安静的大床房',
             done: containsAnyText(transcript, 'quiet room', 'quiet', 'queen room')
+              || affirmedPrompt('quiet room', 'room near', 'room would', 'room prefer')
           },
           {
             key: 'breakfast',
             label: '询问早餐时间或早餐服务',
-            done: transcript.includes('breakfast')
+            done: transcript.includes('breakfast') || affirmedPrompt('breakfast')
           },
           {
             key: 'wifi',
             label: '询问 Wi-Fi 信息',
-            done: transcript.includes('wifi') || transcript.includes('wi-fi')
+            done: transcript.includes('wifi') || transcript.includes('wi-fi') || affirmedPrompt('wifi', 'wi-fi')
           }
         ];
       case 'shopping_return':
@@ -2373,6 +2376,35 @@ export default function App() {
 
   function containsAnyText(value: string, ...candidates: string[]) {
     return candidates.some((candidate) => value.includes(candidate));
+  }
+
+  function affirmedInDialogueContext(
+    turns: LearningDialogueTurn[],
+    promptSignals: string[]
+  ) {
+    for (let index = 1; index < turns.length; index += 1) {
+      const userMessage = turns[index].userMessage.trim().toLowerCase();
+      const previousRoleplayReply = turns[index - 1].roleplayReply.toLowerCase();
+      if (isAffirmativeText(userMessage) && promptSignals.some((signal) => previousRoleplayReply.includes(signal))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function isAffirmativeText(value: string) {
+    return value === 'yes'
+      || value === 'yeah'
+      || value === 'yep'
+      || value === 'sure'
+      || value === 'ok'
+      || value === 'okay'
+      || value === 'please'
+      || value.startsWith('yes,')
+      || value.startsWith('yes.')
+      || value.startsWith('sure,')
+      || value.startsWith('ok,')
+      || value.startsWith('okay,');
   }
 
   function fallbackTaskRegister(scenarioCode?: string) {

@@ -131,6 +131,7 @@ public class SpringAiAgentModelClient implements AgentModelClient {
             - Treat learningPackage.taskProgress as the authoritative current checklist.
             - If learningPackage.taskProgress.complete=true, you must close the roleplay immediately and set scoringSignal.taskComplete=true.
             - If learningPackage.taskProgress.missing is not empty, ask only for the first missing checklist item. Do not ask about already completed items.
+            - When asking for a missing item, do not use a yes/no meta-question like "Would you like to ask about..."; prompt the learner to actually provide or ask that item.
             - On every turn, before writing the final JSON, explicitly compare the full dialogueHistory plus current userMessage against learningPackage.expectedLearnerAction and learningPackage.taskFacts.
             - Set scoringSignal.taskComplete=true only when the learner has successfully achieved all required actions in learningPackage.expectedLearnerAction using the fixed facts in learningPackage.taskFacts.
             - Do not mark complete just because the learner sent one sentence; all task goals must be satisfied.
@@ -206,6 +207,7 @@ public class SpringAiAgentModelClient implements AgentModelClient {
                 Treat learningPackage.taskProgress as authoritative. Never ask for items listed in taskProgress.completed.
                 If taskProgress.complete is true, close the roleplay now and set scoringSignal.taskComplete=true.
                 If taskProgress.missing is not empty, ask only for the first missing item.
+                Do not ask yes/no meta-questions for missing items; ask the learner to actually provide or ask the missing item.
                 Use learningPackage.taskRegister and learningPackage.registerGuidance to choose the right tone.
                 Mentor feedback must respect the task register; do not over-correct casual service dialogue into long formal sentences.
                 Do not ask for facts outside learningPackage.taskFacts.

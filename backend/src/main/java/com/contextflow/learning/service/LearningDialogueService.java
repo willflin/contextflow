@@ -509,17 +509,22 @@ public class LearningDialogueService {
     private boolean repeatedGenericTaskQuestion(String reply) {
         String lower = reply == null ? "" : reply.toLowerCase(Locale.ROOT);
         return lower.contains("would you like to ask about")
-                && (lower.contains("room type") || lower.contains("hotel services") || lower.contains("check-in time"));
+                && (lower.contains("room type")
+                || lower.contains("hotel services")
+                || lower.contains("check-in time")
+                || lower.contains("breakfast")
+                || lower.contains("wi-fi")
+                || lower.contains("wifi"));
     }
 
     private String promptForMissingTaskItem(String scenarioCode, TaskProgress taskProgress) {
         String missing = taskProgress.missing().isEmpty() ? "the next detail" : taskProgress.missing().get(0);
         if ("hotel_check_in".equals(scenarioCode)) {
             return switch (missing) {
-                case "reservation" -> "Could you confirm your reservation?";
+                case "reservation" -> "Please tell me the reservation name or confirm the reservation details.";
                 case "roomPreference" -> "What kind of room would you prefer?";
-                case "breakfast" -> "Would you like to ask about breakfast time?";
-                case "wifi" -> "Would you like to ask about Wi-Fi?";
+                case "breakfast" -> "Please ask me directly about breakfast time.";
+                case "wifi" -> "Please ask me directly about the Wi-Fi information.";
                 default -> "What else do you need for check-in?";
             };
         }
@@ -527,25 +532,72 @@ public class LearningDialogueService {
     }
 
     private TaskProgress taskProgress(Long packageId, String scenarioCode, String currentUserMessage) {
-        String transcript = learningDialogueTurnRepository.findTop100ByLearningPackageIdOrderByTurnIndexDesc(packageId)
+        List<LearningDialogueTurnEntity> turns = learningDialogueTurnRepository.findTop100ByLearningPackageIdOrderByTurnIndexDesc(packageId)
                 .stream()
                 .sorted(Comparator.comparing(LearningDialogueTurnEntity::getTurnIndex))
+                .toList();
+        String learnerTranscript = (turns.stream()
                 .map(LearningDialogueTurnEntity::getUserMessage)
-                .collect(java.util.stream.Collectors.joining(" "));
-        transcript = (transcript + " " + currentUserMessage).toLowerCase(Locale.ROOT);
+                .collect(java.util.stream.Collectors.joining(" ")) + " " + currentUserMessage).toLowerCase(Locale.ROOT);
 
         if ("hotel_check_in".equals(scenarioCode)) {
             List<String> completed = new ArrayList<>();
             List<String> missing = new ArrayList<>();
-            collectProgress(completed, missing, "checkIn", containsAny(transcript, "check in", "checking in", "reservation", "stay", "room"));
-            collectProgress(completed, missing, "reservation", containsAny(transcript, "reservation", "reserved", "booked", "yes", "here you are", "alex"));
-            collectProgress(completed, missing, "roomPreference", containsAny(transcript, "quiet room", "quiet", "queen room"));
-            collectProgress(completed, missing, "breakfast", transcript.contains("breakfast"));
-            collectProgress(completed, missing, "wifi", transcript.contains("wifi") || transcript.contains("wi-fi"));
+            boolean checkIn = containsAny(learnerTranscript, "check in", "checking in", "reservation", "stay", "room");
+            boolean reservation = containsAny(learnerTranscript, "reservation", "reserved", "booked", "here you are", "alex")
+                    || affirmedInDialogueContext(turns, currentUserMessage, "reservation");
+            boolean roomPreference = containsAny(learnerTranscript, "quiet room", "quiet", "queen room")
+                    || affirmedInDialogueContext(turns, currentUserMessage, "quiet room", "room near", "room would", "room prefer");
+            boolean breakfast = learnerTranscript.contains("breakfast")
+                    || affirmedInDialogueContext(turns, currentUserMessage, "breakfast");
+            boolean wifi = learnerTranscript.contains("wifi")
+                    || learnerTranscript.contains("wi-fi")
+                    || affirmedInDialogueContext(turns, currentUserMessage, "wifi", "wi-fi");
+            collectProgress(completed, missing, "checkIn", checkIn);
+            collectProgress(completed, missing, "reservation", reservation);
+            collectProgress(completed, missing, "roomPreference", roomPreference);
+            collectProgress(completed, missing, "breakfast", breakfast);
+            collectProgress(completed, missing, "wifi", wifi);
             return new TaskProgress(completed, missing);
         }
 
         return new TaskProgress(List.of(), List.of("taskDetails"));
+    }
+
+    private boolean affirmedInDialogueContext(
+            List<LearningDialogueTurnEntity> previousTurns,
+            String currentUserMessage,
+            String... promptSignals
+    ) {
+        for (int i = 1; i < previousTurns.size(); i++) {
+            String userMessage = previousTurns.get(i).getUserMessage();
+            String previousRoleplayReply = previousTurns.get(i - 1).getRoleplayReply();
+            if (isAffirmative(userMessage)
+                    && containsAny(previousRoleplayReply == null ? "" : previousRoleplayReply.toLowerCase(Locale.ROOT), promptSignals)) {
+                return true;
+            }
+        }
+        if (!isAffirmative(currentUserMessage) || previousTurns.isEmpty()) {
+            return false;
+        }
+        String previousRoleplayReply = previousTurns.get(previousTurns.size() - 1).getRoleplayReply();
+        return containsAny(previousRoleplayReply == null ? "" : previousRoleplayReply.toLowerCase(Locale.ROOT), promptSignals);
+    }
+
+    private boolean isAffirmative(String value) {
+        String normalized = value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+        return normalized.equals("yes")
+                || normalized.equals("yeah")
+                || normalized.equals("yep")
+                || normalized.equals("sure")
+                || normalized.equals("ok")
+                || normalized.equals("okay")
+                || normalized.equals("please")
+                || normalized.startsWith("yes,")
+                || normalized.startsWith("yes.")
+                || normalized.startsWith("sure,")
+                || normalized.startsWith("ok,")
+                || normalized.startsWith("okay,");
     }
 
     private void collectProgress(List<String> completed, List<String> missing, String key, boolean done) {

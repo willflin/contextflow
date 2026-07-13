@@ -1211,3 +1211,21 @@
 ## 说明 / Notes
 
 - 未新增依赖，未新增 SQL 迁移。/ No dependency or SQL migration was added.
+
+## Phase 6.3.24：完整上下文任务进度修复 / Full-Context Task Progress Fix
+
+### 问题 / Problem
+
+- Roleplay Agent 可能在用户用 `yes` 回答上一轮任务问题后继续重复同一个问题，例如反复询问早餐时间。 / The Roleplay Agent could repeat the same task question after the learner answered `yes`, such as repeatedly asking about breakfast time.
+- 任务完成判断只看用户显式文本时，无法理解“上一轮 Agent 问早餐，用户回答 yes”这类依赖完整对话上下文的省略回答。 / Progress based only on explicit learner text could not understand elliptical replies that depend on full dialogue context.
+
+### 操作 / Operations
+
+- 后端 `taskProgress` 改为读取完整历史 turn，并结合上一轮 Roleplay 问题与当前肯定回答推进对应 checklist 项。 / Backend `taskProgress` now reads full historical turns and advances checklist items by combining the previous Roleplay prompt with the current affirmative learner reply.
+- 移除 `yes` 对预订项的全局误判，只在上一轮问题明确指向对应任务项时才生效。 / Removed the global `yes` shortcut for reservation progress; affirmative replies now count only when the previous prompt targets that item.
+- 后端和 Spring AI prompt 禁止用 `Would you like to ask about...` 这类 yes/no 元问题推动缺项，改为要求用户直接提供或询问缺失内容。 / Backend and Spring AI prompts now avoid yes/no meta-questions such as `Would you like to ask about...` and instead prompt the learner to provide or ask the missing item directly.
+- 前端待完成任务 checklist 同步使用完整 turn 级上下文规则。 / The frontend task checklist now uses the same full turn-level context rule.
+
+### 说明 / Notes
+
+- 未新增依赖，未新增 SQL 迁移。 / No dependency or SQL migration was added.

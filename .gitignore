@@ -2,6 +2,7 @@
 target/
 *.class
 .m2/
+.m2-codex/
 
 # Node
 node_modules/
