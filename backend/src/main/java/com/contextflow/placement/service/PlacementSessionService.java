@@ -56,8 +56,18 @@ public class PlacementSessionService {
     private static final int SESSION_ITEM_COUNT = 5;
     private static final int ADAPTIVE_MAX_ITEM_COUNT = 14;
     private static final int INITIAL_DIFFICULTY_SCORE = 40;
-    private static final int DIFFICULTY_STEP = 10;
+    private static final int MAX_ITEMS_PER_BAND = 2;
     private static final String VOCABULARY_ABILITY = "vocabulary_size";
+    private static final List<String> FREQUENCY_BANDS = List.of(
+            "TOP_1000",
+            "TOP_2000",
+            "TOP_3000",
+            "TOP_5000",
+            "TOP_8000",
+            "TOP_12000",
+            "TOP_16000",
+            "TOP_20000"
+    );
 
     private final UserRepository userRepository;
     private final PlacementItemRepository placementItemRepository;
@@ -119,7 +129,7 @@ public class PlacementSessionService {
     @Transactional
     public AdaptivePlacementSessionResponse startAdaptiveSession(String username) {
         UserEntity user = activeUser(username);
-        PlacementItemEntity firstItem = nextAdaptiveItem(INITIAL_DIFFICULTY_SCORE, Set.of())
+        PlacementItemEntity firstItem = nextAdaptiveItem(INITIAL_DIFFICULTY_SCORE, "TOP_2000", Set.of(), Map.of())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "No READY placement items are available."));
 
         PlacementSessionEntity session = placementSessionRepository.save(PlacementSessionEntity.adaptive(
@@ -183,12 +193,15 @@ public class PlacementSessionService {
 
         int answeredCount = (int) answerRows.stream().filter(PlacementSessionAnswerEntity::isAnswered).count();
         int correctCount = (int) answerRows.stream().filter(answer -> Boolean.TRUE.equals(answer.getCorrect())).count();
-        int nextDifficulty = adjustDifficulty(session.getCurrentDifficultyScore(), correct);
         Set<Long> usedItemIds = answerRows.stream()
                 .map(PlacementSessionAnswerEntity::getItemId)
                 .collect(Collectors.toSet());
+        Map<Long, PlacementItemEntity> answeredItemsForSelection = itemMap(answerRows);
+        Map<String, Integer> bandCounts = bandCounts(answerRows, answeredItemsForSelection);
+        String nextBand = nextFrequencyBand(answerRows, currentItem, correct);
+        int nextDifficulty = difficultyForBand(nextBand);
 
-        Optional<PlacementItemEntity> nextItem = nextAdaptiveItem(nextDifficulty, usedItemIds);
+        Optional<PlacementItemEntity> nextItem = nextAdaptiveItem(nextDifficulty, nextBand, usedItemIds, bandCounts);
         boolean finished = answeredCount >= session.getMaxItemCount() || nextItem.isEmpty();
 
         if (finished) {
@@ -383,15 +396,37 @@ public class PlacementSessionService {
         return value == null ? "" : value.trim().toLowerCase();
     }
 
-    private Optional<PlacementItemEntity> nextAdaptiveItem(int targetDifficultyScore, Collection<Long> usedItemIds) {
+    private Optional<PlacementItemEntity> nextAdaptiveItem(
+            int targetDifficultyScore,
+            String targetFrequencyBand,
+            Collection<Long> usedItemIds,
+            Map<String, Integer> bandCounts
+    ) {
         List<PlacementItemEntity> readyItems = placementItemRepository
                 .findByStatusOrderByIdAsc(PlacementItemStatus.READY, PageRequest.of(0, 100))
                 .stream()
                 .filter(item -> !usedItemIds.contains(item.getId()))
                 .toList();
         boolean hasVocabularyPool = placementItemRepository.countByAbilityDimension(VOCABULARY_ABILITY) >= 8;
-        return readyItems.stream()
+        List<PlacementItemEntity> candidates = readyItems.stream()
                 .filter(item -> !hasVocabularyPool || VOCABULARY_ABILITY.equals(item.getAbilityDimension()))
+                .toList();
+
+        Optional<PlacementItemEntity> targetBandItem = candidates.stream()
+                .filter(item -> targetFrequencyBand != null && targetFrequencyBand.equals(item.getFrequencyBand()))
+                .filter(item -> bandCounts.getOrDefault(item.getFrequencyBand(), 0) < MAX_ITEMS_PER_BAND)
+                .min(Comparator
+                        .comparing(this::itemTypePriority)
+                        .thenComparing(PlacementItemEntity::getDifficultyScore)
+                        .thenComparing(PlacementItemEntity::getId));
+
+        if (targetBandItem.isPresent()) {
+            return targetBandItem;
+        }
+
+        return candidates.stream()
+                .filter(item -> item.getFrequencyBand() == null
+                        || bandCounts.getOrDefault(item.getFrequencyBand(), 0) < MAX_ITEMS_PER_BAND)
                 .min(Comparator
                         .comparingInt((PlacementItemEntity item) -> Math.abs(item.getDifficultyScore() - targetDifficultyScore))
                         .thenComparing(this::itemTypePriority)
@@ -419,11 +454,58 @@ public class PlacementSessionService {
                 .collect(Collectors.toMap(PlacementItemEntity::getId, Function.identity()));
     }
 
-    private int adjustDifficulty(int currentDifficultyScore, boolean correct) {
-        int next = correct
-                ? currentDifficultyScore + DIFFICULTY_STEP
-                : currentDifficultyScore - DIFFICULTY_STEP;
-        return Math.max(1, Math.min(100, next));
+    private Map<String, Integer> bandCounts(
+            List<PlacementSessionAnswerEntity> answerRows,
+            Map<Long, PlacementItemEntity> itemMap
+    ) {
+        Map<String, Integer> result = new HashMap<>();
+        for (PlacementSessionAnswerEntity answer : answerRows) {
+            PlacementItemEntity item = itemMap.get(answer.getItemId());
+            if (item != null && item.getFrequencyBand() != null) {
+                result.merge(item.getFrequencyBand(), 1, Integer::sum);
+            }
+        }
+        return result;
+    }
+
+    private String nextFrequencyBand(
+            List<PlacementSessionAnswerEntity> answerRows,
+            PlacementItemEntity currentItem,
+            boolean correct
+    ) {
+        int currentIndex = Math.max(0, FREQUENCY_BANDS.indexOf(currentItem.getFrequencyBand()));
+        int streak = trailingStreak(answerRows, correct);
+        int jump = correct
+                ? (streak >= 2 ? 2 : 1)
+                : (streak >= 2 ? -2 : -1);
+        int nextIndex = Math.max(0, Math.min(FREQUENCY_BANDS.size() - 1, currentIndex + jump));
+        return FREQUENCY_BANDS.get(nextIndex);
+    }
+
+    private int trailingStreak(List<PlacementSessionAnswerEntity> answerRows, boolean correct) {
+        int streak = 0;
+        for (int index = answerRows.size() - 1; index >= 0; index--) {
+            Boolean answerCorrect = answerRows.get(index).getCorrect();
+            if (answerCorrect == null || answerCorrect != correct) {
+                break;
+            }
+            streak++;
+        }
+        return streak;
+    }
+
+    private int difficultyForBand(String band) {
+        return switch (band) {
+            case "TOP_1000" -> 18;
+            case "TOP_2000" -> 35;
+            case "TOP_3000" -> 48;
+            case "TOP_5000" -> 62;
+            case "TOP_8000" -> 76;
+            case "TOP_12000" -> 86;
+            case "TOP_16000" -> 93;
+            case "TOP_20000" -> 98;
+            default -> INITIAL_DIFFICULTY_SCORE;
+        };
     }
 
     private PlacementTestItemResponse toTestItem(PlacementItemEntity item, PlacementSessionAnswerEntity answer) {

@@ -306,6 +306,40 @@ strong {
   margin-top: 24px;
 }
 
+.admin-entry-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.admin-entry-card {
+  display: grid;
+  min-height: 150px;
+  align-content: start;
+  gap: 10px;
+  border: 1px solid #d9e1e5;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 22px;
+  text-align: left;
+  box-shadow: 0 12px 30px rgb(23 32 38 / 0.08);
+  cursor: pointer;
+}
+
+.admin-entry-card:hover {
+  border-color: #0f766e;
+}
+
+.admin-entry-card strong {
+  color: #172026;
+  font-size: 22px;
+}
+
+.admin-entry-card small {
+  color: #5d6b73;
+  line-height: 1.5;
+}
+
 .debug-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
@@ -715,9 +749,12 @@ strong {
 
 .vocabulary-content,
 .admin-word-content,
+.admin-placement-content,
+.admin-runtime-content,
 .admin-dialogue-content,
 .admin-edit-block,
 .vocabulary-list,
+.placement-item-list,
 .sense-list {
   display: grid;
   gap: 14px;
@@ -752,12 +789,43 @@ strong {
   padding: 12px;
 }
 
+.placement-item-list {
+  max-height: 620px;
+  overflow-y: auto;
+  border: 1px solid #d9e1e5;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 12px;
+}
+
 .vocabulary-card,
+.placement-item-card,
 .admin-edit-block {
   border: 1px solid #d9e1e5;
   border-radius: 8px;
   background: #f8fafb;
   padding: 14px;
+}
+
+.placement-item-card p {
+  margin: 0;
+  color: #172026;
+  line-height: 1.5;
+}
+
+.placement-item-card small {
+  color: #6b7a83;
+}
+
+.compact-metrics {
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
+.admin-option-list {
+  margin: 0;
+  padding-left: 22px;
+  color: #44535b;
+  line-height: 1.6;
 }
 
 .word-row {

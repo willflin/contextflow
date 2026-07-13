@@ -1351,3 +1351,21 @@
 ### 说明 / Notes
 
 - 未新增依赖。新增 Flyway 迁移 `V18__add_placement_option_order.sql`，同步 SQL 位于 `docs/sql/phase7_placement_option_order_schema.sql`。 / No dependency was added. Added Flyway migration `V18__add_placement_option_order.sql`; synchronized SQL is in `docs/sql/phase7_placement_option_order_schema.sql`.
+## Phase 7.1.4：自适应难度分层与管理员题库入口 / Adaptive Banding and Admin Question Bank Entry
+
+### 问题 / Problem
+
+- 连续答对或答错后，下一题仍可能落在相近难度，用户难以明显感知动态调题。 / After repeated correct or wrong answers, the next item could still stay near the same difficulty, making adaptation hard to observe.
+- 管理员首页堆叠了多个管理模块，缺少独立二级入口；题库也缺少管理查看界面。 / The admin home stacked multiple management modules and lacked separate secondary entries; the placement question bank also had no admin view.
+
+### 操作 / Operations
+
+- 自适应选题改为优先按 `frequency_band` 跳转：答对上调，答错下调，连对或连错时跨两档。 / Adaptive selection now prioritizes `frequency_band` transitions: correct answers move up, wrong answers move down, and streaks jump two bands.
+- 同一频率层每轮最多抽取 2 题，降低重复落在同层的概率。 / Each frequency band is limited to at most two items per session to reduce same-band repetition.
+- 新增 `/api/admin/placement-items` 只读查询接口，支持 ability/status/query/limit 筛选。 / Added read-only `/api/admin/placement-items` with ability/status/query/limit filters.
+- 管理员首页改为入口页：系统运行时、单词管理、对话记录、题库管理分别进入二级页面。 / Reworked the admin home into entry cards for runtime, word management, dialogue records, and question bank management.
+- 前端新增题库管理页，展示题型、CEFR、难度、频率排名、频率层、题干和选项。 / Added a frontend question-bank page showing item type, CEFR, difficulty, frequency rank, frequency band, question, and options.
+
+### 说明 / Notes
+
+- 未新增依赖，未新增数据库表；本次无新增 SQL 文件。 / No dependency or database table was added; no new SQL file was needed.

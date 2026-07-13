@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import { AccessProbe, fetchAccessProbe } from './api/access';
 import { AgentRuntimeProbe, AgentRuntimeStatus, fetchAgentRuntimeStatus, runAgentRuntimeProbe } from './api/agentRuntime';
 import {
@@ -19,6 +19,7 @@ import {
   fetchAdminDialogues,
   updateAdminDialogue
 } from './api/adminDialogues';
+import { AdminPlacementItem, fetchAdminPlacementItems } from './api/adminPlacementItems';
 import { CurrentUser, fetchCurrentUser, login, register } from './api/auth';
 import { fetchHealth, HealthStatus } from './api/health';
 import {
@@ -45,6 +46,7 @@ import { fetchVocabulary, VocabularyList, VocabularyStatusFilter } from './api/v
 type LoadState = 'idle' | 'loading' | 'success' | 'error';
 type AuthMode = 'login' | 'register';
 type LearnerView = 'home' | 'vocabulary';
+type AdminView = 'home' | 'runtime' | 'words' | 'dialogues' | 'placementItems';
 type MentorHint = {
   id: number;
   level: 'HINT' | 'PRECISE';
@@ -93,6 +95,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [authMode, setAuthMode] = useState<AuthMode>('login');
   const [learnerView, setLearnerView] = useState<LearnerView>('home');
+  const [adminView, setAdminView] = useState<AdminView>('home');
   const [username, setUsername] = useState('learner');
   const [password, setPassword] = useState('learner123');
   const [displayName, setDisplayName] = useState('New Learner');
@@ -140,6 +143,12 @@ export default function App() {
   const [adminDialogueForm, setAdminDialogueForm] = useState<AdminDialogueTurnUpdatePayload>(emptyAdminDialogueForm);
   const [adminDialogueBusy, setAdminDialogueBusy] = useState(false);
   const [adminDialogueError, setAdminDialogueError] = useState<string | null>(null);
+  const [adminPlacementItems, setAdminPlacementItems] = useState<AdminPlacementItem[]>([]);
+  const [adminPlacementQuery, setAdminPlacementQuery] = useState('');
+  const [adminPlacementAbility, setAdminPlacementAbility] = useState('vocabulary_size');
+  const [adminPlacementStatus, setAdminPlacementStatus] = useState('READY');
+  const [adminPlacementBusy, setAdminPlacementBusy] = useState(false);
+  const [adminPlacementError, setAdminPlacementError] = useState<string | null>(null);
   const [learningPackage, setLearningPackage] = useState<LearningPackage | null>(null);
   const [learningBusy, setLearningBusy] = useState(false);
   const [skipBusy, setSkipBusy] = useState(false);
@@ -241,8 +250,10 @@ export default function App() {
       resetVocabulary();
       resetAdminWords();
       resetAdminDialogues();
+      resetAdminPlacementItems();
       resetAgentRuntime();
       setLearnerView('home');
+      setAdminView('home');
     } catch (exception) {
       setAuthError(exception instanceof Error ? exception.message : 'Login failed.');
       setCurrentUser(null);
@@ -259,11 +270,13 @@ export default function App() {
     resetVocabulary();
     resetAdminWords();
     resetAdminDialogues();
+    resetAdminPlacementItems();
     resetPlacement();
     resetLearning();
     resetReviewPlan();
     resetAgentRuntime();
     setLearnerView('home');
+    setAdminView('home');
   }
 
   async function loadAgentRuntime() {
@@ -794,6 +807,42 @@ export default function App() {
     setAdminDialogueError(null);
   }
 
+  async function loadAdminPlacementItems() {
+    const token = tokenOrNull();
+
+    if (!token) {
+      setAdminPlacementError('请先登录。');
+      return;
+    }
+
+    setAdminPlacementBusy(true);
+    setAdminPlacementError(null);
+
+    try {
+      const result = await fetchAdminPlacementItems(token, {
+        abilityDimension: adminPlacementAbility || undefined,
+        status: adminPlacementStatus || undefined,
+        query: adminPlacementQuery,
+        limit: 120
+      });
+      setAdminPlacementItems(result);
+    } catch (exception) {
+      setAdminPlacementItems([]);
+      setAdminPlacementError(exception instanceof Error ? exception.message : '题库加载失败。');
+    } finally {
+      setAdminPlacementBusy(false);
+    }
+  }
+
+  function resetAdminPlacementItems() {
+    setAdminPlacementItems([]);
+    setAdminPlacementQuery('');
+    setAdminPlacementAbility('vocabulary_size');
+    setAdminPlacementStatus('READY');
+    setAdminPlacementBusy(false);
+    setAdminPlacementError(null);
+  }
+
   async function loadNextLearningPackage() {
     const token = tokenOrNull();
 
@@ -1144,7 +1193,7 @@ export default function App() {
             </button>
           </section>
 
-          {isAdmin ? renderAdminConsole() : renderLearnerExperience()}
+          {isAdmin ? renderAdminConsoleV2() : renderLearnerExperience()}
         </>
       ) : (
         renderAuthPanel()
@@ -1315,6 +1364,139 @@ export default function App() {
           {renderVocabularyPanel()}
         </section>
       </section>
+    );
+  }
+
+  function renderAdminConsoleV2() {
+    if (adminView === 'runtime') {
+      return renderAdminSecondaryPage('系统运行时', renderAdminRuntimePage());
+    }
+    if (adminView === 'words') {
+      return renderAdminSecondaryPage('单词管理', renderAdminWordPanel());
+    }
+    if (adminView === 'dialogues') {
+      return renderAdminSecondaryPage('对话记录', renderAdminDialoguePanel(), loadAdminDialogues, adminDialogueBusy);
+    }
+    if (adminView === 'placementItems') {
+      return renderAdminSecondaryPage('题库管理', renderAdminPlacementItemPanel(), loadAdminPlacementItems, adminPlacementBusy);
+    }
+
+    return (
+      <section className="admin-console">
+        <section className="admin-entry-grid">
+          <button className="admin-entry-card" type="button" onClick={() => setAdminView('runtime')}>
+            <span className="eyebrow">Runtime</span>
+            <strong>系统运行时</strong>
+            <small>健康检查、权限探测、Spring AI 状态。</small>
+          </button>
+          <button className="admin-entry-card" type="button" onClick={() => setAdminView('words')}>
+            <span className="eyebrow">Words</span>
+            <strong>单词管理</strong>
+            <small>查询、新增单个单词、编辑词义。</small>
+          </button>
+          <button
+            className="admin-entry-card"
+            type="button"
+            onClick={() => {
+              setAdminView('dialogues');
+              void loadAdminDialogues();
+            }}
+          >
+            <span className="eyebrow">Dialogues</span>
+            <strong>对话记录</strong>
+            <small>查询、编辑、删除学习对话记录。</small>
+          </button>
+          <button
+            className="admin-entry-card"
+            type="button"
+            onClick={() => {
+              setAdminView('placementItems');
+              void loadAdminPlacementItems();
+            }}
+          >
+            <span className="eyebrow">Placement</span>
+            <strong>题库管理</strong>
+            <small>查看水平测试题、难度、频率层级。</small>
+          </button>
+        </section>
+      </section>
+    );
+  }
+
+  function renderAdminSecondaryPage(
+    title: string,
+    content: ReactNode,
+    refresh?: () => void | Promise<void>,
+    busy?: boolean
+  ) {
+    return (
+      <section className="admin-console">
+        <section className="tool-panel">
+          <div className="panel-heading">
+            <div>
+              <p className="eyebrow">管理员</p>
+              <h2>{title}</h2>
+            </div>
+            <div className="button-row">
+              <button className="secondary-button" type="button" onClick={() => setAdminView('home')}>
+                返回管理首页
+              </button>
+              {refresh && (
+                <button className="secondary-button" type="button" onClick={() => void refresh()} disabled={busy}>
+                  刷新
+                </button>
+              )}
+            </div>
+          </div>
+          {content}
+        </section>
+      </section>
+    );
+  }
+
+  function renderAdminRuntimePage() {
+    return (
+      <div className="admin-runtime-content">
+        <section className="status-panel">
+          <div>
+            <span className="label">后端状态</span>
+            <strong>{state === 'success' ? health?.status : state}</strong>
+          </div>
+          <div>
+            <span className="label">服务</span>
+            <strong>{health?.service ?? '-'}</strong>
+          </div>
+          <div>
+            <span className="label">版本</span>
+            <strong>{health?.version ?? '-'}</strong>
+          </div>
+        </section>
+        {error && <p className="error">后端请求失败：{error}</p>}
+        <div className="button-row">
+          <button className="secondary-button" type="button" onClick={loadHealth}>
+            刷新健康检查
+          </button>
+          <button className="secondary-button" type="button" onClick={() => checkProtectedEndpoint('/api/learner/probe')}>
+            检查 learner API
+          </button>
+          <button className="secondary-button" type="button" onClick={() => checkProtectedEndpoint('/api/admin/probe')}>
+            检查 admin API
+          </button>
+          <button className="secondary-button" type="button" onClick={loadAgentRuntime} disabled={agentRuntimeBusy}>
+            刷新 Agent
+          </button>
+          <button className="primary-button" type="button" onClick={probeAgentRuntime} disabled={agentRuntimeProbeBusy}>
+            探测模型
+          </button>
+        </div>
+        {accessProbe && (
+          <p className="success">
+            {accessProbe.scope}: {accessProbe.message}
+          </p>
+        )}
+        {accessError && <p className="error compact">访问失败：{accessError}</p>}
+        {renderAgentRuntimePanel()}
+      </div>
     );
   }
 
@@ -1796,6 +1978,105 @@ export default function App() {
         )}
       </div>
     );
+  }
+
+  function renderAdminPlacementItemPanel() {
+    return (
+      <div className="admin-placement-content">
+        <form
+          className="inline-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void loadAdminPlacementItems();
+          }}
+        >
+          <select value={adminPlacementAbility} onChange={(event) => setAdminPlacementAbility(event.target.value)}>
+            <option value="vocabulary_size">词汇量</option>
+            <option value="">全部能力维度</option>
+          </select>
+          <select value={adminPlacementStatus} onChange={(event) => setAdminPlacementStatus(event.target.value)}>
+            <option value="READY">READY</option>
+            <option value="">全部状态</option>
+            <option value="PENDING">PENDING</option>
+            <option value="GENERATING_TEXT">GENERATING_TEXT</option>
+            <option value="VALIDATING_TEXT">VALIDATING_TEXT</option>
+            <option value="GENERATING_AUDIO">GENERATING_AUDIO</option>
+            <option value="FAILED">FAILED</option>
+            <option value="EXPIRED">EXPIRED</option>
+          </select>
+          <input
+            value={adminPlacementQuery}
+            onChange={(event) => setAdminPlacementQuery(event.target.value)}
+            placeholder="搜索题干、场景或技能"
+          />
+          <button className="secondary-button" type="submit" disabled={adminPlacementBusy}>
+            查询
+          </button>
+        </form>
+
+        {adminPlacementError && <p className="error compact">题库加载失败：{adminPlacementError}</p>}
+        <p className="hint">当前只做题库查看与筛选；批量导入不放在管理员界面。</p>
+
+        <div className="placement-item-list">
+          {adminPlacementItems.length === 0 ? (
+            <p className="hint">暂无题目，点击查询加载。</p>
+          ) : (
+            adminPlacementItems.map((item) => {
+              const content = parseAdminPlacementContent(item);
+              return (
+                <article className="placement-item-card" key={item.id}>
+                  <div className="word-row">
+                    <strong>#{item.id} {item.itemType}</strong>
+                    <span className="status-pill">{item.status}</span>
+                  </div>
+                  <div className="metrics-row compact-metrics">
+                    <div>
+                      <span className="label">CEFR</span>
+                      <strong>{item.cefrLevel}</strong>
+                    </div>
+                    <div>
+                      <span className="label">难度</span>
+                      <strong>{item.difficultyScore}</strong>
+                    </div>
+                    <div>
+                      <span className="label">频率层</span>
+                      <strong>{item.frequencyBand ?? '-'}</strong>
+                    </div>
+                    <div>
+                      <span className="label">频率排名</span>
+                      <strong>{item.frequencyRank ?? '-'}</strong>
+                    </div>
+                  </div>
+                  <p>{content.question ?? '未解析题干'}</p>
+                  {content.options.length > 0 && (
+                    <ol className="admin-option-list">
+                      {content.options.map((option) => (
+                        <li key={option}>{option}</li>
+                      ))}
+                    </ol>
+                  )}
+                  <small>
+                    {item.abilityDimension} / {item.scenarioTag} / {item.targetSkill} / {item.gradingType}
+                  </small>
+                </article>
+              );
+            })
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  function parseAdminPlacementContent(item: AdminPlacementItem): { question: string | null; options: string[] } {
+    try {
+      const content = JSON.parse(item.contentJson) as { question?: unknown; options?: unknown };
+      return {
+        question: typeof content.question === 'string' ? content.question : null,
+        options: Array.isArray(content.options) ? content.options.filter((option): option is string => typeof option === 'string') : []
+      };
+    } catch {
+      return { question: null, options: [] };
+    }
   }
 
   function renderAdminWordPanel() {
