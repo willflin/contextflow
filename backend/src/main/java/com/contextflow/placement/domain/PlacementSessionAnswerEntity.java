@@ -36,6 +36,9 @@ public class PlacementSessionAnswerEntity {
     @Column(name = "difficulty_score", nullable = false)
     private Integer difficultyScore;
 
+    @Column(name = "option_order_json", columnDefinition = "json")
+    private String optionOrderJson;
+
     @Column(name = "selected_option_index")
     private Integer selectedOptionIndex;
 
@@ -102,6 +105,14 @@ public class PlacementSessionAnswerEntity {
         this.correct = correct;
         this.judgePayload = judgePayload;
         this.answeredAt = Instant.now();
+    }
+
+    public String getOptionOrderJson() {
+        return optionOrderJson;
+    }
+
+    public void setOptionOrderJson(String optionOrderJson) {
+        this.optionOrderJson = optionOrderJson;
     }
 
     public Long getItemId() {

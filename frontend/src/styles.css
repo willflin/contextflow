@@ -461,6 +461,21 @@ strong {
   background: #f0fdfa;
 }
 
+.unknown-option {
+  border-style: dashed;
+  background: #f3f6f7;
+  color: #52636b;
+}
+
+.unknown-option span {
+  font-weight: 800;
+}
+
+.unknown-option:has(input:checked) {
+  border-color: #64747c;
+  background: #e9eef0;
+}
+
 .text-answer {
   display: grid;
   gap: 8px;

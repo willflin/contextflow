@@ -26,6 +26,7 @@ import com.contextflow.user.service.UserLevelProfileService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
@@ -42,6 +43,9 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Random;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -93,13 +97,15 @@ public class PlacementSessionService {
         List<PlacementSessionAnswerEntity> answerRows = new java.util.ArrayList<>();
         for (int i = 0; i < items.size(); i++) {
             PlacementItemEntity item = items.get(i);
-            answerRows.add(new PlacementSessionAnswerEntity(
+            PlacementSessionAnswerEntity answerRow = new PlacementSessionAnswerEntity(
                     session.getId(),
                     item.getId(),
                     i + 1,
                     item.getGradingType(),
                     item.getDifficultyScore()
-            ));
+            );
+            answerRow.setOptionOrderJson(optionOrderJson(item, session.getId(), i + 1));
+            answerRows.add(answerRow);
         }
         placementSessionAnswerRepository.saveAll(answerRows);
 
@@ -122,13 +128,15 @@ public class PlacementSessionService {
                 INITIAL_DIFFICULTY_SCORE
         ));
 
-        placementSessionAnswerRepository.save(new PlacementSessionAnswerEntity(
+        PlacementSessionAnswerEntity firstAnswer = new PlacementSessionAnswerEntity(
                 session.getId(),
                 firstItem.getId(),
                 1,
                 firstItem.getGradingType(),
                 firstItem.getDifficultyScore()
-        ));
+        );
+        firstAnswer.setOptionOrderJson(optionOrderJson(firstItem, session.getId(), 1));
+        placementSessionAnswerRepository.save(firstAnswer);
 
         return new AdaptivePlacementSessionResponse(
                 session.getId(),
@@ -136,7 +144,7 @@ public class PlacementSessionService {
                 session.getAnsweredCount(),
                 session.getMaxItemCount(),
                 session.getCurrentDifficultyScore(),
-                toTestItem(firstItem)
+                toTestItem(firstItem, firstAnswer)
         );
     }
 
@@ -170,7 +178,7 @@ public class PlacementSessionService {
 
         PlacementItemEntity currentItem = placementItemRepository.findById(request.itemId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Placement item not found."));
-        boolean correct = grade(currentItem, currentAnswer.getGradingType(), request);
+        boolean correct = grade(currentItem, currentAnswer, request);
         currentAnswer.submit(request.selectedOptionIndex(), request.textAnswer(), correct, null);
 
         int answeredCount = (int) answerRows.stream().filter(PlacementSessionAnswerEntity::isAnswered).count();
@@ -220,13 +228,15 @@ public class PlacementSessionService {
         }
 
         PlacementItemEntity selectedNextItem = nextItem.get();
-        placementSessionAnswerRepository.save(new PlacementSessionAnswerEntity(
+        PlacementSessionAnswerEntity nextAnswer = new PlacementSessionAnswerEntity(
                 session.getId(),
                 selectedNextItem.getId(),
                 answerRows.size() + 1,
                 selectedNextItem.getGradingType(),
                 selectedNextItem.getDifficultyScore()
-        ));
+        );
+        nextAnswer.setOptionOrderJson(optionOrderJson(selectedNextItem, session.getId(), answerRows.size() + 1));
+        placementSessionAnswerRepository.save(nextAnswer);
         session.updateAdaptiveProgress(answeredCount, correctCount, nextDifficulty);
 
         return new AdaptivePlacementAnswerResponse(
@@ -237,7 +247,7 @@ public class PlacementSessionService {
                 correctCount,
                 nextDifficulty,
                 false,
-                toTestItem(selectedNextItem),
+                toTestItem(selectedNextItem, nextAnswer),
                 null
         );
     }
@@ -275,7 +285,7 @@ public class PlacementSessionService {
         for (PlacementSessionAnswerEntity answerRow : answerRows) {
             PlacementItemEntity item = itemMap.get(answerRow.getItemId());
             Integer selectedOptionIndex = submittedAnswers.get(answerRow.getItemId());
-            boolean correct = selectedOptionIndex.equals(correctAnswerIndex(item));
+            boolean correct = originalSelectedOptionIndex(answerRow, selectedOptionIndex).equals(correctAnswerIndex(item));
             answerRow.submit(selectedOptionIndex, correct);
             if (correct) {
                 correctCount++;
@@ -325,27 +335,27 @@ public class PlacementSessionService {
         }
     }
 
-    private boolean grade(
-            PlacementItemEntity item,
-            PlacementItemGradingType gradingType,
-            SubmitAdaptivePlacementAnswerRequest request
-    ) {
-        return switch (gradingType) {
-            case LOCAL_EXACT -> gradeLocalExact(item, request);
-            case LOCAL_ACCEPTED_ANSWERS -> gradeAcceptedAnswers(item, request);
+    private boolean grade(PlacementItemEntity item, PlacementSessionAnswerEntity answer, SubmitAdaptivePlacementAnswerRequest request) {
+        if (isUnknownOption(answer, request.selectedOptionIndex())) {
+            return false;
+        }
+        return switch (answer.getGradingType()) {
+            case LOCAL_EXACT -> gradeLocalExact(item, answer, request);
+            case LOCAL_ACCEPTED_ANSWERS -> gradeAcceptedAnswers(item, answer, request);
             case AI_JUDGE -> throw new ResponseStatusException(HttpStatus.NOT_IMPLEMENTED, "AI judging is not wired yet.");
         };
     }
 
-    private boolean gradeLocalExact(PlacementItemEntity item, SubmitAdaptivePlacementAnswerRequest request) {
+    private boolean gradeLocalExact(PlacementItemEntity item, PlacementSessionAnswerEntity answer, SubmitAdaptivePlacementAnswerRequest request) {
         if (request.selectedOptionIndex() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "selectedOptionIndex is required for this item.");
         }
-        return request.selectedOptionIndex().equals(correctAnswerIndex(item));
+        return originalSelectedOptionIndex(answer, request.selectedOptionIndex()).equals(correctAnswerIndex(item));
     }
 
-    private boolean gradeAcceptedAnswers(PlacementItemEntity item, SubmitAdaptivePlacementAnswerRequest request) {
-        if (request.selectedOptionIndex() != null && request.selectedOptionIndex().equals(correctAnswerIndex(item))) {
+    private boolean gradeAcceptedAnswers(PlacementItemEntity item, PlacementSessionAnswerEntity answer, SubmitAdaptivePlacementAnswerRequest request) {
+        if (request.selectedOptionIndex() != null
+                && originalSelectedOptionIndex(answer, request.selectedOptionIndex()).equals(correctAnswerIndex(item))) {
             return true;
         }
         String textAnswer = normalize(request.textAnswer());
@@ -416,12 +426,13 @@ public class PlacementSessionService {
         return Math.max(1, Math.min(100, next));
     }
 
-    private PlacementTestItemResponse toTestItem(PlacementItemEntity item) {
+    private PlacementTestItemResponse toTestItem(PlacementItemEntity item, PlacementSessionAnswerEntity answer) {
         try {
             JsonNode content = objectMapper.readTree(item.getContentJson());
             if (!(content instanceof ObjectNode publicContent)) {
                 throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Invalid placement item content.");
             }
+            applyOptionOrder(publicContent, answer);
             publicContent.remove("answerIndex");
             publicContent.remove("acceptedAnswers");
             publicContent.remove("explanation");
@@ -429,6 +440,70 @@ public class PlacementSessionService {
         } catch (JsonProcessingException exception) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Invalid placement item content.");
         }
+    }
+
+    private String optionOrderJson(PlacementItemEntity item, Long sessionId, int itemOrder) {
+        try {
+            JsonNode options = objectMapper.readTree(item.getContentJson()).path("options");
+            if (!options.isArray() || options.size() < 2) {
+                return null;
+            }
+            List<Integer> order = new ArrayList<>();
+            for (int index = 0; index < options.size(); index++) {
+                order.add(index);
+            }
+            Collections.shuffle(order, new Random(sessionId * 10_000L + item.getId() * 31L + itemOrder));
+            return objectMapper.writeValueAsString(order);
+        } catch (JsonProcessingException exception) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Invalid placement item content.");
+        }
+    }
+
+    private Integer originalSelectedOptionIndex(PlacementSessionAnswerEntity answer, Integer displayedOptionIndex) {
+        if (displayedOptionIndex == null || answer.getOptionOrderJson() == null || answer.getOptionOrderJson().isBlank()) {
+            return displayedOptionIndex;
+        }
+        try {
+            JsonNode order = objectMapper.readTree(answer.getOptionOrderJson());
+            if (!order.isArray() || displayedOptionIndex < 0 || displayedOptionIndex >= order.size()) {
+                return displayedOptionIndex;
+            }
+            return order.get(displayedOptionIndex).asInt(displayedOptionIndex);
+        } catch (JsonProcessingException exception) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Invalid placement option order.");
+        }
+    }
+
+    private boolean isUnknownOption(PlacementSessionAnswerEntity answer, Integer displayedOptionIndex) {
+        if (displayedOptionIndex == null || answer.getOptionOrderJson() == null || answer.getOptionOrderJson().isBlank()) {
+            return false;
+        }
+        try {
+            JsonNode order = objectMapper.readTree(answer.getOptionOrderJson());
+            return order.isArray() && displayedOptionIndex == order.size();
+        } catch (JsonProcessingException exception) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Invalid placement option order.");
+        }
+    }
+
+    private void applyOptionOrder(ObjectNode publicContent, PlacementSessionAnswerEntity answer) throws JsonProcessingException {
+        JsonNode options = publicContent.path("options");
+        if (!options.isArray() || answer.getOptionOrderJson() == null || answer.getOptionOrderJson().isBlank()) {
+            return;
+        }
+        JsonNode order = objectMapper.readTree(answer.getOptionOrderJson());
+        if (!order.isArray() || order.size() != options.size()) {
+            return;
+        }
+        ArrayNode shuffled = objectMapper.createArrayNode();
+        for (JsonNode originalIndex : order) {
+            int index = originalIndex.asInt(-1);
+            if (index < 0 || index >= options.size()) {
+                return;
+            }
+            shuffled.add(options.get(index));
+        }
+        publicContent.set("options", shuffled);
     }
 
     private BigDecimal scorePercent(int correctCount, int itemCount) {

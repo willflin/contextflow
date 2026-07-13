@@ -1333,3 +1333,21 @@
 ### 说明 / Notes
 
 - 未新增依赖。新增 Flyway 迁移 `V17__extend_placement_to_c2_and_seed_hard_vocabulary.sql`，同步 SQL 位于 `docs/sql/phase7_extend_placement_to_c2_and_seed_hard_vocabulary.sql`。 / No dependency was added. Added Flyway migration `V17__extend_placement_to_c2_and_seed_hard_vocabulary.sql`; synchronized SQL is in `docs/sql/phase7_extend_placement_to_c2_and_seed_hard_vocabulary.sql`.
+
+## Phase 7.1.3：测试选项乱序与不知道选项 / Randomized Options and I Don't Know Choice
+
+### 问题 / Problem
+
+- 词汇测试题的正确答案固定在第一个选项，用户可能形成位置猜测。 / Vocabulary placement items always had the correct answer as the first option, allowing position-based guessing.
+- 用户不认识单词时只能乱选，影响词汇量估计准确性。 / Learners had to guess when they did not know a word, reducing vocabulary-size estimate accuracy.
+
+### 操作 / Operations
+
+- 后端为每个 session answer 保存 `option_order_json`，返回题目时按该映射打乱选项，判分时还原为原始选项索引。 / Backend now stores `option_order_json` per session answer, shuffles options on delivery, and maps the submitted display index back to the original index for grading.
+- 前端为选择题追加样式不同的 `I DON'T KNOW` 选项。 / The frontend appends a visually distinct `I DON'T KNOW` option to choice items.
+- 后端识别 `I DON'T KNOW` 的显示索引并直接判错，不触发文本答案校验。 / Backend recognizes the `I DON'T KNOW` display index and grades it as incorrect without requiring text-answer validation.
+- 水平测试题目下方增加诚实作答提示。 / Added a placement hint asking learners to answer honestly and avoid guessing.
+
+### 说明 / Notes
+
+- 未新增依赖。新增 Flyway 迁移 `V18__add_placement_option_order.sql`，同步 SQL 位于 `docs/sql/phase7_placement_option_order_schema.sql`。 / No dependency was added. Added Flyway migration `V18__add_placement_option_order.sql`; synchronized SQL is in `docs/sql/phase7_placement_option_order_schema.sql`.

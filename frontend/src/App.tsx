@@ -1489,6 +1489,15 @@ export default function App() {
                     <span>{option}</span>
                   </label>
                 ))}
+                <label className="option-item unknown-option">
+                  <input
+                    type="radio"
+                    name="placement-option"
+                    checked={selectedOptionIndex === options.length}
+                    onChange={() => setSelectedOptionIndex(options.length)}
+                  />
+                  <span>I DON'T KNOW</span>
+                </label>
               </div>
             ) : (
               <label className="text-answer">
@@ -1496,6 +1505,7 @@ export default function App() {
                 <input value={textAnswer} onChange={(event) => setTextAnswer(event.target.value)} />
               </label>
             )}
+            <p className="hint compact">请尽量诚实作答；不认识的词请选择 I DON'T KNOW，不要靠猜测。</p>
             <button
               className="refresh-button compact-button"
               type="button"
