@@ -55,9 +55,9 @@ import java.util.stream.Collectors;
 public class PlacementSessionService {
 
     private static final int SESSION_ITEM_COUNT = 5;
-    private static final int ADAPTIVE_MAX_ITEM_COUNT = 14;
+    private static final int ADAPTIVE_MAX_ITEM_COUNT = 40;
     private static final int INITIAL_DIFFICULTY_SCORE = 40;
-    private static final int MAX_ITEMS_PER_BAND = 2;
+    private static final int MAX_ITEMS_PER_BAND = 5;
     private static final String VOCABULARY_ABILITY = "vocabulary_size";
     private static final List<String> FREQUENCY_BANDS = List.of(
             "TOP_1000",
@@ -406,7 +406,7 @@ public class PlacementSessionService {
             Map<String, Integer> bandCounts
     ) {
         List<PlacementItemEntity> readyItems = placementItemRepository
-                .findByStatusOrderByIdAsc(PlacementItemStatus.READY, PageRequest.of(0, 100))
+                .findByStatusOrderByIdAsc(PlacementItemStatus.READY, PageRequest.of(0, 1000))
                 .stream()
                 .filter(item -> !usedItemIds.contains(item.getId()))
                 .toList();

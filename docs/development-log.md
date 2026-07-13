@@ -1409,3 +1409,37 @@
 ### 说明 / Notes
 
 - 未新增依赖，未新增数据库表；本次无新增 SQL 文件。 / No dependency or database table was added; no new SQL file was needed.
+## Phase 7.1.7：清理旧版测试题 / Legacy Placement Item Cleanup
+
+### 问题 / Problem
+
+- V19 批量题库生成后，`placement_items` 中仍保留 V19 之前的旧场景题和少量旧词汇量样例题，导致管理员题库默认筛选数量为 822 而不是 800。 / After V19 generated the batch question bank, legacy scenario items and older vocabulary sample items still remained in `placement_items`, causing the admin default question-bank count to show 822 instead of 800.
+
+### 操作 / Operations
+
+- 新增 V20 清理迁移，只保留 V19 从 ECDICT 清洗数据生成的题目。 / Added V20 cleanup migration that keeps only V19 items generated from cleaned ECDICT data.
+- 清理引用旧题的 placement 测试会话和答题记录，并将相关 `user_level_profiles.last_placement_session_id` 置空。 / Removed placement sessions and answers that referenced legacy items, and cleared related `user_level_profiles.last_placement_session_id`.
+- 已在当前数据库手动执行同一份清理 SQL；后续 Flyway 执行 V20 时会成为 no-op。 / Executed the same cleanup SQL on the current database; later Flyway execution of V20 will be a no-op.
+
+### 结果 / Result
+
+- `placement_items` 当前总数为 800，旧题数量为 0。 / `placement_items` now contains 800 items, with 0 legacy items.
+
+### 说明 / Notes
+
+- 未新增依赖。新增 Flyway 迁移 `V20__remove_legacy_placement_items.sql`，同步 SQL 位于 `docs/sql/phase7_remove_legacy_placement_items.sql`。 / No dependency was added. Added Flyway migration `V20__remove_legacy_placement_items.sql`; synchronized SQL is in `docs/sql/phase7_remove_legacy_placement_items.sql`.
+## Phase 7.1.8：词汇测试题量修正 / Vocabulary Test Length Fix
+
+### 问题 / Problem
+
+- 清理旧题后，选题逻辑只读取前 100 条 READY 题；由于 V19 按频率层顺序插入，前 100 条全部来自 `TOP_1000`，再叠加“每层最多 2 题”的限制，导致测试可能只出 2 题就结束。 / After removing legacy items, selection only read the first 100 READY items. Since V19 inserted items by frequency band, those 100 were all from `TOP_1000`; combined with the two-items-per-band cap, a test could end after only two items.
+
+### 操作 / Operations
+
+- 词汇量自适应测试统一为 40 题。 / Standardized adaptive vocabulary placement to 40 items.
+- 每个频率层最多 5 题，8 个频率层合计支撑 40 题。 / Each frequency band is capped at 5 items, so 8 bands support 40 items.
+- 选题候选池从前 100 条扩大到前 1000 条，覆盖当前 800 条 READY 词汇题。 / Expanded the selection candidate pool from the first 100 items to the first 1000 items, covering the current 800 READY vocabulary items.
+
+### 说明 / Notes
+
+- 未新增依赖，未新增数据库表；本次无新增 SQL 文件。 / No dependency or database table was added; no new SQL file was needed.
