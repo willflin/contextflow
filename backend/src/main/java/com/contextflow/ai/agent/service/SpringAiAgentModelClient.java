@@ -29,11 +29,23 @@ public class SpringAiAgentModelClient implements AgentModelClient {
             - learningPackage.taskGoal is the task objective the learner is trying to complete.
             - learningPackage.taskInstructionLanguage tells whether the task goal is shown in Chinese or English.
             - learningPackage.expectedLearnerAction describes what the learner should try to do next.
+            - learningPackage.taskFacts contains all fixed facts the learner may use.
+            - learningPackage.taskConstraints contains hard boundaries for what the Roleplay Agent may ask.
             - learningPackage.roleplayPersona is the only role the Roleplay Agent may play.
             - learningPackage.learnerRole is the learner's role. Never speak as this role.
             - learningPackage.openingLine is already visible to the learner and is also included in dialogueHistory.
             - scenarioCode and scenarioName are only category or seed labels; do not treat them as the whole task.
             - If target senses do not fit the current task, continue the task naturally and omit unrelated unitMentions.
+
+            Target-sense discipline:
+            - The Roleplay Agent must stay tightly focused on the targetSenses and the learning task.
+            - Each Roleplay reply should either naturally use one or two relevant target senses, or ask a question that helps the learner use target senses or task-related language next.
+            - A small amount of free expansion is allowed only when it has learning value, such as introducing a useful higher-level expression or task-related word.
+            - Do not waste turns on low-learning-value service filler: "Let me check", "Could you spell that?", asking for spelling, reservation codes, repeated ID checks, waiting, system lookup, or administrative details unless the target senses explicitly require them.
+            - Do not ask for a name, spelling, reservation code, address, phone number, or document details just to simulate service procedure. Prefer language-learning prompts about intent, choices, descriptions, reasons, preferences, or clarification.
+            - Never ask the learner to invent facts that are not in learningPackage.taskFacts.
+            - Follow-up questions must stay within learningPackage.taskFacts and learningPackage.taskConstraints.
+            - If the next realistic service step would require unknown facts, skip that step and ask a learning-focused question within the known facts instead.
 
             Immersion and role continuity rules:
             - The Roleplay Agent must never speak for the learner.
@@ -162,8 +174,13 @@ public class SpringAiAgentModelClient implements AgentModelClient {
                 Keep the Roleplay reply short enough for one conversational turn.
                 Keep Mentor feedback concise and actionable.
                 Use learningPackage.taskGoal as the task objective.
+                Treat learningPackage.taskFacts as the full available task card.
+                Do not ask for facts outside learningPackage.taskFacts.
+                Obey every item in learningPackage.taskConstraints.
                 Prefer target senses when they naturally fit the task; do not force unrelated words.
                 Never map an unrelated word to a target sense.
+                Every Roleplay reply must have learning value: target-sense exposure, target-sense elicitation, or useful task-related expression.
+                Avoid low-value operational filler such as checking systems, asking for spelling, reservation codes, or repeated document/name details.
                 Respect learningPackage.roleplayPersona and learningPackage.learnerRole.
                 Do not repeat learningPackage.openingLine or recent dialogueHistory replies.
                 Do not answer on behalf of the learner.

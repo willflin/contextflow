@@ -187,6 +187,8 @@ public class LearningDialogueService {
                         taskGoal(learningTask, scenario),
                         learningTask.path("instructionLanguage").asText("zh-CN"),
                         expectedLearnerAction(learningTask, scenario),
+                        taskFacts(learningTask, scenario),
+                        taskConstraints(learningTask, scenario),
                         roleplayAgent.path("persona").asText(roleplayPersona(scenario.path("code").asText("general"))),
                         roleplayAgent.path("learnerRole").asText(learnerRole(scenario.path("code").asText("general"))),
                         roleplayAgent.path("openingLine").asText(openingLine(scenario.path("code").asText("general"))),
@@ -215,12 +217,48 @@ public class LearningDialogueService {
         return "Complete this English learning task naturally.";
     }
 
+    private String taskFacts(JsonNode learningTask, JsonNode scenario) {
+        JsonNode facts = learningTask.path("facts");
+        if (facts.isMissingNode() || facts.isNull()) {
+            return fallbackTaskFacts(scenario.path("code").asText("general"));
+        }
+        return facts.toString();
+    }
+
+    private String taskConstraints(JsonNode learningTask, JsonNode scenario) {
+        JsonNode constraints = learningTask.path("constraints");
+        if (constraints.isMissingNode() || constraints.isNull()) {
+            return fallbackTaskConstraints(scenario.path("code").asText("general"));
+        }
+        return constraints.toString();
+    }
+
+    private String fallbackTaskFacts(String scenarioCode) {
+        return switch (scenarioCode) {
+            case "hotel_check_in" -> "{\"learnerName\":\"Alex Chen\",\"hotelName\":\"Harbor View Hotel\",\"arrival\":\"tonight\",\"reservation\":\"two nights under Alex Chen\",\"roomPreference\":\"quiet queen room\",\"document\":\"passport ready\",\"questionsToAsk\":\"breakfast time and Wi-Fi\"}";
+            case "shopping_return" -> "{\"item\":\"wireless headphones\",\"purchaseTime\":\"yesterday\",\"problem\":\"the left side has no sound\",\"receipt\":\"available\",\"payment\":\"paid by card\",\"desiredOutcome\":\"refund or exchange\"}";
+            case "bank_account" -> "{\"learnerName\":\"Alex Chen\",\"accountType\":\"savings account\",\"documents\":\"passport and proof of address\",\"requestedService\":\"debit card\",\"questionsToAsk\":\"monthly fees and required documents\"}";
+            case "police_stop" -> "{\"situation\":\"walking to the subway at night\",\"transport\":\"not driving\",\"document\":\"ID is available\",\"tone\":\"calm and polite\",\"questionsToAsk\":\"why you were stopped and what to do next\"}";
+            default -> "{}";
+        };
+    }
+
+    private String fallbackTaskConstraints(String scenarioCode) {
+        return switch (scenarioCode) {
+            case "hotel_check_in" -> "[\"Do not ask the learner to invent a name, spelling, reservation code, address, or payment details.\",\"Follow-up questions must stay within the given facts: Alex Chen, two-night reservation, quiet queen room, passport, breakfast, and Wi-Fi.\"]";
+            case "shopping_return" -> "[\"Do not ask the learner to invent a brand, order number, address, or extra purchase details.\",\"Follow-up questions must stay within the given facts: wireless headphones, left side no sound, bought yesterday, receipt, card payment, refund or exchange.\"]";
+            case "bank_account" -> "[\"Do not ask the learner to invent income, address, phone number, account number, or private details.\",\"Follow-up questions must stay within the given facts: savings account, passport, proof of address, debit card, monthly fees, and documents.\"]";
+            case "police_stop" -> "[\"Do not ask the learner to invent illegal behavior, vehicle details, address, or personal history.\",\"Follow-up questions must stay within the given facts: walking to the subway, not driving, ID available, calm tone, reason for stop, next steps.\"]";
+            default -> "[]";
+        };
+    }
+
     private String fallbackTaskGoal(String scenarioCode) {
         return switch (scenarioCode) {
-            case "hotel_check_in" -> "你需要办理酒店入住，并确认预订信息。";
-            case "shopping_return" -> "你需要向店员描述商品问题，并申请退货或换货。";
-            case "bank_account" -> "你需要去银行开一个账户，并询问需要哪些材料。";
-            case "police_stop" -> "你需要冷静询问被拦下的原因，并回答基本问题。";
+            case "hotel_check_in" -> "你是 Alex Chen，今晚到 Harbor View Hotel 办理入住。你已经预订两晚，想要安静的大床房，护照已准备好。请用英语完成入住，并询问早餐时间和 Wi-Fi。";
+            case "shopping_return" -> "你昨天买了一副无线耳机，左边没有声音。你带了收据，用银行卡付款。请用英语说明问题，并申请退款或换货。";
+            case "bank_account" -> "你是 Alex Chen，要开一个储蓄账户。你带了护照和地址证明，想申请借记卡，并需要询问月费和所需材料。";
+            case "police_stop" -> "你晚上正走去地铁站，被警察拦下。你带了身份证件，没有开车。请冷静询问被拦下的原因，并询问下一步该怎么做。";
             default -> "";
         };
     }
@@ -231,10 +269,10 @@ public class LearningDialogueService {
             return action;
         }
         return switch (scenario.path("code").asText("general")) {
-            case "hotel_check_in" -> "用英语提出入住请求，说明预订姓名，并回答房间相关问题。";
-            case "shopping_return" -> "用英语描述商品问题，并礼貌提出退货或换货请求。";
-            case "bank_account" -> "用英语说明想开户，并询问所需材料或下一步。";
-            case "police_stop" -> "用英语冷静询问原因，并回答对方的后续问题。";
+            case "hotel_check_in" -> "用英语说明要入住，给出姓名 Alex Chen，说明已预订两晚，提出想要安静的大床房，并询问早餐时间和 Wi-Fi。";
+            case "shopping_return" -> "用英语说明耳机左边没有声音、昨天购买、带了收据，并礼貌申请退款或换货。";
+            case "bank_account" -> "用英语说明想开储蓄账户，提到护照和地址证明，询问借记卡、月费和所需材料。";
+            case "police_stop" -> "用英语冷静询问原因，说明你正走去地铁站，如被要求则说明带了证件，并询问下一步该怎么做。";
             default -> "用英语回复，并推动任务继续。";
         };
     }
@@ -286,7 +324,8 @@ public class LearningDialogueService {
                 .stream()
                 .anyMatch(turn -> sameMeaning(output.reply(), turn.getRoleplayReply()));
         boolean roleBreak = roleplaySpeaksAsLearner(output.reply(), scenarioCode);
-        if (!duplicate && !roleBreak) {
+        boolean lowValue = lowValueRoleplayReply(output.reply(), scenarioCode);
+        if (!duplicate && !roleBreak && !lowValue) {
             return output;
         }
         return new AgentDialogueOutput(
@@ -327,24 +366,47 @@ public class LearningDialogueService {
         return lower.matches("^(yes|yeah|sure|of course)[,.! ]+i\\b.*");
     }
 
+    private boolean lowValueRoleplayReply(String reply, String scenarioCode) {
+        String lower = reply == null ? "" : reply.toLowerCase(Locale.ROOT);
+        boolean serviceFiller = lower.contains("let me check")
+                || lower.contains("checking")
+                || lower.contains("check our system")
+                || lower.contains("spell that")
+                || lower.contains("spell your")
+                || lower.contains("reservation code")
+                || lower.contains("booking reference")
+                || lower.contains("confirmation number")
+                || lower.contains("one moment")
+                || lower.contains("please wait");
+        if (serviceFiller) {
+            return true;
+        }
+        if ("hotel_check_in".equals(scenarioCode)) {
+            return lower.contains("name on the reservation")
+                    || lower.contains("under what name")
+                    || lower.contains("under which name");
+        }
+        return false;
+    }
+
     private String repairedRoleplayReply(String scenarioCode, String userMessage, int turnIndex) {
         String trimmed = userMessage == null ? "" : userMessage.trim();
         boolean unclear = trimmed.isBlank() || trimmed.matches("\\?+");
         return switch (scenarioCode) {
             case "hotel_check_in" -> unclear
-                    ? "Could you clarify your request? Are you checking in with a reservation, or would you like to book a room for tonight?"
+                    ? "Are you asking to check in, book a room, or ask about room details?"
                     : turnIndex <= 1
-                    ? "Of course. Are you checking in with a reservation, or would you like to book a room for tonight?"
-                    : "I can help with that. Could you tell me the name on the reservation?";
+                    ? "Do you mean you would like to check in, or are you asking about booking a room?"
+                    : "Thanks. Would you like to ask about the room type, the check-in time, or hotel services?";
             case "shopping_return" -> unclear
-                    ? "Could you tell me what is wrong with the item?"
-                    : "I can help with that. Do you have the receipt with you?";
+                    ? "Are you trying to return the item, exchange it, or describe the problem?"
+                    : "What is the main problem with the item: size, quality, or something else?";
             case "bank_account" -> unclear
-                    ? "Could you tell me what kind of account you would like to open?"
-                    : "I can help with that. Do you have your ID and proof of address with you?";
+                    ? "Are you asking to open an account, compare account types, or ask about required documents?"
+                    : "Would you like a checking account or a savings account, and what do you need it for?";
             case "police_stop" -> unclear
-                    ? "Could you please tell me what you want to ask?"
-                    : "Please stay calm. Could you answer a few basic questions first?";
+                    ? "Are you asking why you were stopped, or what you should do next?"
+                    : "Please explain where you were going and ask any clarification question you need.";
             default -> unclear
                     ? "Could you clarify what you mean?"
                     : "I understand. Could you tell me a little more?";

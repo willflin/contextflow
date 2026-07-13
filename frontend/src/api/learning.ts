@@ -25,6 +25,8 @@ export type LearningPackageContent = {
     goal?: string;
     instructionLanguage?: string;
     expectedLearnerAction?: string;
+    facts?: Record<string, string>;
+    constraints?: string[];
     source?: string;
   };
   learnerProfile?: {

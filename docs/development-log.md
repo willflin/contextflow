@@ -1,5 +1,56 @@
 # 开发日志 / Development Log
 
+## Phase 6.3.16：Mentor 渐进提示 / Progressive Mentor Hints
+
+### 问题 / Problem
+
+- 用户完全不知道如何回复时，只能直接输入或等待，没有 Mentor 渐进式提示机制。 / When learners do not know how to reply, they can only type or wait; there was no progressive Mentor hint mechanism.
+
+### 操作 / Operations
+
+- 前端新增“请求 Mentor 提示”按钮，普通提示最多 3 轮。 / Added a "请求 Mentor 提示" button on the frontend, with up to three ordinary hints.
+- 普通提示只提供思考方向、任务事实、功能意图和空句型框架，不直接给完整答案。 / Ordinary hints provide thinking direction, task facts, communicative function, and blank sentence frames, but not full answers.
+- 若目标词义中包含新词，Mentor 会提示词义；若都是复习词，则提示用户这些词已经学过并鼓励回忆。 / If target senses include new words, Mentor explains them; if they are review words, Mentor tells the learner they have learned them and encourages recall.
+- 第 3 轮提示后或用户 1 分钟未回复时，弹窗询问是否需要精确提示。 / After the third hint or one minute without a learner reply, a modal asks whether the learner needs a precise hint.
+- 精确提示可包含可用单词、句型和参考表达。 / Precise hints may include usable words, syntax, and reference expressions.
+
+### 说明 / Notes
+
+- 当前为前端最小闭环实现，未新增后端接口、依赖或 SQL。 / This is a frontend minimal loop; no backend API, dependency, or SQL was added.
+
+## Phase 6.3.15：精确任务卡 / Precise Task Cards
+
+### 问题 / Problem
+
+- 任务目标过于泛化，用户需要临场编造姓名、房间种类、预订信息等，导致对话不可控。 / Task goals were too generic, forcing learners to invent names, room types, reservation details, and similar facts, making dialogue hard to control.
+
+### 操作 / Operations
+
+- READY 学习包的 `learningTask.goal` 改为精确任务卡，直接包含用户身份、固定事实和要完成的英语动作。 / Changed READY package `learningTask.goal` into a precise task card containing learner identity, fixed facts, and required English actions.
+- 新增 `learningTask.facts` 和 `learningTask.constraints`，并在 Agent 输入中暴露为 `taskFacts` 和 `taskConstraints`。 / Added `learningTask.facts` and `learningTask.constraints`, exposed to Agent input as `taskFacts` and `taskConstraints`.
+- Spring AI prompt 要求后续提问只能围绕任务卡事实，不能要求用户编造未给出的事实。 / Updated the Spring AI prompt so follow-up questions must stay within task-card facts and cannot ask learners to invent missing facts.
+- 前端任务目标区新增“已给信息”网格，展示用户可以直接使用的固定事实。 / Added a frontend task-facts grid showing fixed facts the learner can directly use.
+- 更新 `docs/agent-contract.md` 和 `docs/learning-task-design.md`。 / Updated `docs/agent-contract.md` and `docs/learning-task-design.md`.
+
+### 说明 / Notes
+
+- 未新增依赖，未新增 SQL 迁移。 / No dependency or SQL migration was added.
+
+## Phase 6.3.14：对话等待提示 / Dialogue Waiting Indicator
+
+### 问题 / Problem
+
+- 用户发送消息后到 Agent 回复前有明显延时，但界面只有发送按钮变灰，等待状态不够明确。 / After the learner sends a message, there is a visible delay before the Agent replies, but the UI only disabled the send button and did not make the waiting state clear.
+
+### 操作 / Operations
+
+- 在 Roleplay 对话流底部新增等待气泡，显示转圈动画和“对方正在回复...”。 / Added a waiting bubble at the bottom of the Roleplay dialogue stream with a spinner and "对方正在回复...".
+- 使用纯 CSS 动画实现，无新增依赖。 / Implemented the animation with pure CSS and added no dependency.
+
+### 验证 / Verification
+
+- 前端 `npm run typecheck` 通过。 / Frontend `npm run typecheck` passed.
+
 ## Phase 0：前后端基础框架 / Frontend and Backend Foundation
 
 ### 操作 / Operations
@@ -964,6 +1015,22 @@
 - Spring AI prompt 增加角色边界：Roleplay 不能替 learner 说话，不能编造用户事实，模糊输入要原角色澄清。/ Hardened the Spring AI prompt: Roleplay must not speak for the learner, invent learner facts, or mishandle unclear input.
 - 后端增加轻量 guard：重复 opening line/近期回复或明显说话人错位时，替换为安全角色回复并丢弃该轮 `unitMentions`。/ Added a lightweight backend guard: repeated openings/recent replies or clear speaker-role breaks are replaced with safe in-character replies and the turn's `unitMentions` are dropped.
 - 前端 Mentor 面板改为滚动历史窗口，每轮同时显示用户输入和 Mentor 回复。/ Changed the Mentor panel into a scrollable history window showing both learner input and Mentor reply for each turn.
+
+## 说明 / Notes
+
+- 未新增依赖，未新增 SQL 迁移。/ No dependency or SQL migration was added.
+# Phase 6.3.13：目标词义驱动对话约束 / Target-Sense Driven Dialogue Constraint
+
+## 问题 / Problem
+
+- Roleplay Agent 仍可能生成低学习价值的服务流程问题，例如 `Let me check`、`Could you spell that?`、询问预订号或姓名拼写。/ The Roleplay Agent could still generate low-learning-value service-procedure questions such as `Let me check`, `Could you spell that?`, reservation codes, or name spelling.
+
+## 操作 / Operations
+
+- Spring AI prompt 增加目标词义驱动规则：每句 Roleplay 回复必须服务于目标词义曝光、目标词义诱发，或有明确学习价值的任务相关表达。/ Added target-sense driven rules to the Spring AI prompt: every Roleplay reply must serve target-sense exposure, target-sense elicitation, or clearly useful task-related language.
+- 明确禁止低价值服务填充：查系统、拼姓名、预订号、反复证件检查、等待等。/ Explicitly banned low-value service filler: system lookup, spelling names, reservation codes, repeated document checks, waiting, and similar turns.
+- 后端 `guardRoleplayOutput` 增加低价值回复检测，并替换为更能诱发目标语言的安全角色回复。/ Extended `guardRoleplayOutput` to detect low-value replies and replace them with safe in-character prompts that better elicit target language.
+- 更新 `docs/learning-task-design.md` 的目标词义驱动约束。/ Updated target-sense driven constraints in `docs/learning-task-design.md`.
 
 ## 说明 / Notes
 

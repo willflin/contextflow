@@ -137,6 +137,8 @@ public class LearningPackageService {
                         "goal", taskGoal(scenario.getCode(), profile.getCefrLevel().name()),
                         "instructionLanguage", taskInstructionLanguage(profile.getCefrLevel().name()),
                         "expectedLearnerAction", expectedLearnerAction(scenario.getCode(), profile.getCefrLevel().name()),
+                        "facts", taskFacts(scenario.getCode()),
+                        "constraints", taskConstraints(scenario.getCode()),
                         "source", "scenario_template_seed"
                 ),
                 "learnerProfile", Map.of(
@@ -196,17 +198,17 @@ public class LearningPackageService {
         boolean english = advancedLevel(cefrLevel);
         return switch (scenarioCode) {
             case "hotel_check_in" -> english
-                    ? "Check in at a hotel and confirm your reservation details."
-                    : "你需要办理酒店入住，并确认预订信息。";
+                    ? "You are Alex Chen. Check in at Harbor View Hotel tonight. You have a two-night reservation, prefer a quiet queen room, have your passport ready, and need to ask about breakfast time and Wi-Fi."
+                    : "你是 Alex Chen，今晚到 Harbor View Hotel 办理入住。你已经预订两晚，想要安静的大床房，护照已准备好。请用英语完成入住，并询问早餐时间和 Wi-Fi。";
             case "shopping_return" -> english
-                    ? "Explain a problem with an item and ask for a return or exchange."
-                    : "你需要向店员描述商品问题，并申请退货或换货。";
+                    ? "You bought wireless headphones yesterday. The left side has no sound. You have the receipt and paid by card. Ask for a refund or exchange."
+                    : "你昨天买了一副无线耳机，左边没有声音。你带了收据，用银行卡付款。请用英语说明问题，并申请退款或换货。";
             case "bank_account" -> english
-                    ? "Open a bank account and ask what documents are needed."
-                    : "你需要去银行开一个账户，并询问需要哪些材料。";
+                    ? "You are Alex Chen. Open a savings account. You have your passport and proof of address, want a debit card, and need to ask about monthly fees and required documents."
+                    : "你是 Alex Chen，要开一个储蓄账户。你带了护照和地址证明，想申请借记卡，并需要询问月费和所需材料。";
             case "police_stop" -> english
-                    ? "Stay calm, ask why you were stopped, and answer basic questions."
-                    : "你需要冷静询问被拦下的原因，并回答基本问题。";
+                    ? "You are walking to the subway at night and a police officer stops you. You have your ID, are not driving, and need to calmly ask why you were stopped and what to do next."
+                    : "你晚上正走去地铁站，被警察拦下。你带了身份证件，没有开车。请冷静询问被拦下的原因，并询问下一步该怎么做。";
             default -> english
                     ? "Complete a realistic communication task using the target senses naturally."
                     : "你需要根据本轮目标词义完成一个真实沟通任务，并尽量自然地使用相关表达。";
@@ -217,20 +219,89 @@ public class LearningPackageService {
         boolean english = advancedLevel(cefrLevel);
         return switch (scenarioCode) {
             case "hotel_check_in" -> english
-                    ? "Ask to check in, give the reservation name, and respond to room questions."
-                    : "用英语提出入住请求，说明预订姓名，并回答房间相关问题。";
+                    ? "Say you want to check in, give the name Alex Chen, mention the two-night reservation, request a quiet queen room, and ask about breakfast time and Wi-Fi."
+                    : "用英语说明要入住，给出姓名 Alex Chen，说明已预订两晚，提出想要安静的大床房，并询问早餐时间和 Wi-Fi。";
             case "shopping_return" -> english
-                    ? "Describe the item issue and ask politely for a return or exchange."
-                    : "用英语描述商品问题，并礼貌提出退货或换货请求。";
+                    ? "Describe that the left side of the headphones has no sound, say you bought them yesterday, mention the receipt, and ask for a refund or exchange."
+                    : "用英语说明耳机左边没有声音、昨天购买、带了收据，并礼貌申请退款或换货。";
             case "bank_account" -> english
-                    ? "Ask to open an account and clarify the documents or next steps."
-                    : "用英语说明想开户，并询问所需材料或下一步。";
+                    ? "Ask to open a savings account, mention your passport and proof of address, ask about the debit card, monthly fees, and required documents."
+                    : "用英语说明想开储蓄账户，提到护照和地址证明，询问借记卡、月费和所需材料。";
             case "police_stop" -> english
-                    ? "Ask for the reason calmly and answer the officer's follow-up questions."
-                    : "用英语冷静询问原因，并回答对方的后续问题。";
+                    ? "Calmly ask why you were stopped, explain you are walking to the subway, show ID if asked, and ask what to do next."
+                    : "用英语冷静询问原因，说明你正走去地铁站，如被要求则说明带了证件，并询问下一步该怎么做。";
             default -> english
                     ? "Reply in English and move the task forward."
                     : "用英语回复，并推动任务继续。";
+        };
+    }
+
+    private Map<String, String> taskFacts(String scenarioCode) {
+        return switch (scenarioCode) {
+            case "hotel_check_in" -> Map.of(
+                    "learnerName", "Alex Chen",
+                    "hotelName", "Harbor View Hotel",
+                    "arrival", "tonight",
+                    "reservation", "two nights under Alex Chen",
+                    "roomPreference", "quiet queen room",
+                    "document", "passport ready",
+                    "questionsToAsk", "breakfast time and Wi-Fi"
+            );
+            case "shopping_return" -> Map.of(
+                    "item", "wireless headphones",
+                    "purchaseTime", "yesterday",
+                    "problem", "the left side has no sound",
+                    "receipt", "available",
+                    "payment", "paid by card",
+                    "desiredOutcome", "refund or exchange"
+            );
+            case "bank_account" -> Map.of(
+                    "learnerName", "Alex Chen",
+                    "accountType", "savings account",
+                    "documents", "passport and proof of address",
+                    "requestedService", "debit card",
+                    "questionsToAsk", "monthly fees and required documents"
+            );
+            case "police_stop" -> Map.of(
+                    "situation", "walking to the subway at night",
+                    "transport", "not driving",
+                    "document", "ID is available",
+                    "tone", "calm and polite",
+                    "questionsToAsk", "why you were stopped and what to do next"
+            );
+            default -> Map.of(
+                    "task", "complete the communication task",
+                    "languageGoal", "use target senses naturally"
+            );
+        };
+    }
+
+    private List<String> taskConstraints(String scenarioCode) {
+        return switch (scenarioCode) {
+            case "hotel_check_in" -> List.of(
+                    "Do not ask the learner to invent a name, spelling, reservation code, address, or payment details.",
+                    "Follow-up questions must stay within the given facts: Alex Chen, two-night reservation, quiet queen room, passport, breakfast, and Wi-Fi.",
+                    "If information is needed, ask about room preference, check-in purpose, breakfast time, Wi-Fi, or services already present in the task facts."
+            );
+            case "shopping_return" -> List.of(
+                    "Do not ask the learner to invent a brand, order number, address, or extra purchase details.",
+                    "Follow-up questions must stay within the given facts: wireless headphones, left side no sound, bought yesterday, receipt, card payment, refund or exchange.",
+                    "Use questions that elicit description, reason, refund, exchange, receipt, or payment language."
+            );
+            case "bank_account" -> List.of(
+                    "Do not ask the learner to invent income, address, phone number, account number, or private details.",
+                    "Follow-up questions must stay within the given facts: savings account, passport, proof of address, debit card, monthly fees, and documents.",
+                    "Use questions that elicit account type, documents, fees, debit card, and next-step language."
+            );
+            case "police_stop" -> List.of(
+                    "Do not ask the learner to invent illegal behavior, vehicle details, address, or personal history.",
+                    "Follow-up questions must stay within the given facts: walking to the subway, not driving, ID available, calm tone, reason for stop, next steps.",
+                    "Use questions that elicit clarification, reason, ID, destination, and next-step language."
+            );
+            default -> List.of(
+                    "Do not ask the learner to invent missing personal facts.",
+                    "Stay within the task facts and target senses."
+            );
         };
     }
 

@@ -36,6 +36,11 @@ import { fetchVocabulary, VocabularyList, VocabularyStatusFilter } from './api/v
 type LoadState = 'idle' | 'loading' | 'success' | 'error';
 type AuthMode = 'login' | 'register';
 type LearnerView = 'home' | 'vocabulary';
+type MentorHint = {
+  id: number;
+  level: 'HINT' | 'PRECISE';
+  text: string;
+};
 
 const emptyAdminWordForm: AdminWordPayload = {
   canonicalText: '',
@@ -113,6 +118,9 @@ export default function App() {
   const [dialogueMessage, setDialogueMessage] = useState('');
   const [dialogueBusy, setDialogueBusy] = useState(false);
   const [dialogueError, setDialogueError] = useState<string | null>(null);
+  const [mentorHints, setMentorHints] = useState<MentorHint[]>([]);
+  const [mentorHintCount, setMentorHintCount] = useState(0);
+  const [preciseHintPromptVisible, setPreciseHintPromptVisible] = useState(false);
 
   const isAdmin = currentUser?.role === 'ADMIN';
   const itemContent = currentItem ? parsePlacementItemContent(currentItem) : null;
@@ -132,6 +140,16 @@ export default function App() {
       }
     }
   }, [currentUser]);
+
+  useEffect(() => {
+    if (!learningPackage || dialogueBusy || dialogueMessage.trim()) {
+      return;
+    }
+    const timeoutId = window.setTimeout(() => {
+      setPreciseHintPromptVisible(true);
+    }, 60000);
+    return () => window.clearTimeout(timeoutId);
+  }, [learningPackage?.id, dialogueTurns.length, dialogueBusy, dialogueMessage]);
 
   async function loadHealth() {
     setState('loading');
@@ -637,6 +655,7 @@ export default function App() {
       setDialogueTurns([]);
       setDialogueMessage('');
       setDialogueError(null);
+      resetMentorHints();
       await loadReviewPlan();
     } catch (exception) {
       setLearningPackage(null);
@@ -654,6 +673,7 @@ export default function App() {
     setDialogueMessage('');
     setDialogueError(null);
     setDialogueBusy(false);
+    resetMentorHints();
   }
 
   async function submitDialogueMessage(event: React.FormEvent<HTMLFormElement>) {
@@ -679,10 +699,99 @@ export default function App() {
       const response = await sendLearningDialogueMessage(token, learningPackage.id, trimmedMessage);
       setDialogueTurns((previous) => [...previous, response]);
       setDialogueMessage('');
+      resetMentorHints();
     } catch (exception) {
       setDialogueError(exception instanceof Error ? exception.message : 'Dialogue failed.');
     } finally {
       setDialogueBusy(false);
+    }
+  }
+
+  function resetMentorHints() {
+    setMentorHints([]);
+    setMentorHintCount(0);
+    setPreciseHintPromptVisible(false);
+  }
+
+  function requestMentorHint() {
+    if (!learningPackage) {
+      return;
+    }
+    if (mentorHintCount >= 3) {
+      setPreciseHintPromptVisible(true);
+      return;
+    }
+    const nextCount = mentorHintCount + 1;
+    setMentorHintCount(nextCount);
+    setMentorHints((previous) => [
+      ...previous,
+      {
+        id: Date.now(),
+        level: 'HINT',
+        text: buildMentorHint(nextCount)
+      }
+    ]);
+    if (nextCount >= 3) {
+      setPreciseHintPromptVisible(true);
+    }
+  }
+
+  function addPreciseHint() {
+    setPreciseHintPromptVisible(false);
+    setMentorHints((previous) => [
+      ...previous,
+      {
+        id: Date.now(),
+        level: 'PRECISE',
+        text: buildPreciseHint()
+      }
+    ]);
+  }
+
+  function buildMentorHint(step: number) {
+    const content = learningPackage ? parseLearningPackageContent(learningPackage) : {};
+    const facts = content.learningTask?.facts ?? fallbackTaskFacts(content.scenario?.code) ?? {};
+    const targets = reviewPlan?.items ?? [];
+    const newTargets = targets.filter((item) => item.pool === 'NEW');
+    const reviewedTargets = targets.filter((item) => item.pool === 'REVIEW');
+    const factSummary = Object.entries(facts)
+      .slice(0, 4)
+      .map(([key, value]) => `${formatTaskFactLabel(key)}=${value}`)
+      .join('；');
+
+    if (step === 1) {
+      const wordNote =
+        newTargets.length > 0
+          ? `这里可能有新词：${newTargets.slice(0, 2).map((item) => `${item.canonicalText}（${item.definitionZh ?? item.definitionEn}）`).join('、')}。`
+          : reviewedTargets.length > 0
+          ? `要用到的重点词你已经学过，先回忆和 ${reviewedTargets.slice(0, 2).map((item) => item.canonicalText).join('、')} 相关的表达。`
+          : '先从任务卡里的已给信息开始，不需要编造新信息。';
+      return `先别急着写完整答案。看任务卡：${factSummary}。${wordNote}`;
+    }
+
+    if (step === 2) {
+      return '先想这句话的功能：你是在提出请求、说明事实，还是询问信息？请先用一个礼貌开头，再接任务卡里的一个固定事实。';
+    }
+
+    return '可以先搭一个空框架，但不要直接套答案：I would like to ... / I have ... / Could you tell me ... ? 你需要自己把任务卡里的信息放进去。';
+  }
+
+  function buildPreciseHint() {
+    const content = learningPackage ? parseLearningPackageContent(learningPackage) : {};
+    const scenarioCode = content.scenario?.code;
+    const targets = reviewPlan?.items.slice(0, 4).map((item) => item.canonicalText).join('、');
+    const targetNote = targets ? `重点词可优先考虑：${targets}。` : '优先使用任务卡里的关键词。';
+    switch (scenarioCode) {
+      case 'hotel_check_in':
+        return `${targetNote} 可以使用结构：I'd like to check in. The reservation is under Alex Chen. Could I have a quiet queen room? Also, could you tell me the breakfast time and Wi-Fi information?`;
+      case 'shopping_return':
+        return `${targetNote} 可以使用结构：I'd like to return or exchange these wireless headphones. I bought them yesterday, but the left side has no sound. I have the receipt.`;
+      case 'bank_account':
+        return `${targetNote} 可以使用结构：I'd like to open a savings account. I have my passport and proof of address. Could you tell me about the debit card, monthly fees, and required documents?`;
+      case 'police_stop':
+        return `${targetNote} 可以使用结构：Could you explain why I was stopped? I am walking to the subway, and I have my ID with me. What should I do next?`;
+      default:
+        return `${targetNote} 可以先用：I'd like to ... / I have ... / Could you tell me ... ?`;
     }
   }
 
@@ -1477,6 +1586,7 @@ export default function App() {
     const scenarioCode = content.scenario?.code;
     const taskGoal = content.learningTask?.goal ?? fallbackTaskGoal(scenarioCode) ?? content.scenario?.description;
     const expectedLearnerAction = content.learningTask?.expectedLearnerAction ?? fallbackExpectedLearnerAction(scenarioCode);
+    const taskFacts = Object.entries(content.learningTask?.facts ?? fallbackTaskFacts(scenarioCode) ?? {});
     return (
       <div className="learning-content">
         <div className="scenario-header">
@@ -1492,6 +1602,16 @@ export default function App() {
             <span className="label">任务目标</span>
             <p>{taskGoal}</p>
             {expectedLearnerAction && <small>{expectedLearnerAction}</small>}
+            {taskFacts.length > 0 && (
+              <div className="task-facts-grid">
+                {taskFacts.map(([key, value]) => (
+                  <div className="task-fact" key={key}>
+                    <span>{formatTaskFactLabel(key)}</span>
+                    <strong>{value}</strong>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
         )}
 
@@ -1530,6 +1650,18 @@ export default function App() {
                   </div>
                 </div>
               ))}
+
+              {dialogueBusy && (
+                <div className="message-row agent" aria-live="polite">
+                  <div className="message-bubble waiting-bubble">
+                    <span>Roleplay</span>
+                    <div className="waiting-indicator">
+                      <span className="loading-spinner" aria-hidden="true" />
+                      <p>对方正在回复...</p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <form className="dialogue-form" onSubmit={submitDialogueMessage}>
@@ -1539,6 +1671,9 @@ export default function App() {
                 placeholder="Type your English reply..."
                 rows={3}
               />
+              <button className="secondary-button compact-button" type="button" onClick={requestMentorHint} disabled={dialogueBusy}>
+                请求 Mentor 提示
+              </button>
               <button className="refresh-button compact-button" type="submit" disabled={dialogueBusy}>
                 发送
               </button>
@@ -1555,44 +1690,71 @@ export default function App() {
             </div>
 
             <div className="dialogue-thread mentor-thread">
-              {dialogueTurns.length === 0 ? (
+              {dialogueTurns.length === 0 && mentorHints.length === 0 ? (
                 <p className="hint">Mentor feedback will appear after your first reply.</p>
               ) : (
-                dialogueTurns.map((turn) => (
-                  <div className="turn-group" key={`mentor-${turn.turnId}`}>
-                    <div className="message-row user">
-                      <div className="message-bubble">
-                        <span>You</span>
-                        <p>{turn.userMessage}</p>
+                <>
+                  {dialogueTurns.map((turn) => (
+                    <div className="turn-group" key={`mentor-${turn.turnId}`}>
+                      <div className="message-row user">
+                        <div className="message-bubble">
+                          <span>You</span>
+                          <p>{turn.userMessage}</p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="message-row agent">
-                      <div className="message-bubble mentor-bubble">
-                        <span>Mentor</span>
-                        <p>{turn.mentorFeedback}</p>
-                        {turn.corrections.length > 0 && (
-                          <div className="mentor-detail">
-                            <span className="label">Corrections</span>
-                            {turn.corrections.map((correction) => (
-                              <div className="correction-item" key={`${turn.turnId}-${correction.original}-${correction.suggestion}`}>
-                                <strong>{correction.suggestion}</strong>
-                                <p>{correction.reason}</p>
-                              </div>
-                            ))}
+                      <div className="message-row agent">
+                        <div className="message-bubble mentor-bubble">
+                          <span>Mentor</span>
+                          <p>{turn.mentorFeedback}</p>
+                          {turn.corrections.length > 0 && (
+                            <div className="mentor-detail">
+                              <span className="label">Corrections</span>
+                              {turn.corrections.map((correction) => (
+                                <div className="correction-item" key={`${turn.turnId}-${correction.original}-${correction.suggestion}`}>
+                                  <strong>{correction.suggestion}</strong>
+                                  <p>{correction.reason}</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          <div className="mentor-detail natural-expression">
+                            <span className="label">Natural expression</span>
+                            <p>{turn.naturalExpression}</p>
                           </div>
-                        )}
-                        <div className="mentor-detail natural-expression">
-                          <span className="label">Natural expression</span>
-                          <p>{turn.naturalExpression}</p>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  ))}
+                  {mentorHints.map((hint) => (
+                    <div className="message-row agent" key={hint.id}>
+                      <div className={`message-bubble mentor-bubble ${hint.level === 'PRECISE' ? 'precise-hint' : ''}`}>
+                        <span>{hint.level === 'PRECISE' ? 'Mentor precise hint' : 'Mentor hint'}</span>
+                        <p>{hint.text}</p>
+                      </div>
+                    </div>
+                  ))}
+                </>
               )}
             </div>
           </aside>
         </section>
+
+        {preciseHintPromptVisible && (
+          <div className="hint-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="precise-hint-title">
+            <div className="hint-modal">
+              <h3 id="precise-hint-title">需要精确提示吗？</h3>
+              <p>Mentor 可以直接给出可用单词、句型和参考表达。这样会降低自主思考比例。</p>
+              <div className="hint-modal-actions">
+                <button className="secondary-button compact-button" type="button" onClick={() => setPreciseHintPromptVisible(false)}>
+                  我再想想
+                </button>
+                <button className="refresh-button compact-button" type="button" onClick={addPreciseHint}>
+                  给我精确提示
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <section className="learning-plan-section">
           <div className="panel-heading compact-heading">
@@ -1636,13 +1798,13 @@ export default function App() {
   function fallbackTaskGoal(scenarioCode?: string) {
     switch (scenarioCode) {
       case 'hotel_check_in':
-        return '你需要办理酒店入住，并确认预订信息。';
+        return '你是 Alex Chen，今晚到 Harbor View Hotel 办理入住。你已经预订两晚，想要安静的大床房，护照已准备好。请用英语完成入住，并询问早餐时间和 Wi-Fi。';
       case 'shopping_return':
-        return '你需要向店员描述商品问题，并申请退货或换货。';
+        return '你昨天买了一副无线耳机，左边没有声音。你带了收据，用银行卡付款。请用英语说明问题，并申请退款或换货。';
       case 'bank_account':
-        return '你需要去银行开一个账户，并询问需要哪些材料。';
+        return '你是 Alex Chen，要开一个储蓄账户。你带了护照和地址证明，想申请借记卡，并需要询问月费和所需材料。';
       case 'police_stop':
-        return '你需要冷静询问被拦下的原因，并回答基本问题。';
+        return '你晚上正走去地铁站，被警察拦下。你带了身份证件，没有开车。请冷静询问被拦下的原因，并询问下一步该怎么做。';
       default:
         return undefined;
     }
@@ -1651,15 +1813,82 @@ export default function App() {
   function fallbackExpectedLearnerAction(scenarioCode?: string) {
     switch (scenarioCode) {
       case 'hotel_check_in':
-        return '用英语提出入住请求，说明预订姓名，并回答房间相关问题。';
+        return '用英语说明要入住，给出姓名 Alex Chen，说明已预订两晚，提出想要安静的大床房，并询问早餐时间和 Wi-Fi。';
       case 'shopping_return':
-        return '用英语描述商品问题，并礼貌提出退货或换货请求。';
+        return '用英语说明耳机左边没有声音、昨天购买、带了收据，并礼貌申请退款或换货。';
       case 'bank_account':
-        return '用英语说明想开户，并询问所需材料或下一步。';
+        return '用英语说明想开储蓄账户，提到护照和地址证明，询问借记卡、月费和所需材料。';
       case 'police_stop':
-        return '用英语冷静询问原因，并回答对方的后续问题。';
+        return '用英语冷静询问原因，说明你正走去地铁站，如被要求则说明带了证件，并询问下一步该怎么做。';
       default:
         return undefined;
     }
+  }
+
+  function fallbackTaskFacts(scenarioCode?: string): Record<string, string> | undefined {
+    switch (scenarioCode) {
+      case 'hotel_check_in':
+        return {
+          learnerName: 'Alex Chen',
+          hotelName: 'Harbor View Hotel',
+          arrival: 'tonight',
+          reservation: 'two nights under Alex Chen',
+          roomPreference: 'quiet queen room',
+          document: 'passport ready',
+          questionsToAsk: 'breakfast time and Wi-Fi'
+        };
+      case 'shopping_return':
+        return {
+          item: 'wireless headphones',
+          purchaseTime: 'yesterday',
+          problem: 'the left side has no sound',
+          receipt: 'available',
+          payment: 'paid by card',
+          desiredOutcome: 'refund or exchange'
+        };
+      case 'bank_account':
+        return {
+          learnerName: 'Alex Chen',
+          accountType: 'savings account',
+          documents: 'passport and proof of address',
+          requestedService: 'debit card',
+          questionsToAsk: 'monthly fees and required documents'
+        };
+      case 'police_stop':
+        return {
+          situation: 'walking to the subway at night',
+          transport: 'not driving',
+          document: 'ID is available',
+          tone: 'calm and polite',
+          questionsToAsk: 'why you were stopped and what to do next'
+        };
+      default:
+        return undefined;
+    }
+  }
+
+  function formatTaskFactLabel(value: string) {
+    const labels: Record<string, string> = {
+      learnerName: '姓名',
+      hotelName: '地点',
+      arrival: '时间',
+      reservation: '预订信息',
+      roomPreference: '房间偏好',
+      document: '证件',
+      questionsToAsk: '需要询问',
+      item: '物品',
+      purchaseTime: '购买时间',
+      problem: '问题',
+      receipt: '收据',
+      payment: '付款方式',
+      desiredOutcome: '目标',
+      accountType: '账户类型',
+      documents: '材料',
+      requestedService: '服务',
+      situation: '情况',
+      transport: '交通状态',
+      tone: '语气'
+    };
+    return labels[value] ?? value;
   }
 }
