@@ -121,6 +121,7 @@ export default function App() {
   const [mentorHints, setMentorHints] = useState<MentorHint[]>([]);
   const [mentorHintCount, setMentorHintCount] = useState(0);
   const [preciseHintPromptVisible, setPreciseHintPromptVisible] = useState(false);
+  const [preciseHintUnlocked, setPreciseHintUnlocked] = useState(false);
 
   const isAdmin = currentUser?.role === 'ADMIN';
   const itemContent = currentItem ? parsePlacementItemContent(currentItem) : null;
@@ -146,6 +147,7 @@ export default function App() {
       return;
     }
     const timeoutId = window.setTimeout(() => {
+      setPreciseHintUnlocked(true);
       setPreciseHintPromptVisible(true);
     }, 60000);
     return () => window.clearTimeout(timeoutId);
@@ -711,6 +713,7 @@ export default function App() {
     setMentorHints([]);
     setMentorHintCount(0);
     setPreciseHintPromptVisible(false);
+    setPreciseHintUnlocked(false);
   }
 
   function requestMentorHint() {
@@ -718,6 +721,7 @@ export default function App() {
       return;
     }
     if (mentorHintCount >= 3) {
+      setPreciseHintUnlocked(true);
       setPreciseHintPromptVisible(true);
       return;
     }
@@ -731,12 +735,10 @@ export default function App() {
         text: buildMentorHint(nextCount)
       }
     ]);
-    if (nextCount >= 3) {
-      setPreciseHintPromptVisible(true);
-    }
   }
 
   function addPreciseHint() {
+    setPreciseHintUnlocked(true);
     setPreciseHintPromptVisible(false);
     setMentorHints((previous) => [
       ...previous,
@@ -744,6 +746,20 @@ export default function App() {
         id: Date.now(),
         level: 'PRECISE',
         text: buildPreciseHint()
+      }
+    ]);
+  }
+
+  function continueMentorHintAfterPrompt() {
+    setPreciseHintPromptVisible(false);
+    const nextCount = mentorHintCount + 1;
+    setMentorHintCount(nextCount);
+    setMentorHints((previous) => [
+      ...previous,
+      {
+        id: Date.now(),
+        level: 'HINT',
+        text: buildMentorHint(nextCount)
       }
     ]);
   }
@@ -773,7 +789,11 @@ export default function App() {
       return '先想这句话的功能：你是在提出请求、说明事实，还是询问信息？请先用一个礼貌开头，再接任务卡里的一个固定事实。';
     }
 
-    return '可以先搭一个空框架，但不要直接套答案：I would like to ... / I have ... / Could you tell me ... ? 你需要自己把任务卡里的信息放进去。';
+    if (step === 3) {
+      return '可以先搭一个空框架，但不要直接套答案：I would like to ... / I have ... / Could you tell me ... ? 你需要自己把任务卡里的信息放进去。';
+    }
+
+    return '继续普通提示：先只写半句也可以。选择任务卡中的一个事实，把它接到一个礼貌开头后面；不要追求一次写完整。';
   }
 
   function buildPreciseHint() {
@@ -1674,6 +1694,9 @@ export default function App() {
               <button className="secondary-button compact-button" type="button" onClick={requestMentorHint} disabled={dialogueBusy}>
                 请求 Mentor 提示
               </button>
+              <button className="secondary-button compact-button" type="button" onClick={addPreciseHint} disabled={dialogueBusy || !preciseHintUnlocked}>
+                精确提示
+              </button>
               <button className="refresh-button compact-button" type="submit" disabled={dialogueBusy}>
                 发送
               </button>
@@ -1745,8 +1768,8 @@ export default function App() {
               <h3 id="precise-hint-title">需要精确提示吗？</h3>
               <p>Mentor 可以直接给出可用单词、句型和参考表达。这样会降低自主思考比例。</p>
               <div className="hint-modal-actions">
-                <button className="secondary-button compact-button" type="button" onClick={() => setPreciseHintPromptVisible(false)}>
-                  我再想想
+                <button className="secondary-button compact-button" type="button" onClick={continueMentorHintAfterPrompt}>
+                  继续普通提示
                 </button>
                 <button className="refresh-button compact-button" type="button" onClick={addPreciseHint}>
                   给我精确提示

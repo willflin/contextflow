@@ -1,5 +1,22 @@
 # 开发日志 / Development Log
 
+## Phase 6.3.17：Mentor 提示拦截时机修正 / Mentor Hint Intercept Timing
+
+### 问题 / Problem
+
+- 第 3 个普通提示生成后立即弹出精确提示确认框，打断用户继续思考。 / The precise-hint confirmation appeared immediately after the third ordinary hint, interrupting learner thinking.
+
+### 操作 / Operations
+
+- 改为第 1-3 次请求只生成普通提示。 / Changed the first three hint requests to generate only ordinary hints.
+- 第 4 次请求提示时先拦截并弹出确认框；用户选择“继续普通提示”后才继续追加普通 Mentor 提示。 / The fourth hint request is intercepted with a confirmation modal; choosing "continue ordinary hint" appends another ordinary Mentor hint.
+- 新增“精确提示”按钮，前三轮禁用，确认框出现后解锁。 / Added a "precise hint" button that is disabled during the first three rounds and unlocks after the confirmation prompt appears.
+- 超过一分钟未回复仍会弹出确认框并解锁精确提示。 / One minute without reply still shows the confirmation prompt and unlocks precise hints.
+
+### 说明 / Notes
+
+- 仅前端状态机调整，未新增依赖或 SQL。 / Frontend state-machine change only; no dependency or SQL was added.
+
 ## Phase 6.3.16：Mentor 渐进提示 / Progressive Mentor Hints
 
 ### 问题 / Problem

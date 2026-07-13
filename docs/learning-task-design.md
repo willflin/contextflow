@@ -39,5 +39,7 @@
 - 用户不知道如何回复时，可以请求 Mentor 提示。/ When learners do not know how to reply, they can request Mentor hints.
 - 普通提示最多三轮，只能给思考方向、任务事实、功能意图和空句型框架，不能直接给完整答案。/ Ordinary hints are limited to three rounds and may give thinking direction, task facts, communicative function, and blank sentence frames, but not full answers.
 - 如果提示中涉及用户可能不会的新词，Mentor 可以告诉用户词义；如果只涉及已学词，Mentor 应提示用户这些词已经学过并鼓励回忆。/ If hints involve likely unknown new words, Mentor may explain their meanings; if only learned words are needed, Mentor should tell the learner they have learned them and encourage recall.
-- 三轮普通提示后，或用户超过一分钟未回复时，系统询问是否需要精确提示。/ After three ordinary hints, or after more than one minute without a learner reply, the system asks whether a precise hint is needed.
+- 三轮普通提示后不立即打断；第 4 次请求提示时先拦截并询问是否需要精确提示。/ The system does not interrupt immediately after three ordinary hints; the fourth hint request is intercepted to ask whether a precise hint is needed.
+- 用户超过一分钟未回复时，系统也会询问是否需要精确提示。/ If the learner does not reply for more than one minute, the system also asks whether a precise hint is needed.
+- 精确提示按钮前三轮禁用；提示确认框出现后解锁。/ The precise-hint button is disabled during the first three ordinary hints and unlocks after the confirmation prompt appears.
 - 精确提示可以包含要用到的单词、句法和参考表达，但应明确这是降低自主思考比例的帮助。/ Precise hints may include words, syntax, and reference expressions, but should make clear that this reduces autonomous thinking.
