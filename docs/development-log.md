@@ -1052,6 +1052,39 @@
 
 - 未新增依赖，未新增 SQL 迁移。/ No dependency or SQL migration was added.
 
+# Phase 6.3.22：临时 Agent 请求日志 / Temporary Agent Request Logging
+
+## 问题 / Problem
+
+- 调试真实 Agent 行为时，需要看到每次实际传给模型的完整上下文。/ Debugging real Agent behavior requires seeing the full context sent to the model each time.
+
+## 操作 / Operations
+
+- 在 Spring AI 调用前临时打印 System prompt 和 `AgentDialogueInput` JSON。/ Temporarily log the System prompt and `AgentDialogueInput` JSON before Spring AI calls.
+
+## 说明 / Notes
+
+- 这是临时调试日志，后续稳定后应删除。/ This is temporary debug logging and should be removed after stabilization.
+- 未新增依赖，未新增 SQL 迁移。/ No dependency or SQL migration was added.
+
+# Phase 6.3.21：任务 Checklist 与完成判定 / Task Checklist and Completion Decision
+
+## 问题 / Problem
+
+- Agent 会重复询问已经完成的目标，例如用户已经询问早餐和 Wi-Fi、选择 quiet room 后，仍继续问 hotel services。/ The Agent could repeat already completed objectives, such as asking about hotel services after the learner already asked about breakfast/Wi-Fi and chose a quiet room.
+- 用户在背景信息区看不到哪些任务目标已经完成。/ The learner could not see which task objectives were already completed in the task background card.
+
+## 操作 / Operations
+
+- 后端按当前对话计算 `taskProgress` checklist，并传给 Agent。/ The backend now computes a `taskProgress` checklist from the current dialogue and sends it to the Agent.
+- 完成 checklist 后，后端按结构化任务进度生成收尾回复并设置 `taskComplete=true`。/ When the checklist is complete, the backend uses structured task progress to close the turn and set `taskComplete=true`.
+- 未完成时，后端避免重复泛问，改为只问第一个缺失目标。/ When incomplete, the backend avoids repeated generic questions and asks only for the first missing objective.
+- 前端任务背景卡新增待完成任务 checklist，完成项自动打勾。/ The frontend task card now shows a task checklist with completed items checked automatically.
+
+## 说明 / Notes
+
+- 未新增依赖，未新增 SQL 迁移。/ No dependency or SQL migration was added.
+
 # Phase 6.3.19：任务语域、完成兜底与跳过任务 / Task Register, Completion Fallback, and Skip Task
 
 ## 问题 / Problem

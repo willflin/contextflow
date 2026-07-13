@@ -50,6 +50,11 @@ type MentorHint = {
   level: 'HINT' | 'PRECISE';
   text: string;
 };
+type TaskChecklistItem = {
+  key: string;
+  label: string;
+  done: boolean;
+};
 
 const emptyAdminWordForm: AdminWordPayload = {
   canonicalText: '',
@@ -2014,6 +2019,7 @@ export default function App() {
     const expectedLearnerAction = content.learningTask?.expectedLearnerAction ?? fallbackExpectedLearnerAction(scenarioCode);
     const registerNote = taskRegisterNote(content);
     const taskFacts = Object.entries(content.learningTask?.facts ?? fallbackTaskFacts(scenarioCode) ?? {});
+    const taskChecklist = buildTaskChecklist(content);
     const learningCompleted = learningPackage.status === 'COMPLETED';
     return (
       <div className="learning-content">
@@ -2031,6 +2037,17 @@ export default function App() {
             <p>{taskGoal}</p>
             <small>{registerNote}</small>
             {expectedLearnerAction && <small>{expectedLearnerAction}</small>}
+            {taskChecklist.length > 0 && (
+              <div className="task-checklist" aria-label="待完成任务">
+                <span className="label">待完成任务</span>
+                {taskChecklist.map((item) => (
+                  <div className={`task-checklist-item ${item.done ? 'done' : ''}`} key={item.key}>
+                    <span aria-hidden="true">{item.done ? '✓' : '□'}</span>
+                    <strong>{item.label}</strong>
+                  </div>
+                ))}
+              </div>
+            )}
             {taskFacts.length > 0 && (
               <div className="task-facts-grid">
                 {taskFacts.map(([key, value]) => (
@@ -2292,6 +2309,70 @@ export default function App() {
     const register = content.learningTask?.register ?? fallbackTaskRegister(scenarioCode);
     const guidance = fallbackRegisterGuidance(scenarioCode);
     return `语域：${formatTaskRegister(register)}。${guidance}`;
+  }
+
+  function buildTaskChecklist(content: ReturnType<typeof parseLearningPackageContent>): TaskChecklistItem[] {
+    const scenarioCode = content.scenario?.code;
+    const transcript = dialogueTurns.map((turn) => turn.userMessage).join(' ').toLowerCase();
+    switch (scenarioCode) {
+      case 'hotel_check_in':
+        return [
+          {
+            key: 'checkIn',
+            label: '说明要办理入住',
+            done: containsAnyText(transcript, 'check in', 'checking in', 'reservation', 'stay', 'room')
+          },
+          {
+            key: 'reservation',
+            label: '确认预订或给出 Alex Chen',
+            done: containsAnyText(transcript, 'reservation', 'reserved', 'booked', 'yes', 'here you are', 'alex')
+          },
+          {
+            key: 'roomPreference',
+            label: '说明想要安静的大床房',
+            done: containsAnyText(transcript, 'quiet room', 'quiet', 'queen room')
+          },
+          {
+            key: 'breakfast',
+            label: '询问早餐时间或早餐服务',
+            done: transcript.includes('breakfast')
+          },
+          {
+            key: 'wifi',
+            label: '询问 Wi-Fi 信息',
+            done: transcript.includes('wifi') || transcript.includes('wi-fi')
+          }
+        ];
+      case 'shopping_return':
+        return [
+          { key: 'item', label: '说明物品是无线耳机', done: containsAnyText(transcript, 'headphones', 'earphones') },
+          { key: 'problem', label: '说明左边没有声音', done: containsAnyText(transcript, 'left side', 'no sound') },
+          { key: 'purchaseTime', label: '说明昨天购买', done: transcript.includes('yesterday') },
+          { key: 'receipt', label: '说明有收据', done: transcript.includes('receipt') },
+          { key: 'outcome', label: '申请退款或换货', done: containsAnyText(transcript, 'refund', 'exchange', 'return') }
+        ];
+      case 'bank_account':
+        return [
+          { key: 'accountType', label: '说明要开储蓄账户', done: containsAnyText(transcript, 'savings account', 'open an account') },
+          { key: 'documents', label: '提到护照和地址证明', done: transcript.includes('passport') && containsAnyText(transcript, 'proof of address', 'address') },
+          { key: 'debitCard', label: '询问借记卡', done: containsAnyText(transcript, 'debit card', 'card') },
+          { key: 'fees', label: '询问月费', done: containsAnyText(transcript, 'monthly fee', 'fees') },
+          { key: 'requiredDocuments', label: '询问所需材料', done: containsAnyText(transcript, 'documents', 'what do i need') }
+        ];
+      case 'police_stop':
+        return [
+          { key: 'reason', label: '询问被拦下原因', done: containsAnyText(transcript, 'why', 'reason') },
+          { key: 'destination', label: '说明正走去地铁站', done: containsAnyText(transcript, 'subway', 'station') },
+          { key: 'id', label: '说明带了证件', done: containsAnyText(transcript, 'id', 'identity') },
+          { key: 'nextStep', label: '询问下一步怎么做', done: containsAnyText(transcript, 'next', 'what should i do') }
+        ];
+      default:
+        return [];
+    }
+  }
+
+  function containsAnyText(value: string, ...candidates: string[]) {
+    return candidates.some((candidate) => value.includes(candidate));
   }
 
   function fallbackTaskRegister(scenarioCode?: string) {

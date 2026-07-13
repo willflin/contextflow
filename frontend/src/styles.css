@@ -995,6 +995,33 @@ strong {
   margin-top: 6px;
 }
 
+.task-checklist {
+  display: grid;
+  gap: 8px;
+  padding: 10px 0 2px;
+}
+
+.task-checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #56636b;
+}
+
+.task-checklist-item span {
+  width: 18px;
+  color: #8a99a3;
+  font-weight: 700;
+}
+
+.task-checklist-item.done {
+  color: #1f6f5b;
+}
+
+.task-checklist-item.done span {
+  color: #0f766e;
+}
+
 .task-fact {
   display: grid;
   gap: 4px;

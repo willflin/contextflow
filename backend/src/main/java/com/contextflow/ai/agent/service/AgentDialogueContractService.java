@@ -139,6 +139,7 @@ public class AgentDialogueContractService {
                         "用英语说明想开储蓄账户，提到护照和地址证明，询问借记卡、月费和所需材料。",
                         "business_service",
                         "Business service conversation. Use polite and clear wording, but keep sentences concise.",
+                        "{\"completed\":[],\"missing\":[\"accountType\",\"documents\",\"debitCard\",\"fees\"],\"complete\":false}",
                         "{\"learnerName\":\"Alex Chen\",\"accountType\":\"savings account\",\"documents\":\"passport and proof of address\",\"requestedService\":\"debit card\",\"questionsToAsk\":\"monthly fees and required documents\"}",
                         "[\"Do not ask the learner to invent income, address, phone number, account number, or private details.\",\"Follow-up questions must stay within the given facts: savings account, passport, proof of address, debit card, monthly fees, and documents.\"]",
                         "Bank service representative. You help the learner open an account.",

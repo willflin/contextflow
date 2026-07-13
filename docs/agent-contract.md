@@ -41,6 +41,7 @@ Real dialogue requests read the user's current review/new-sense targets from `/a
     "expectedLearnerAction": "用英语说明想开储蓄账户，提到护照和地址证明，询问借记卡、月费和所需材料。",
     "taskRegister": "business_service",
     "registerGuidance": "Business service conversation. Use polite and clear wording, but keep sentences concise.",
+    "taskProgress": "{\"completed\":[],\"missing\":[\"accountType\",\"documents\",\"debitCard\",\"fees\"],\"complete\":false}",
     "taskFacts": "{\"learnerName\":\"Alex Chen\",\"accountType\":\"savings account\",\"documents\":\"passport and proof of address\",\"requestedService\":\"debit card\",\"questionsToAsk\":\"monthly fees and required documents\"}",
     "taskConstraints": "[\"Do not ask the learner to invent income, address, phone number, account number, or private details.\",\"Follow-up questions must stay within the given facts: savings account, passport, proof of address, debit card, monthly fees, and documents.\"]",
     "roleplayPersona": "Bank service representative. You help the learner open an account.",

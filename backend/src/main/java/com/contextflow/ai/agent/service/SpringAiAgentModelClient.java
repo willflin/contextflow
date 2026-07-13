@@ -12,12 +12,16 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.beans.factory.ObjectProvider;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
 @Service
 public class SpringAiAgentModelClient implements AgentModelClient {
+
+    private static final Logger log = LoggerFactory.getLogger(SpringAiAgentModelClient.class);
 
     private static final String SYSTEM_PROMPT = """
             You are ContextFlow's dual-agent English learning runtime.
@@ -31,6 +35,7 @@ public class SpringAiAgentModelClient implements AgentModelClient {
             - learningPackage.expectedLearnerAction describes what the learner should try to do next.
             - learningPackage.taskRegister describes the social/register context, such as daily service, business service, or formal sensitive.
             - learningPackage.registerGuidance tells whether colloquial, simplified, concise, formal, or business-like wording is appropriate.
+            - learningPackage.taskProgress is a backend checklist with completed, missing, and complete fields.
             - learningPackage.taskFacts contains all fixed facts the learner may use.
             - learningPackage.taskConstraints contains hard boundaries for what the Roleplay Agent may ask.
             - learningPackage.roleplayPersona is the only role the Roleplay Agent may play.
@@ -123,6 +128,9 @@ public class SpringAiAgentModelClient implements AgentModelClient {
             - If user text is nonsense, unrecognizable, or completely wrong usage, do not create a unitMention; explain it in feedback.
 
             Task completion policy:
+            - Treat learningPackage.taskProgress as the authoritative current checklist.
+            - If learningPackage.taskProgress.complete=true, you must close the roleplay immediately and set scoringSignal.taskComplete=true.
+            - If learningPackage.taskProgress.missing is not empty, ask only for the first missing checklist item. Do not ask about already completed items.
             - On every turn, before writing the final JSON, explicitly compare the full dialogueHistory plus current userMessage against learningPackage.expectedLearnerAction and learningPackage.taskFacts.
             - Set scoringSignal.taskComplete=true only when the learner has successfully achieved all required actions in learningPackage.expectedLearnerAction using the fixed facts in learningPackage.taskFacts.
             - Do not mark complete just because the learner sent one sentence; all task goals must be satisfied.
@@ -157,6 +165,15 @@ public class SpringAiAgentModelClient implements AgentModelClient {
             throw new IllegalStateException("Spring AI ChatModel is not available.");
         }
         String inputJson = writeJson(input);
+        log.info("""
+                ===== ContextFlow Agent Request BEGIN =====
+                [System Prompt]
+                {}
+
+                [AgentDialogueInput JSON]
+                {}
+                ===== ContextFlow Agent Request END =====
+                """, SYSTEM_PROMPT, inputJson);
         ChatResponse response = chatModel.call(new Prompt(List.of(
                 new SystemMessage(SYSTEM_PROMPT),
                 new UserMessage(userPrompt(inputJson))
@@ -186,6 +203,9 @@ public class SpringAiAgentModelClient implements AgentModelClient {
                 Keep Mentor feedback concise and actionable.
                 Use learningPackage.taskGoal as the task objective.
                 Treat learningPackage.taskFacts as the full available task card.
+                Treat learningPackage.taskProgress as authoritative. Never ask for items listed in taskProgress.completed.
+                If taskProgress.complete is true, close the roleplay now and set scoringSignal.taskComplete=true.
+                If taskProgress.missing is not empty, ask only for the first missing item.
                 Use learningPackage.taskRegister and learningPackage.registerGuidance to choose the right tone.
                 Mentor feedback must respect the task register; do not over-correct casual service dialogue into long formal sentences.
                 Do not ask for facts outside learningPackage.taskFacts.

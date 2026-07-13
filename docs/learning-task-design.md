@@ -6,6 +6,7 @@
 - `learningTask.instructionLanguage` 控制任务目标给用户的语言：低水平优先中文，高水平可直接英文。/ `learningTask.instructionLanguage` controls the language shown to the learner: Chinese for lower levels, English for higher levels.
 - `learningTask.expectedLearnerAction` 描述用户下一步应尝试完成的英语行为。/ `learningTask.expectedLearnerAction` describes what the learner should try to do in English next.
 - `learningTask.register` 和 `learningTask.registerGuidance` 描述任务语域，例如日常口语、商务服务、严肃敏感场景。/ `learningTask.register` and `learningTask.registerGuidance` describe the task register, such as daily spoken, business service, or formal sensitive contexts.
+- Agent 输入中的 `taskProgress` 是后端按当前对话计算的任务 checklist，包含 `completed`、`missing` 和 `complete`。/ `taskProgress` in Agent input is the backend-computed task checklist for the current dialogue, including `completed`, `missing`, and `complete`.
 - `learningTask.facts` 必须给出用户完成任务所需的全部固定事实，不能要求用户临场编造姓名、房型、预订号、账户信息等。/ `learningTask.facts` must provide all fixed facts needed for the task, so the learner is never forced to invent names, room types, reservation codes, account information, or similar details.
 - `learningTask.constraints` 必须限制 Agent 后续提问只能围绕已给事实和学习目标展开。/ `learningTask.constraints` must restrict Agent follow-up questions to the given facts and learning goals.
 - `scenarioCode` 和 `scenarioName` 只保留为分类、标签和种子来源，不再代表完整学习场景。/ `scenarioCode` and `scenarioName` remain only as category, tag, and seed-source fields; they no longer represent the full learning scenario.
@@ -53,6 +54,7 @@
 - 后端只信任结构化 `scoringSignal.taskComplete=true` 或用户显式点击“结束当前对话”，不会根据结束语文本猜测任务完成。/ The backend trusts only structured `scoringSignal.taskComplete=true` or the learner explicitly clicking "end current dialogue"; it does not infer completion from closing text.
 - 后端收到完成信号或手动结束请求后把当前学习包标记为 `COMPLETED`，后续点击“开始学习/开始下一轮”会进入新的 READY 任务。/ After receiving a completion signal or manual end request, the backend marks the current learning package as `COMPLETED`; later "start learning/start next round" fetches a new READY task.
 - 前端只负责展示完成弹窗和手动结束入口，不自行判断任务是否完成。/ The frontend only displays the completion dialog and manual end action; it does not decide task completion by itself.
+- 前端任务背景卡展示同一套待完成任务 checklist；用户完成某个目标后对应项目打勾。/ The frontend task card shows the same task checklist; each item is checked after the learner completes it.
 
 ## 跳过任务 / Skip Task
 

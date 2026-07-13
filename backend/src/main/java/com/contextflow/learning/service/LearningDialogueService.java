@@ -92,6 +92,7 @@ public class LearningDialogueService {
         int turnIndex = Math.toIntExact(learningDialogueTurnRepository.countByLearningPackageId(packageId) + 1);
         JsonNode packageContent = readPackageContent(packageEntity);
         String scenarioCode = packageContent.path("scenario").path("code").asText("general");
+        TaskProgress taskProgress = taskProgress(packageEntity.getId(), scenarioCode, userMessage);
         MessageFeatures features = analyze(userMessage);
 
         List<CorrectionResponse> corrections = corrections(userMessage, scenarioCode, features);
@@ -111,6 +112,7 @@ public class LearningDialogueService {
                 )
         );
         agentOutput = guardRoleplayOutput(agentOutput, packageEntity.getId(), packageContent, scenarioCode, userMessage, turnIndex);
+        agentOutput = alignWithTaskProgress(agentOutput, scenarioCode, taskProgress);
         List<CorrectionResponse> outputCorrections = correctionResponses(agentOutput.corrections());
 
         LearningDialogueTurnEntity saved = learningDialogueTurnRepository.save(new LearningDialogueTurnEntity(
@@ -193,6 +195,7 @@ public class LearningDialogueService {
                         expectedLearnerAction(learningTask, scenario),
                         taskRegister(learningTask, scenario),
                         registerGuidance(learningTask, scenario),
+                        taskProgress(packageEntity.getId(), scenario.path("code").asText("general"), userMessage).toJson(),
                         taskFacts(learningTask, scenario),
                         taskConstraints(learningTask, scenario),
                         roleplayAgent.path("persona").asText(roleplayPersona(scenario.path("code").asText("general"))),
@@ -452,6 +455,114 @@ public class LearningDialogueService {
                     ? "Could you clarify what you mean?"
                     : "I understand. Could you tell me a little more?";
         };
+    }
+
+    private AgentDialogueOutput alignWithTaskProgress(
+            AgentDialogueOutput output,
+            String scenarioCode,
+            TaskProgress taskProgress
+    ) {
+        if (output == null || taskProgress == null) {
+            return output;
+        }
+        if (taskProgress.complete()) {
+            Map<String, Object> scoringSignal = new java.util.LinkedHashMap<>(
+                    output.scoringSignal() == null ? Map.of() : output.scoringSignal()
+            );
+            scoringSignal.put("taskComplete", true);
+            scoringSignal.put("completionReason", "All task checklist items are complete: " + String.join(", ", taskProgress.completed()));
+            return new AgentDialogueOutput(
+                    output.contractVersion(),
+                    closingReply(scenarioCode),
+                    output.feedback(),
+                    output.corrections(),
+                    output.naturalExpression(),
+                    List.of(),
+                    scoringSignal
+            );
+        }
+        if (sameMeaning(output.reply(), repairedRoleplayReply(scenarioCode, "", 2))
+                || repeatedGenericTaskQuestion(output.reply())) {
+            return new AgentDialogueOutput(
+                    output.contractVersion(),
+                    promptForMissingTaskItem(scenarioCode, taskProgress),
+                    output.feedback(),
+                    output.corrections(),
+                    output.naturalExpression(),
+                    List.of(),
+                    output.scoringSignal()
+            );
+        }
+        return output;
+    }
+
+    private String closingReply(String scenarioCode) {
+        return switch (scenarioCode) {
+            case "hotel_check_in" -> "Great, Alex. Your quiet queen room is ready. Breakfast and Wi-Fi information will be provided at the front desk. Enjoy your stay.";
+            case "shopping_return" -> "Thanks. That covers the return request. We can process a refund or exchange for the headphones.";
+            case "bank_account" -> "Thanks. That covers the account opening details. We can continue with the savings account application.";
+            case "police_stop" -> "Thank you. That answers my questions. Please continue calmly and follow the next instructions.";
+            default -> "Thanks. That completes this task.";
+        };
+    }
+
+    private boolean repeatedGenericTaskQuestion(String reply) {
+        String lower = reply == null ? "" : reply.toLowerCase(Locale.ROOT);
+        return lower.contains("would you like to ask about")
+                && (lower.contains("room type") || lower.contains("hotel services") || lower.contains("check-in time"));
+    }
+
+    private String promptForMissingTaskItem(String scenarioCode, TaskProgress taskProgress) {
+        String missing = taskProgress.missing().isEmpty() ? "the next detail" : taskProgress.missing().get(0);
+        if ("hotel_check_in".equals(scenarioCode)) {
+            return switch (missing) {
+                case "reservation" -> "Could you confirm your reservation?";
+                case "roomPreference" -> "What kind of room would you prefer?";
+                case "breakfast" -> "Would you like to ask about breakfast time?";
+                case "wifi" -> "Would you like to ask about Wi-Fi?";
+                default -> "What else do you need for check-in?";
+            };
+        }
+        return "Could you give the next missing detail for this task?";
+    }
+
+    private TaskProgress taskProgress(Long packageId, String scenarioCode, String currentUserMessage) {
+        String transcript = learningDialogueTurnRepository.findTop100ByLearningPackageIdOrderByTurnIndexDesc(packageId)
+                .stream()
+                .sorted(Comparator.comparing(LearningDialogueTurnEntity::getTurnIndex))
+                .map(LearningDialogueTurnEntity::getUserMessage)
+                .collect(java.util.stream.Collectors.joining(" "));
+        transcript = (transcript + " " + currentUserMessage).toLowerCase(Locale.ROOT);
+
+        if ("hotel_check_in".equals(scenarioCode)) {
+            List<String> completed = new ArrayList<>();
+            List<String> missing = new ArrayList<>();
+            collectProgress(completed, missing, "checkIn", containsAny(transcript, "check in", "checking in", "reservation", "stay", "room"));
+            collectProgress(completed, missing, "reservation", containsAny(transcript, "reservation", "reserved", "booked", "yes", "here you are", "alex"));
+            collectProgress(completed, missing, "roomPreference", containsAny(transcript, "quiet room", "quiet", "queen room"));
+            collectProgress(completed, missing, "breakfast", transcript.contains("breakfast"));
+            collectProgress(completed, missing, "wifi", transcript.contains("wifi") || transcript.contains("wi-fi"));
+            return new TaskProgress(completed, missing);
+        }
+
+        return new TaskProgress(List.of(), List.of("taskDetails"));
+    }
+
+    private void collectProgress(List<String> completed, List<String> missing, String key, boolean done) {
+        if (done) {
+            completed.add(key);
+        } else {
+            missing.add(key);
+        }
+    }
+
+    private boolean containsAny(String value, String... candidates) {
+        for (String candidate : candidates) {
+            if (value.contains(candidate)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private List<AgentTargetSenseContext> targetSenses(String username) {
@@ -793,5 +904,24 @@ public class LearningDialogueService {
             int wordCount,
             boolean likelyFragment
     ) {
+    }
+
+    private record TaskProgress(
+            List<String> completed,
+            List<String> missing
+    ) {
+        boolean complete() {
+            return missing.isEmpty();
+        }
+
+        String toJson() {
+            return "{\"completed\":" + jsonArray(completed) + ",\"missing\":" + jsonArray(missing) + ",\"complete\":" + complete() + "}";
+        }
+
+        private String jsonArray(List<String> values) {
+            return values.stream()
+                    .map(value -> "\"" + value.replace("\"", "\\\"") + "\"")
+                    .collect(java.util.stream.Collectors.joining(",", "[", "]"));
+        }
     }
 }
