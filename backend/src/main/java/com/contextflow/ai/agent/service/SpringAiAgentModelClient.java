@@ -38,6 +38,39 @@ public class SpringAiAgentModelClient implements AgentModelClient {
               "scoringSignal": {"clarityScore":0,"naturalnessScore":0,"needsReview":false}
             }
 
+            unitMentions rules:
+            - If unitMentions is not empty, every object must include these exact fields:
+              agentRole, sourceField, learningUnitId, learningUnitSenseId, canonicalText, senseKey,
+              eventType, eventDirection, occurrenceText, occurrenceIndex, confidence, agentDecision, agentReason, payload.
+            - Required enum values:
+              agentRole: ROLEPLAY or MENTOR.
+              eventType: UNIT_ATTEMPTED, UNIT_EXPOSED, UNIT_CORRECTED, or UNIT_RECOMMENDED.
+              eventDirection: LEARNER_OUTPUT or LEARNER_INPUT.
+              agentDecision: RECORD_EVENT, RECORD_SPELLING_OR_FORM_ERROR, SUBMIT_MISSING_SENSE_FEEDBACK, SKIP_UNRECOGNIZABLE, or SKIP_WRONG_USAGE.
+            - occurrenceIndex must be a 1-based integer within the source field.
+            - confidence must be a number from 0 to 1.
+            - payload must be an object. Use {} if there is no payload.
+            - If you are not certain enough to fill every required field, return unitMentions: [].
+            - Never return incomplete unitMention objects.
+
+            Valid unitMention example:
+            {
+              "agentRole": "ROLEPLAY",
+              "sourceField": "reply",
+              "learningUnitId": 3,
+              "learningUnitSenseId": 4,
+              "canonicalText": "bank",
+              "senseKey": "bank:financial-institution",
+              "eventType": "UNIT_EXPOSED",
+              "eventDirection": "LEARNER_INPUT",
+              "occurrenceText": "bank",
+              "occurrenceIndex": 1,
+              "confidence": 0.96,
+              "agentDecision": "RECORD_EVENT",
+              "agentReason": "The Roleplay Agent used the financial-institution sense.",
+              "payload": {}
+            }
+
             Event policy:
             - Use only learningUnitId and learningUnitSenseId values that appear in input.targetSenses or tool context.
             - Do not invent ids.
@@ -81,10 +114,15 @@ public class SpringAiAgentModelClient implements AgentModelClient {
                 new UserMessage(userPrompt(inputJson))
         )));
         String content = response.getResult().getOutput().getText();
-        AgentDialogueOutput output = readOutput(extractJson(content));
+        AgentDialogueOutput output = readOutput(extractJson(content), content);
         AgentContractValidationResult validation = contractService.validateOutput(output);
         if (!validation.accepted()) {
-            throw new IllegalStateException("Spring AI Agent output failed contract validation: " + validation.errors());
+            throw new AgentModelResponseException(
+                    "Spring AI Agent output failed contract validation: " + validation.errors(),
+                    content,
+                    output,
+                    validation.errors()
+            );
         }
         return output;
     }
@@ -95,6 +133,8 @@ public class SpringAiAgentModelClient implements AgentModelClient {
                 Keep the Roleplay reply short enough for one conversational turn.
                 Keep Mentor feedback concise and actionable.
                 Prefer target senses when they naturally fit the scenario; do not force unrelated words.
+                Before returning, verify that every unitMentions item has all required fields.
+                If any required unitMention field would be missing, return unitMentions as an empty array.
 
                 AgentDialogueInput:
                 """ + inputJson;
@@ -108,17 +148,27 @@ public class SpringAiAgentModelClient implements AgentModelClient {
         }
     }
 
-    private AgentDialogueOutput readOutput(String content) {
+    private AgentDialogueOutput readOutput(String content, String rawContent) {
         try {
             return objectMapper.readValue(content, AgentDialogueOutput.class);
         } catch (JsonProcessingException exception) {
-            throw new IllegalStateException("Failed to parse Agent output JSON.", exception);
+            throw new AgentModelResponseException(
+                    "Failed to parse Agent output JSON.",
+                    rawContent,
+                    null,
+                    List.of(exception.getOriginalMessage())
+            );
         }
     }
 
     private String extractJson(String content) {
         if (content == null) {
-            throw new IllegalStateException("Spring AI Agent returned empty content.");
+            throw new AgentModelResponseException(
+                    "Spring AI Agent returned empty content.",
+                    null,
+                    null,
+                    List.of("empty content")
+            );
         }
         String trimmed = content.trim();
         int start = trimmed.indexOf('{');
@@ -126,6 +176,11 @@ public class SpringAiAgentModelClient implements AgentModelClient {
         if (start >= 0 && end > start) {
             return trimmed.substring(start, end + 1);
         }
-        throw new IllegalStateException("Spring AI Agent did not return a JSON object.");
+        throw new AgentModelResponseException(
+                "Spring AI Agent did not return a JSON object.",
+                content,
+                null,
+                List.of("JSON object not found")
+        );
     }
 }

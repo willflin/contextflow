@@ -46,6 +46,9 @@ export type AgentRuntimeProbe = AgentRuntimeStatus & {
   errors: string[];
   elapsedMs: number;
   errorMessage: string | null;
+  modelRawContent: string | null;
+  modelOutput: AgentDialogueOutput | null;
+  modelValidationErrors: string[];
   output: AgentDialogueOutput | null;
 };
 

@@ -786,3 +786,25 @@
 
 - 前端 `npm run typecheck` 通过。 / Frontend `npm run typecheck` passed.
 - 使用 JDK 21 和临时 Maven settings 执行 `mvn -q -DskipTests compile` 通过。 / Backend `mvn -q -DskipTests compile` passed with JDK 21 and a temporary Maven settings file.
+
+## Phase 6.3.4：Agent 输出契约调试增强 / Agent Output Contract Debugging
+
+### 问题 / Problem
+
+- DeepSeek API 已被调用，但模型返回的 `unitMentions` 缺少必填字段，导致契约校验失败并回退本地输出。 / DeepSeek was called, but the model returned `unitMentions` without required fields, causing contract validation failure and local fallback.
+
+### 操作 / Operations
+
+- 强化 Spring AI system prompt，明确 `unitMentions` 的必填字段、枚举值、`occurrenceIndex`、`confidence` 和 `payload` 要求。 / Strengthened the Spring AI system prompt with required `unitMentions` fields, enum values, `occurrenceIndex`, `confidence`, and `payload` rules.
+- 新增 `AgentModelResponseException`，在模型输出不合约或无法解析时保留模型原始内容、解析后的模型输出和校验错误。 / Added `AgentModelResponseException` to preserve raw model content, parsed model output, and validation errors when model output fails the contract or cannot be parsed.
+- probe 响应和前端 admin 面板区分“模型实际输出”和“最终输出”，避免把 fallback 样例误判为模型结果。 / Probe responses and the frontend admin panel now distinguish the actual model output from the final output, avoiding confusion with fallback samples.
+
+### 说明 / Notes
+
+- 契约不合格时仍不写学习事件，保持学习数据安全。 / Invalid contract output still does not write learning events, preserving learning-data safety.
+- 未新增依赖，未新增 SQL。 / No dependency or SQL change was added.
+
+### 验证 / Verification
+
+- 前端 `npm run typecheck` 通过。 / Frontend `npm run typecheck` passed.
+- 使用 JDK 21 和临时 Maven settings 执行 `mvn -q -DskipTests compile` 通过。 / Backend `mvn -q -DskipTests compile` passed with JDK 21 and a temporary Maven settings file.

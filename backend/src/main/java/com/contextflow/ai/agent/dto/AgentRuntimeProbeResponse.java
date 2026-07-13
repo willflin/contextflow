@@ -13,10 +13,14 @@ public record AgentRuntimeProbeResponse(
         List<String> errors,
         Long elapsedMs,
         String errorMessage,
+        String modelRawContent,
+        AgentDialogueOutput modelOutput,
+        List<String> modelValidationErrors,
         AgentDialogueOutput output,
         AgentRuntimeDiagnosticsResponse diagnostics
 ) {
     public AgentRuntimeProbeResponse {
         errors = errors == null ? List.of() : List.copyOf(errors);
+        modelValidationErrors = modelValidationErrors == null ? List.of() : List.copyOf(modelValidationErrors);
     }
 }

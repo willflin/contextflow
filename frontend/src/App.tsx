@@ -1157,14 +1157,32 @@ export default function App() {
             {agentRuntimeProbe.errors.length > 0 && (
               <pre>{JSON.stringify(agentRuntimeProbe.errors, null, 2)}</pre>
             )}
+            {agentRuntimeProbe.modelValidationErrors.length > 0 && (
+              <label>
+                模型契约错误
+                <pre>{JSON.stringify(agentRuntimeProbe.modelValidationErrors, null, 2)}</pre>
+              </label>
+            )}
+            {agentRuntimeProbe.modelOutput && (
+              <label>
+                模型实际输出
+                <pre>{JSON.stringify(agentRuntimeProbe.modelOutput, null, 2)}</pre>
+              </label>
+            )}
+            {agentRuntimeProbe.modelRawContent && !agentRuntimeProbe.modelOutput && (
+              <label>
+                模型原始输出
+                <pre>{agentRuntimeProbe.modelRawContent}</pre>
+              </label>
+            )}
             {agentRuntimeProbe.output && (
               <div className="agent-probe-output">
                 <label>
-                  Roleplay 回复
+                  最终 Roleplay 回复
                   <pre>{agentRuntimeProbe.output.reply}</pre>
                 </label>
                 <label>
-                  Mentor 反馈
+                  最终 Mentor 反馈
                   <pre>{agentRuntimeProbe.output.feedback}</pre>
                 </label>
                 <label>

@@ -102,6 +102,9 @@ public class AgentRuntimeService {
                     validation.accepted(),
                     validation.errors(),
                     null,
+                    null,
+                    output,
+                    List.of(),
                     output
             );
         } catch (RuntimeException exception) {
@@ -168,6 +171,9 @@ public class AgentRuntimeService {
                 validation.accepted(),
                 validation.errors(),
                 compactError(exception),
+                modelRawContent(exception),
+                modelOutput(exception),
+                modelValidationErrors(exception),
                 output
         );
     }
@@ -187,6 +193,9 @@ public class AgentRuntimeService {
                 false,
                 List.of(compactError(exception)),
                 compactError(exception),
+                modelRawContent(exception),
+                modelOutput(exception),
+                modelValidationErrors(exception),
                 null
         );
     }
@@ -199,6 +208,9 @@ public class AgentRuntimeService {
             boolean accepted,
             List<String> errors,
             String errorMessage,
+            String modelRawContent,
+            AgentDialogueOutput modelOutput,
+            List<String> modelValidationErrors,
             AgentDialogueOutput output
     ) {
         return new AgentRuntimeProbeResponse(
@@ -212,6 +224,9 @@ public class AgentRuntimeService {
                 errors,
                 elapsedMs(startedAt),
                 errorMessage,
+                modelRawContent,
+                modelOutput,
+                modelValidationErrors,
                 output,
                 diagnostics()
         );
@@ -242,5 +257,33 @@ public class AgentRuntimeService {
 
     private boolean isClientAvailable(AgentModelClient client) {
         return client != null && client.isAvailable();
+    }
+
+    private String modelRawContent(RuntimeException exception) {
+        if (exception instanceof AgentModelResponseException responseException) {
+            return truncate(responseException.rawContent());
+        }
+        return null;
+    }
+
+    private AgentDialogueOutput modelOutput(RuntimeException exception) {
+        if (exception instanceof AgentModelResponseException responseException) {
+            return responseException.output();
+        }
+        return null;
+    }
+
+    private List<String> modelValidationErrors(RuntimeException exception) {
+        if (exception instanceof AgentModelResponseException responseException) {
+            return responseException.validationErrors();
+        }
+        return List.of();
+    }
+
+    private String truncate(String value) {
+        if (value == null || value.length() <= 12000) {
+            return value;
+        }
+        return value.substring(0, 12000) + "...";
     }
 }
