@@ -117,7 +117,7 @@ CREATE TABLE `ecdict_clean_word_entries` (
   `effective_frequency_rank` int GENERATED ALWAYS AS (coalesce(`frq_rank`,`bnc_rank`)) STORED,
   `frequency_source` varchar(16) COLLATE utf8mb4_unicode_ci GENERATED ALWAYS AS ((case when (`frq_rank` is not null) then _utf8mb4'FRQ' when (`bnc_rank` is not null) then _utf8mb4'BNC' else NULL end)) STORED,
   `exchange_raw` text COLLATE utf8mb4_unicode_ci,
-  `cleaning_rule_version` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'word-frequency-v2',
+  `cleaning_rule_version` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'word-frequency-v3',
   `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_ecdict_clean_word_entries_raw` (`raw_entry_id`),

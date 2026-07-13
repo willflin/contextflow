@@ -61,6 +61,12 @@ public class LearningUnitEntity {
         this.status = status;
     }
 
+    public void updateWord(String canonicalText, String normalizedText, LearningUnitStatus status) {
+        this.canonicalText = canonicalText;
+        this.normalizedText = normalizedText;
+        this.status = status;
+    }
+
     @PrePersist
     void prePersist() {
         Instant now = Instant.now();

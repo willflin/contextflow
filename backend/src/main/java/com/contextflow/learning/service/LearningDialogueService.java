@@ -7,9 +7,13 @@ import com.contextflow.ai.agent.dto.AgentDialogueInput;
 import com.contextflow.ai.agent.dto.AgentDialogueOutput;
 import com.contextflow.ai.agent.dto.AgentLearnerProfileContext;
 import com.contextflow.ai.agent.dto.AgentLearningPackageContext;
+import com.contextflow.ai.agent.dto.AgentTargetSenseContext;
+import com.contextflow.ai.agent.dto.AgentUnitMention;
+import com.contextflow.ai.agent.dto.AgentUnitMentionDecision;
 import com.contextflow.ai.agent.service.AgentDialogueContractService;
 import com.contextflow.ai.agent.service.AgentRuntimeService;
 import com.contextflow.learning.domain.LearningDialogueTurnEntity;
+import com.contextflow.learning.domain.LearningEventSourceType;
 import com.contextflow.learning.domain.LearningPackageEntity;
 import com.contextflow.learning.domain.LearningPackageStatus;
 import com.contextflow.learning.dto.CorrectionResponse;
@@ -17,6 +21,8 @@ import com.contextflow.learning.dto.LearningDialogueRequest;
 import com.contextflow.learning.dto.LearningDialogueResponse;
 import com.contextflow.learning.repository.LearningDialogueTurnRepository;
 import com.contextflow.learning.repository.LearningPackageRepository;
+import com.contextflow.review.dto.ReviewPlanItemResponse;
+import com.contextflow.review.service.ReviewPlanService;
 import com.contextflow.user.domain.UserEntity;
 import com.contextflow.user.repository.UserRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -47,6 +53,7 @@ public class LearningDialogueService {
     private final LearningPackageRepository learningPackageRepository;
     private final LearningDialogueTurnRepository learningDialogueTurnRepository;
     private final LearningEventService learningEventService;
+    private final ReviewPlanService reviewPlanService;
     private final AgentDialogueContractService agentDialogueContractService;
     private final AgentRuntimeService agentRuntimeService;
     private final ObjectMapper objectMapper;
@@ -56,6 +63,7 @@ public class LearningDialogueService {
             LearningPackageRepository learningPackageRepository,
             LearningDialogueTurnRepository learningDialogueTurnRepository,
             LearningEventService learningEventService,
+            ReviewPlanService reviewPlanService,
             AgentDialogueContractService agentDialogueContractService,
             AgentRuntimeService agentRuntimeService,
             ObjectMapper objectMapper
@@ -64,6 +72,7 @@ public class LearningDialogueService {
         this.learningPackageRepository = learningPackageRepository;
         this.learningDialogueTurnRepository = learningDialogueTurnRepository;
         this.learningEventService = learningEventService;
+        this.reviewPlanService = reviewPlanService;
         this.agentDialogueContractService = agentDialogueContractService;
         this.agentRuntimeService = agentRuntimeService;
         this.objectMapper = objectMapper;
@@ -114,7 +123,11 @@ public class LearningDialogueService {
                 agentOutput.naturalExpression(),
                 serialize(agentOutput.scoringSignal())
         ));
-        learningEventService.recordDialogueTurnEvents(saved, scenarioCode, outputCorrections, agentOutput.scoringSignal());
+        boolean modelReturnedMentions = agentOutput.unitMentions() != null && !agentOutput.unitMentions().isEmpty();
+        recordAgentUnitMentions(saved, agentOutput.unitMentions());
+        if (!modelReturnedMentions) {
+            learningEventService.recordDialogueTurnEvents(saved, scenarioCode, outputCorrections, agentOutput.scoringSignal());
+        }
 
         return new LearningDialogueResponse(
                 saved.getId(),
@@ -170,11 +183,111 @@ public class LearningDialogueService {
                         scenario.path("name").asText("General English"),
                         packageEntity.getContent()
                 ),
-                List.of(),
+                targetSenses(user.getUsername()),
                 dialogueHistory(packageEntity.getId()),
                 userMessage,
                 agentDialogueContractService.toolAccess()
         );
+    }
+
+    private List<AgentTargetSenseContext> targetSenses(String username) {
+        return reviewPlanService.plan(username, 12)
+                .items()
+                .stream()
+                .map(this::targetSense)
+                .toList();
+    }
+
+    private AgentTargetSenseContext targetSense(ReviewPlanItemResponse item) {
+        return new AgentTargetSenseContext(
+                item.pool(),
+                item.learningUnitId(),
+                item.learningUnitSenseId(),
+                item.canonicalText(),
+                item.senseKey(),
+                item.partOfSpeech(),
+                item.definitionEn(),
+                item.definitionZh(),
+                item.difficultyLevel(),
+                item.frequencyBand(),
+                null,
+                item.score(),
+                item.scenarioCode()
+        );
+    }
+
+    private int recordAgentUnitMentions(
+            LearningDialogueTurnEntity saved,
+            List<AgentUnitMention> unitMentions
+    ) {
+        if (unitMentions == null || unitMentions.isEmpty()) {
+            return 0;
+        }
+
+        int recorded = 0;
+        for (AgentUnitMention mention : unitMentions) {
+            if (!isRecordable(mention)) {
+                continue;
+            }
+            try {
+                learningEventService.recordUnitOccurrence(
+                        saved.getUserId(),
+                        mention.learningUnitId(),
+                        mention.learningUnitSenseId(),
+                        mention.eventType(),
+                        mention.eventDirection(),
+                        LearningEventSourceType.LEARNING_DIALOGUE_TURN,
+                        saved.getId(),
+                        sourceText(saved, mention.sourceField()),
+                        mention.occurrenceText(),
+                        mentionPayload(saved, mention)
+                );
+                recorded++;
+            } catch (RuntimeException ignored) {
+                // Invalid model-provided ids should not block the learner dialogue.
+            }
+        }
+        return recorded;
+    }
+
+    private boolean isRecordable(AgentUnitMention mention) {
+        return mention != null
+                && (mention.agentDecision() == AgentUnitMentionDecision.RECORD_EVENT
+                || mention.agentDecision() == AgentUnitMentionDecision.RECORD_SPELLING_OR_FORM_ERROR)
+                && mention.learningUnitId() != null
+                && mention.learningUnitSenseId() != null
+                && mention.eventType() != null
+                && mention.eventDirection() != null
+                && mention.occurrenceText() != null
+                && !mention.occurrenceText().isBlank();
+    }
+
+    private String sourceText(LearningDialogueTurnEntity saved, String sourceField) {
+        String normalized = sourceField == null ? "" : sourceField.trim().toLowerCase(Locale.ROOT);
+        return switch (normalized) {
+            case "usermessage", "user_message", "learner_message" -> saved.getUserMessage();
+            case "reply", "roleplayreply", "roleplay_reply" -> saved.getRoleplayReply();
+            case "feedback", "mentorfeedback", "mentor_feedback" -> saved.getMentorFeedback();
+            case "naturalexpression", "natural_expression" -> saved.getNaturalExpression();
+            case "correction", "corrections", "correctionsuggestion", "correction_suggestion" -> saved.getCorrections();
+            default -> saved.getRoleplayReply();
+        };
+    }
+
+    private Map<String, Object> mentionPayload(LearningDialogueTurnEntity saved, AgentUnitMention mention) {
+        Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        payload.put("packageId", saved.getLearningPackageId());
+        payload.put("turnIndex", saved.getTurnIndex());
+        payload.put("sourceField", mention.sourceField());
+        payload.put("agentRole", mention.agentRole() == null ? null : mention.agentRole().name());
+        payload.put("occurrenceIndex", mention.occurrenceIndex());
+        payload.put("confidence", mention.confidence());
+        payload.put("agentDecision", mention.agentDecision() == null ? null : mention.agentDecision().name());
+        payload.put("agentReason", mention.agentReason());
+        payload.put("canonicalText", mention.canonicalText());
+        payload.put("senseKey", mention.senseKey());
+        payload.put("agentPayload", mention.payload());
+        return payload;
     }
 
     private List<AgentDialogueHistoryTurn> dialogueHistory(Long packageId) {

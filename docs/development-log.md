@@ -646,16 +646,83 @@
 
 ### 新增功能 / Added Features
 
-- `word-frequency-v2` 清洗规则只保留普通单词形态、必须有有效频率，并排除缩写和专名。 / The `word-frequency-v2` cleaning rule keeps ordinary word-shaped entries with valid frequency and excludes abbreviations and proper names.
+- `word-frequency-v3` 清洗规则只保留普通单词形态、必须有有效频率，并排除缩写、专名和重复字母噪声。 / The `word-frequency-v3` cleaning rule keeps ordinary word-shaped entries with valid frequency and excludes abbreviations, proper names, and repeated-letter noise.
 - 清洗表保留 raw 追溯字段、释义、翻译、词性、标签、词形和有效频率排名，不修改 `ecdict_import_entries`。 / The cleaned table keeps raw trace fields, definitions, translations, POS, tags, forms, and valid frequency ranks without modifying `ecdict_import_entries`.
 
 ### 验证 / Verification
 
 - 已从 `ecdict_import_entries` 清洗生成 `ecdict_clean_word_entries`。 / Generated `ecdict_clean_word_entries` from `ecdict_import_entries`.
-- 当前原始表仍为 770611 行；清洗表按 `word-frequency-v2` 重建后为 46559 行，且全部有有效频率排名。 / The raw table remains at 770611 rows; the cleaned table was rebuilt with `word-frequency-v2` to 46559 rows, all with valid frequency ranks.
+- 当前原始表仍为 770611 行；清洗表按 `word-frequency-v3` 重建后为 46552 行，且全部有有效频率排名。 / The raw table remains at 770611 rows; the cleaned table was rebuilt with `word-frequency-v3` to 46552 rows, all with valid frequency ranks.
 - `ecdict_clean_word_entries` 中非 `^[A-Za-z]+$` 的行数为 0，且 `aaa`、`aaad` 等缩写/字母串噪声不再进入清洗表。 / `ecdict_clean_word_entries` has 0 rows outside `^[A-Za-z]+$`, and abbreviation/letter-string noise such as `aaa` and `aaad` no longer enters the cleaned table.
 
 ### 调整 / Adjustment
 
 - 将 `effective_frequency_rank` 改为 `COALESCE(frq_rank, bnc_rank)`，即优先使用 `frq_rank`，缺失时用 `bnc_rank`。 / Changed `effective_frequency_rank` to `COALESCE(frq_rank, bnc_rank)`, preferring `frq_rank` and falling back to `bnc_rank`.
 - 新增生成列 `frequency_source`，取值为 `FRQ` 或 `BNC`，用于解释当前有效频率来源。 / Added generated column `frequency_source` with `FRQ` or `BNC` to explain the effective frequency source.
+- 排除由同一字母重复组成的 token，例如 `zz`、`zzz`、`xxx`、`mmm`。 / Excluded tokens made of one repeated letter, such as `zz`, `zzz`, `xxx`, and `mmm`.
+
+## Phase 6.2 formal-test：ECDICT 小批量正式导入 / ECDICT Small Formal Import
+
+### 操作 / Operations
+
+- 新增 `tools/EcdictFormalTestImporter.java`，用于从 `ecdict_clean_word_entries` 受控导入正式语言单元表。 / Added `tools/EcdictFormalTestImporter.java` to import controlled batches from `ecdict_clean_word_entries` into formal language-unit tables.
+- 新增 `docs/sql/ecdict_formal_test_cleanup.sql`，保留本次清理旧 demo/测试正式数据的 SQL。 / Added `docs/sql/ecdict_formal_test_cleanup.sql` to preserve the cleanup SQL for old demo/test formal data.
+- 将 `contextflow.content.seed-demo-units` 默认改为 `false`，避免后端启动后重新混入旧 demo 语言单元。 / Changed the default `contextflow.content.seed-demo-units` to `false` to avoid reseeding old demo language units on backend startup.
+- 清理旧 `MANUAL_SEED` 语言单元、旧学习事件和旧来源数据后，从清洗表导入 top 500 高频候选。 / Cleaned old `MANUAL_SEED` language units, old learning events, and old source data before importing the top 500 high-frequency candidates from the cleaned table.
+
+### 新增功能 / Added Features
+
+- 导入 `learning_units`、`learning_unit_senses`、`learning_unit_forms`、`learning_data_sources` 和 `learning_unit_sense_sources`。 / Imported into `learning_units`, `learning_unit_senses`, `learning_unit_forms`, `learning_data_sources`, and `learning_unit_sense_sources`.
+- `definition_raw` 按英文释义行拆分为多个 sense；中文释义暂保留整段原文，避免错误逐行对齐。 / `definition_raw` is split into multiple senses by English definition lines; Chinese translation keeps the full raw text for now to avoid incorrect line-by-line alignment.
+- `exchange_raw` 解析为 lemma、复数、第三人称单数、过去式、过去分词、现在分词、比较级和最高级词形。 / `exchange_raw` is parsed into lemma, plural, third-person singular, past tense, past participle, present participle, comparative, and superlative forms.
+
+### 验证 / Verification
+
+- 本次正式表测试导入结果：`learning_units=499`，`learning_unit_senses=1638`，`learning_unit_forms=1727`，`learning_unit_sense_sources=6552`。 / Formal test import result: `learning_units=499`, `learning_unit_senses=1638`, `learning_unit_forms=1727`, and `learning_unit_sense_sources=6552`.
+- 旧学习事件和旧掌握度统计已清空：`learning_events=0`，`user_learning_unit_sense_stats=0`。 / Old learning events and mastery stats were cleared: `learning_events=0`, `user_learning_unit_sense_stats=0`.
+
+## Phase 6.2 app-data：单词数据管理与用户词库 / Word Data Management and Learner Vocabulary
+
+### 操作 / Operations
+
+- 撤销 admin 侧 ECDICT 导入入口；admin 不负责批量导入词库。 / Removed the admin-side ECDICT import entry; admin is not responsible for bulk dictionary import.
+- 扩展 `GET /api/admin/learning-units/search` 和详情查询，使 admin 可查看非 active 词义状态。 / Extended `GET /api/admin/learning-units/search` and detail queries so admin can see non-active sense states.
+- 新增 admin 单词 CRUD 接口：单个单词新增、单词本体更新、首级词义字段更新、安全删除。 / Added admin word CRUD APIs: single-word creation, word update, sense-field update, and safe deletion.
+- 新增 learner 词库接口 `GET /api/learning/vocabulary`，支持全部、已学、未学和 query 查询。 / Added learner vocabulary API `GET /api/learning/vocabulary`, supporting all/learned/unlearned filters and query search.
+- 新增前端 learner 词库模块和 admin 单词管理模块。 / Added the frontend learner vocabulary module and admin word-management module.
+
+### 新增功能 / Added Features
+
+- admin 新增单词一次只允许一个 WORD，并写入 `ADMIN_MANUAL/v1` 数据来源。 / Admin creation allows only one WORD at a time and records the `ADMIN_MANUAL/v1` data source.
+- admin 删除单词时，如果已有 learning event 或用户词义掌握度统计，后端拒绝物理删除，建议改为 OFFLINE。 / Admin deletion is rejected when learning events or user sense stats exist, recommending OFFLINE instead.
+- learner 词库按用户自己的 sense-level stats 标记 `LEARNED`、`PARTIAL`、`UNLEARNED`。 / Learner vocabulary marks words as `LEARNED`, `PARTIAL`, or `UNLEARNED` from the user's own sense-level stats.
+- 当前 500 测试词库来自清洗表按 `effective_frequency_rank` 升序取前 500 个候选，不是原始 CSV 文件前 500 行。 / The current 500-word test set is selected from cleaned candidates by ascending `effective_frequency_rank`, not the first 500 raw CSV rows.
+- 管理员界面、按钮和非学习内容提示改为中文。 / Admin UI, buttons, and non-learning hints were changed to Chinese.
+
+### 验证 / Verification
+
+- 前端 `npm run typecheck` 通过。 / Frontend `npm run typecheck` passed.
+- 使用 JDK 21 和临时 Maven settings 执行 `mvn -q -DskipTests compile` 通过；默认 Maven 仍会因 E 盘仓库权限失败。 / Backend `mvn -q -DskipTests compile` passed with JDK 21 and a temporary Maven settings file; the default Maven path still fails because the E drive repository is not writable.
+- `git diff --check` 通过，仅有 Windows 换行提示。 / `git diff --check` passed with only Windows line-ending warnings.
+
+## Phase 6.3：真实 Agent 对话运行时 / Real Agent Dialogue Runtime
+
+### 操作 / Operations
+
+- 将学习对话输入的 `targetSenses` 接到 `/api/review/plan`，让真实 Agent 能看到当前复习/新词义目标。 / Wired dialogue `targetSenses` to `/api/review/plan` so the real Agent can see current review/new-sense targets.
+- 增强 Spring AI Prompt，固定双 Agent 职责、输出 JSON 形状和 learning event 记录规则。 / Strengthened the Spring AI prompt with dual-agent roles, output JSON shape, and learning-event rules.
+- 将 Agent 输出中的可记录 `unitMentions` 写入 `learning_events`，并继续触发词义级掌握度更新。 / Writes recordable `unitMentions` from Agent output into `learning_events`, continuing sense-level mastery updates.
+- 新增前端 admin Agent 运行时状态面板。 / Added a frontend admin panel for Agent runtime status.
+- 更新 `docs/agent-contract.md`。 / Updated `docs/agent-contract.md`.
+
+### 新增功能 / Added Features
+
+- 真实模型只允许使用输入中已有的 `learningUnitId` 和 `learningUnitSenseId`，不得编造 id。 / The real model may use only input-provided `learningUnitId` and `learningUnitSenseId`, never invented ids.
+- 模型明确返回 non-recordable mention 时，不再用本地字符串匹配补事件，避免误记学习事件。 / When the model returns a non-recordable mention, local string matching no longer adds fallback events, avoiding false learning events.
+- 模型输出如果带有前后多余文本，后端会提取首尾 JSON 对象再做契约校验。 / If model output contains extra surrounding text, the backend extracts the JSON object before contract validation.
+
+### 验证 / Verification
+
+- 前端 `npm run typecheck` 通过。 / Frontend `npm run typecheck` passed.
+- 使用 JDK 21 和临时 Maven settings 执行 `mvn -q -DskipTests compile` 通过；默认 Maven 仍会因 E 盘仓库权限失败。 / Backend `mvn -q -DskipTests compile` passed with JDK 21 and a temporary Maven settings file; the default Maven path still fails because the E drive repository is not writable.
+- `git diff --check` 通过，仅有 Windows 换行提示。 / `git diff --check` passed with only Windows line-ending warnings.

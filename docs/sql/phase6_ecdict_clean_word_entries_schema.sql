@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS ecdict_clean_word_entries (
         END
     ) STORED,
     exchange_raw TEXT NULL,
-    cleaning_rule_version VARCHAR(32) NOT NULL DEFAULT 'word-frequency-v2',
+    cleaning_rule_version VARCHAR(32) NOT NULL DEFAULT 'word-frequency-v3',
     created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     PRIMARY KEY (id),
     UNIQUE KEY uk_ecdict_clean_word_entries_raw (raw_entry_id),

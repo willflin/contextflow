@@ -2,14 +2,17 @@
 
 ## 目标 / Goal
 
-Phase 6.1 固定真实 Agent 接入前的输入/输出 JSON。当前仍使用本地规则模拟，不接 AI API。  
-Phase 6.1 fixes the input/output JSON before real Agent integration. The system still uses local rules and does not call an AI API yet.
+Phase 6.3 将 `agent-dialogue.v1` 接到 Spring AI / DeepSeek 运行时。默认仍使用本地规则；显式启用 Spring AI provider 和 API key 后才调用真实模型。
+Phase 6.3 connects `agent-dialogue.v1` to the Spring AI / DeepSeek runtime. The default remains local rules; real model calls happen only after explicitly enabling the Spring AI provider and API key.
 
 ## 契约版本 / Contract Version
 
 `agent-dialogue.v1`
 
 ## 输入 / Input
+
+真实对话请求会从 `/api/review/plan` 读取当前用户的复习/新词义目标，并写入 `targetSenses`。
+Real dialogue requests read the user's current review/new-sense targets from `/api/review/plan` and place them in `targetSenses`.
 
 ```json
 {
@@ -105,13 +108,15 @@ Phase 6.1 fixes the input/output JSON before real Agent integration. The system 
 
 ## 事件规则 / Event Rules
 
-- `unitMentions` 是未来直接写入 `learning_events` 的主要依据。 / `unitMentions` will be the main source for writing `learning_events`.
+- `unitMentions` 是真实 Agent 直接写入 `learning_events` 的主要依据。 / `unitMentions` is the main source for writing `learning_events` from the real Agent.
 - 可记录事件必须有 `learningUnitId` 和 `learningUnitSenseId`；掌握度只更新到词义级。 / Recordable events must include `learningUnitId` and `learningUnitSenseId`; mastery is updated only at sense level.
+- Agent 只能使用输入中已给出的词义 id，不能编造 `learningUnitId` 或 `learningUnitSenseId`。 / The Agent may use only sense ids provided in the input and must not invent `learningUnitId` or `learningUnitSenseId`.
 - 用户输出只在 Agent 能判断具体词义时记录 `UNIT_ATTEMPTED`。 / Learner output records `UNIT_ATTEMPTED` only when the Agent can identify the exact sense.
 - 拼写或变形错误但可识别为某个词义时，可以记录事件并在 `agentDecision` 标记。 / Spelling or form errors can be recorded when the Agent can map them to a known sense.
 - 乱输入、无法辨认、或用法完全错误时，不写学习事件，由 Mentor 反馈。 / Nonsense, unrecognizable text, or completely wrong usage does not create learning events and should be handled by Mentor feedback.
 - Agent 输出给用户的句子属于用户输入，记录 `LEARNER_INPUT` 方向。 / Agent-generated sentences are learner input and use `LEARNER_INPUT`.
 - 数据库没有对应词义但语义合理时，调用 `sense-feedback`，等待人工维护词义库。 / If the sense is valid but absent from the database, call `sense-feedback` for manual sense maintenance.
+- 如果模型返回 non-recordable mention，系统不会再用本地字符串匹配补事件，避免误记学习事件。 / If the model returns a non-recordable mention, the system does not add fallback string-match events, avoiding false learning events.
 
 ## 已预留工具 / Reserved Tools
 
@@ -123,8 +128,8 @@ Phase 6.1 fixes the input/output JSON before real Agent integration. The system 
 
 ## Spring AI / DeepSeek 运行时 / Spring AI / DeepSeek Runtime
 
-当前项目已引入 Spring AI DeepSeek starter，用 DeepSeek API 作为后续真实模型入口。默认仍关闭真实模型调用。
-The project now includes the Spring AI DeepSeek starter and reserves the DeepSeek API as the real model entry point. Real model calls are still disabled by default.
+当前项目已引入 Spring AI DeepSeek starter，并已接到学习对话运行时。默认仍关闭真实模型调用。
+The project includes the Spring AI DeepSeek starter and wires it into the learning dialogue runtime. Real model calls are still disabled by default.
 
 默认配置 / Defaults:
 
@@ -155,6 +160,7 @@ $env:DEEPSEEK_MODEL="deepseek-chat"
 - `contextflow.agent.provider=local` 时学习对话继续走本地规则模拟。 / `contextflow.agent.provider=local` keeps learning dialogue on local rule simulation.
 - `contextflow.agent.provider=spring-ai` 且 ChatModel 可用时，才通过 Spring AI 调 DeepSeek。 / Only when `contextflow.agent.provider=spring-ai` and ChatModel is available does the system call DeepSeek through Spring AI.
 - `fallback-to-local-on-error=true` 时模型失败会回退本地规则，避免阻断学习流程。 / With `fallback-to-local-on-error=true`, model failures fall back to local rules to avoid blocking learning.
+- `GET /api/admin/agent-contract/runtime` 可查看当前 provider、Spring AI client 是否可用和契约版本。 / `GET /api/admin/agent-contract/runtime` shows the current provider, Spring AI client availability, and contract version.
 
 ## 接入真实词义数据前提 / Before Real Sense Data Import
 

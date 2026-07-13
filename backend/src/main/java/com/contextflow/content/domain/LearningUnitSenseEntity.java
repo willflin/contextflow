@@ -93,6 +93,26 @@ public class LearningUnitSenseEntity {
         this.status = status;
     }
 
+    public void updateAdminFields(
+            PartOfSpeech partOfSpeech,
+            String definitionEn,
+            String definitionZh,
+            DifficultyLevel difficultyLevel,
+            BigDecimal difficultyConfidence,
+            BigDecimal frequencyScore,
+            FrequencyBand frequencyBand,
+            LearningUnitStatus status
+    ) {
+        this.partOfSpeech = partOfSpeech;
+        this.definitionEn = definitionEn;
+        this.definitionZh = definitionZh;
+        this.difficultyLevel = difficultyLevel;
+        this.difficultyConfidence = difficultyConfidence;
+        this.frequencyScore = frequencyScore;
+        this.frequencyBand = frequencyBand;
+        this.status = status;
+    }
+
     @PrePersist
     void prePersist() {
         Instant now = Instant.now();

@@ -46,6 +46,15 @@ public class LearningUnitQueryService {
 
     @Transactional(readOnly = true)
     public LearningUnitDetailResponse search(String text) {
+        return search(text, true);
+    }
+
+    @Transactional(readOnly = true)
+    public LearningUnitDetailResponse searchForAdmin(String text) {
+        return search(text, false);
+    }
+
+    private LearningUnitDetailResponse search(String text, boolean activeSensesOnly) {
         String normalized = normalize(text);
         LearningUnitEntity unit = learningUnitRepository
                 .findFirstByLanguageCodeAndNormalizedTextOrderByIdAsc(LANGUAGE_CODE, normalized)
@@ -55,29 +64,49 @@ public class LearningUnitQueryService {
                         .findFirst())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Learning unit not found."));
 
-        return detail(unit);
+        return detail(unit, activeSensesOnly);
     }
 
     @Transactional(readOnly = true)
     public LearningUnitDetailResponse detail(Long id) {
+        return detail(id, true);
+    }
+
+    @Transactional(readOnly = true)
+    public LearningUnitDetailResponse detailForAdmin(Long id) {
+        return detail(id, false);
+    }
+
+    private LearningUnitDetailResponse detail(Long id, boolean activeSensesOnly) {
         LearningUnitEntity unit = learningUnitRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Learning unit not found."));
-        return detail(unit);
+        return detail(unit, activeSensesOnly);
     }
 
     @Transactional(readOnly = true)
     public List<LearningUnitSenseResponse> senses(Long id) {
+        return senses(id, true);
+    }
+
+    @Transactional(readOnly = true)
+    public List<LearningUnitSenseResponse> sensesForAdmin(Long id) {
+        return senses(id, false);
+    }
+
+    private List<LearningUnitSenseResponse> senses(Long id, boolean activeSensesOnly) {
         if (!learningUnitRepository.existsById(id)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Learning unit not found.");
         }
-        return learningUnitSenseRepository
-                .findByLearningUnitIdAndStatusOrderByIdAsc(id, LearningUnitStatus.ACTIVE)
+        List<LearningUnitSenseEntity> senseRows = activeSensesOnly
+                ? learningUnitSenseRepository.findByLearningUnitIdAndStatusOrderByIdAsc(id, LearningUnitStatus.ACTIVE)
+                : learningUnitSenseRepository.findByLearningUnitIdOrderByIdAsc(id);
+        return senseRows
                 .stream()
                 .map(this::senseResponse)
                 .toList();
     }
 
-    private LearningUnitDetailResponse detail(LearningUnitEntity unit) {
+    private LearningUnitDetailResponse detail(LearningUnitEntity unit, boolean activeSensesOnly) {
         List<LearningUnitFormResponse> forms = learningUnitFormRepository
                 .findByLearningUnitIdOrderByIdAsc(unit.getId())
                 .stream()
@@ -88,8 +117,13 @@ public class LearningUnitQueryService {
                         form.getFormType().name()
                 ))
                 .toList();
-        List<LearningUnitSenseResponse> senses = learningUnitSenseRepository
-                .findByLearningUnitIdAndStatusOrderByIdAsc(unit.getId(), LearningUnitStatus.ACTIVE)
+        List<LearningUnitSenseEntity> senseRows = activeSensesOnly
+                ? learningUnitSenseRepository.findByLearningUnitIdAndStatusOrderByIdAsc(
+                unit.getId(),
+                LearningUnitStatus.ACTIVE
+        )
+                : learningUnitSenseRepository.findByLearningUnitIdOrderByIdAsc(unit.getId());
+        List<LearningUnitSenseResponse> senses = senseRows
                 .stream()
                 .map(this::senseResponse)
                 .toList();

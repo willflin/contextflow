@@ -42,4 +42,6 @@ public interface UserLearningUnitSenseStatsRepository extends JpaRepository<User
     List<UserLearningUnitSenseStatsEntity> findByUserIdWithSenseAndUnit(@Param("userId") Long userId);
 
     long countByUserId(Long userId);
+
+    long countByLearningUnitSenseLearningUnitId(Long learningUnitId);
 }

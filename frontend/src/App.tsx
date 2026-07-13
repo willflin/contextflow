@@ -1,5 +1,17 @@
 import { useEffect, useState } from 'react';
 import { AccessProbe, fetchAccessProbe } from './api/access';
+import { AgentRuntimeStatus, fetchAgentRuntimeStatus } from './api/agentRuntime';
+import {
+  AdminSenseUpdatePayload,
+  AdminWordPayload,
+  AdminWordUpdatePayload,
+  createAdminWord,
+  deleteAdminWord,
+  LearningUnitDetail,
+  searchAdminWord,
+  updateAdminSense,
+  updateAdminWord
+} from './api/adminWords';
 import { CurrentUser, fetchCurrentUser, login, register } from './api/auth';
 import { fetchHealth, HealthStatus } from './api/health';
 import {
@@ -19,9 +31,32 @@ import {
 } from './api/placement';
 import { fetchReviewPlan, ReviewPlan } from './api/review';
 import { fetchUserLevelProfile, prettyJson, UserLevelProfile } from './api/userProfile';
+import { fetchVocabulary, VocabularyList, VocabularyStatusFilter } from './api/vocabulary';
 
 type LoadState = 'idle' | 'loading' | 'success' | 'error';
 type AuthMode = 'login' | 'register';
+
+const emptyAdminWordForm: AdminWordPayload = {
+  canonicalText: '',
+  partOfSpeech: 'NOUN',
+  definitionEn: '',
+  definitionZh: '',
+  difficultyLevel: '',
+  frequencyScore: null,
+  frequencyBand: '',
+  forms: []
+};
+
+const emptyAdminSenseForm: AdminSenseUpdatePayload = {
+  partOfSpeech: '',
+  definitionEn: '',
+  definitionZh: '',
+  difficultyLevel: '',
+  difficultyConfidence: null,
+  frequencyScore: null,
+  frequencyBand: '',
+  status: 'ACTIVE'
+};
 
 export default function App() {
   const [state, setState] = useState<LoadState>('idle');
@@ -35,6 +70,9 @@ export default function App() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [accessProbe, setAccessProbe] = useState<AccessProbe | null>(null);
   const [accessError, setAccessError] = useState<string | null>(null);
+  const [agentRuntime, setAgentRuntime] = useState<AgentRuntimeStatus | null>(null);
+  const [agentRuntimeBusy, setAgentRuntimeBusy] = useState(false);
+  const [agentRuntimeError, setAgentRuntimeError] = useState<string | null>(null);
   const [placementSession, setPlacementSession] = useState<AdaptivePlacementSession | null>(null);
   const [currentItem, setCurrentItem] = useState<PlacementTestItem | null>(null);
   const [selectedOptionIndex, setSelectedOptionIndex] = useState<number | null>(null);
@@ -48,6 +86,21 @@ export default function App() {
   const [reviewPlan, setReviewPlan] = useState<ReviewPlan | null>(null);
   const [reviewBusy, setReviewBusy] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
+  const [vocabulary, setVocabulary] = useState<VocabularyList | null>(null);
+  const [vocabularyQuery, setVocabularyQuery] = useState('');
+  const [vocabularyStatus, setVocabularyStatus] = useState<VocabularyStatusFilter>('ALL');
+  const [vocabularyBusy, setVocabularyBusy] = useState(false);
+  const [vocabularyError, setVocabularyError] = useState<string | null>(null);
+  const [adminWordQuery, setAdminWordQuery] = useState('');
+  const [adminWordDetail, setAdminWordDetail] = useState<LearningUnitDetail | null>(null);
+  const [adminWordForm, setAdminWordForm] = useState<AdminWordPayload>(emptyAdminWordForm);
+  const [adminWordUpdateForm, setAdminWordUpdateForm] = useState<AdminWordUpdatePayload>({
+    canonicalText: '',
+    status: 'ACTIVE'
+  });
+  const [adminSenseForm, setAdminSenseForm] = useState<AdminSenseUpdatePayload>(emptyAdminSenseForm);
+  const [adminWordBusy, setAdminWordBusy] = useState(false);
+  const [adminWordError, setAdminWordError] = useState<string | null>(null);
   const [learningPackage, setLearningPackage] = useState<LearningPackage | null>(null);
   const [learningBusy, setLearningBusy] = useState(false);
   const [learningError, setLearningError] = useState<string | null>(null);
@@ -69,6 +122,9 @@ export default function App() {
       void loadProfile();
       if (currentUser.role === 'ADMIN') {
         void loadHealth();
+        void loadAgentRuntime();
+      } else {
+        void loadVocabulary();
       }
     }
   }, [currentUser]);
@@ -121,6 +177,9 @@ export default function App() {
       resetPlacement();
       resetLearning();
       resetReviewPlan();
+      resetVocabulary();
+      resetAdminWords();
+      resetAgentRuntime();
     } catch (exception) {
       setAuthError(exception instanceof Error ? exception.message : 'Login failed.');
       setCurrentUser(null);
@@ -134,9 +193,40 @@ export default function App() {
     setAccessError(null);
     setProfile(null);
     setProfileError(null);
+    resetVocabulary();
+    resetAdminWords();
     resetPlacement();
     resetLearning();
     resetReviewPlan();
+    resetAgentRuntime();
+  }
+
+  async function loadAgentRuntime() {
+    const token = tokenOrNull();
+
+    if (!token) {
+      setAgentRuntimeError('请先登录。');
+      return;
+    }
+
+    setAgentRuntimeBusy(true);
+    setAgentRuntimeError(null);
+
+    try {
+      const result = await fetchAgentRuntimeStatus(token);
+      setAgentRuntime(result);
+    } catch (exception) {
+      setAgentRuntime(null);
+      setAgentRuntimeError(exception instanceof Error ? exception.message : 'Agent 运行时加载失败。');
+    } finally {
+      setAgentRuntimeBusy(false);
+    }
+  }
+
+  function resetAgentRuntime() {
+    setAgentRuntime(null);
+    setAgentRuntimeBusy(false);
+    setAgentRuntimeError(null);
   }
 
   async function checkProtectedEndpoint(path: '/api/learner/probe' | '/api/admin/probe') {
@@ -294,6 +384,197 @@ export default function App() {
     setReviewError(null);
   }
 
+  async function loadVocabulary() {
+    const token = tokenOrNull();
+
+    if (!token) {
+      setVocabularyError('请先登录。');
+      return;
+    }
+
+    setVocabularyBusy(true);
+    setVocabularyError(null);
+
+    try {
+      const result = await fetchVocabulary(token, vocabularyStatus, vocabularyQuery, 500);
+      setVocabulary(result);
+    } catch (exception) {
+      setVocabulary(null);
+      setVocabularyError(exception instanceof Error ? exception.message : '词库加载失败。');
+    } finally {
+      setVocabularyBusy(false);
+    }
+  }
+
+  function resetVocabulary() {
+    setVocabulary(null);
+    setVocabularyQuery('');
+    setVocabularyStatus('ALL');
+    setVocabularyBusy(false);
+    setVocabularyError(null);
+  }
+
+  async function searchAdminWordByQuery(event?: React.FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+    const token = tokenOrNull();
+    const query = adminWordQuery.trim();
+
+    if (!token) {
+      setAdminWordError('请先登录。');
+      return;
+    }
+    if (!query) {
+      setAdminWordError('请输入要查询的单词。');
+      return;
+    }
+
+    setAdminWordBusy(true);
+    setAdminWordError(null);
+
+    try {
+      const result = await searchAdminWord(token, query);
+      setAdminWordDetail(result);
+      fillAdminEditForms(result);
+    } catch (exception) {
+      setAdminWordDetail(null);
+      setAdminWordError(exception instanceof Error ? exception.message : '单词查询失败。');
+    } finally {
+      setAdminWordBusy(false);
+    }
+  }
+
+  async function createAdminWordFromForm(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const token = tokenOrNull();
+
+    if (!token) {
+      setAdminWordError('请先登录。');
+      return;
+    }
+
+    setAdminWordBusy(true);
+    setAdminWordError(null);
+
+    try {
+      const result = await createAdminWord(token, adminWordForm);
+      setAdminWordDetail(result);
+      fillAdminEditForms(result);
+      setAdminWordForm(emptyAdminWordForm);
+    } catch (exception) {
+      setAdminWordError(exception instanceof Error ? exception.message : '单词新增失败。');
+    } finally {
+      setAdminWordBusy(false);
+    }
+  }
+
+  async function updateAdminWordFromForm(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const token = tokenOrNull();
+
+    if (!token || !adminWordDetail) {
+      setAdminWordError('请先查询一个单词。');
+      return;
+    }
+
+    setAdminWordBusy(true);
+    setAdminWordError(null);
+
+    try {
+      const result = await updateAdminWord(token, adminWordDetail.id, adminWordUpdateForm);
+      setAdminWordDetail(result);
+      fillAdminEditForms(result);
+    } catch (exception) {
+      setAdminWordError(exception instanceof Error ? exception.message : '单词保存失败。');
+    } finally {
+      setAdminWordBusy(false);
+    }
+  }
+
+  async function updateAdminSenseFromForm(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const token = tokenOrNull();
+    const sense = adminWordDetail?.senses[0];
+
+    if (!token || !adminWordDetail || !sense) {
+      setAdminWordError('请先查询一个包含词义的单词。');
+      return;
+    }
+
+    setAdminWordBusy(true);
+    setAdminWordError(null);
+
+    try {
+      const result = await updateAdminSense(token, sense.id, adminSenseForm);
+      setAdminWordDetail(result);
+      fillAdminEditForms(result);
+    } catch (exception) {
+      setAdminWordError(exception instanceof Error ? exception.message : '词义保存失败。');
+    } finally {
+      setAdminWordBusy(false);
+    }
+  }
+
+  async function deleteAdminWordFromDetail() {
+    const token = tokenOrNull();
+
+    if (!token || !adminWordDetail) {
+      setAdminWordError('请先查询一个单词。');
+      return;
+    }
+
+    const confirmed = window.confirm('确认删除这个单词？已有学习记录的单词会被后端拒绝删除。');
+    if (!confirmed) {
+      return;
+    }
+
+    setAdminWordBusy(true);
+    setAdminWordError(null);
+
+    try {
+      await deleteAdminWord(token, adminWordDetail.id);
+      setAdminWordDetail(null);
+      setAdminWordQuery('');
+      setAdminWordUpdateForm({ canonicalText: '', status: 'ACTIVE' });
+      setAdminSenseForm(emptyAdminSenseForm);
+    } catch (exception) {
+      setAdminWordError(exception instanceof Error ? exception.message : '单词删除失败。');
+    } finally {
+      setAdminWordBusy(false);
+    }
+  }
+
+  function fillAdminEditForms(detail: LearningUnitDetail) {
+    setAdminWordUpdateForm({
+      canonicalText: detail.canonicalText,
+      status: detail.status
+    });
+    const firstSense = detail.senses[0];
+    setAdminSenseForm(
+      firstSense
+        ? {
+            partOfSpeech: firstSense.partOfSpeech ?? '',
+            definitionEn: firstSense.definitionEn,
+            definitionZh: firstSense.definitionZh ?? '',
+            difficultyLevel: firstSense.difficultyLevel ?? '',
+            difficultyConfidence: firstSense.difficultyConfidence,
+            frequencyScore: firstSense.frequencyScore,
+            frequencyBand: firstSense.frequencyBand ?? '',
+            status: firstSense.status
+          }
+        : emptyAdminSenseForm
+    );
+  }
+
+  function resetAdminWords() {
+    setAdminWordQuery('');
+    setAdminWordDetail(null);
+    setAdminWordForm(emptyAdminWordForm);
+    setAdminWordUpdateForm({ canonicalText: '', status: 'ACTIVE' });
+    setAdminSenseForm(emptyAdminSenseForm);
+    setAdminWordBusy(false);
+    setAdminWordError(null);
+  }
+
   async function loadNextLearningPackage() {
     const token = tokenOrNull();
 
@@ -368,9 +649,9 @@ export default function App() {
     <main className="app-shell">
       <section className="hero">
         <p className="eyebrow">ContextFlow</p>
-        <h1>Placement-first English learning</h1>
+        <h1>语境化英语学习</h1>
         <p className="summary">
-          Start with a contextual placement test, then build a learner profile for later AI-generated study.
+          先完成水平测试，再基于用户画像进入对话学习、词义掌握度和复习闭环。
         </p>
       </section>
 
@@ -378,12 +659,12 @@ export default function App() {
         <>
           <section className="account-bar">
             <div>
-              <span className="label">Signed in as</span>
+              <span className="label">当前用户</span>
               <strong>{currentUser.displayName}</strong>
               <p>{currentUser.role}</p>
             </div>
             <button className="secondary-button" type="button" onClick={handleLogout}>
-              Log out
+              退出
             </button>
           </section>
 
@@ -400,11 +681,11 @@ export default function App() {
       <section className="login-panel">
         <div>
           <p className="eyebrow">Auth</p>
-          <h2>{authMode === 'login' ? 'JWT login' : 'Learner registration'}</h2>
+          <h2>{authMode === 'login' ? '登录' : '注册学习者'}</h2>
           <p className="hint">
             {authMode === 'login'
-              ? 'Use learner / learner123 for the learner flow, or admin / admin123 for admin tools.'
-              : 'New users are always registered as LEARNER.'}
+              ? '测试账号：learner / learner123，admin / admin123。'
+              : '新注册用户固定为 LEARNER。'}
           </p>
         </div>
 
@@ -415,37 +696,37 @@ export default function App() {
               type="button"
               onClick={() => setAuthMode('login')}
             >
-              Login
+              登录
             </button>
             <button
               className={authMode === 'register' ? 'mode-button active' : 'mode-button'}
               type="button"
               onClick={() => setAuthMode('register')}
             >
-              Register
+              注册
             </button>
           </div>
           <label>
-            Username
+            用户名
             <input value={username} onChange={(event) => setUsername(event.target.value)} />
           </label>
           {authMode === 'register' && (
             <label>
-              Display name
+              显示名
               <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
             </label>
           )}
           <label>
-            Password
+            密码
             <input
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
             />
           </label>
-          {authError && <p className="error compact">Auth failed: {authError}</p>}
+          {authError && <p className="error compact">登录失败：{authError}</p>}
           <button className="refresh-button compact-button" type="submit">
-            {authMode === 'login' ? 'Log in' : 'Create learner account'}
+            {authMode === 'login' ? '登录' : '创建学习者账号'}
           </button>
         </form>
       </section>
@@ -459,10 +740,10 @@ export default function App() {
           <div className="panel-heading">
             <div>
               <p className="eyebrow">Placement</p>
-              <h2>Find your starting level</h2>
+              <h2>找到起始水平</h2>
             </div>
             <button className="secondary-button" type="button" onClick={startPlacement} disabled={placementBusy}>
-              Start test
+              开始测试
             </button>
           </div>
           {renderPlacementQuestion(false)}
@@ -472,10 +753,10 @@ export default function App() {
           <div className="panel-heading">
             <div>
               <p className="eyebrow">Profile</p>
-              <h2>Your level</h2>
+              <h2>你的水平</h2>
             </div>
             <button className="secondary-button" type="button" onClick={loadProfile}>
-              Refresh
+              刷新
             </button>
           </div>
           {renderLearnerProfile()}
@@ -484,8 +765,21 @@ export default function App() {
         <section className="tool-panel learning-panel">
           <div className="panel-heading">
             <div>
+              <p className="eyebrow">词库</p>
+              <h2>已学与未学单词</h2>
+            </div>
+            <button className="secondary-button" type="button" onClick={loadVocabulary} disabled={vocabularyBusy}>
+              刷新
+            </button>
+          </div>
+          {renderVocabularyPanel()}
+        </section>
+
+        <section className="tool-panel learning-panel">
+          <div className="panel-heading">
+            <div>
               <p className="eyebrow">Learning</p>
-              <h2>Next scenario</h2>
+              <h2>下一个场景</h2>
             </div>
             <button
               className="secondary-button"
@@ -493,7 +787,7 @@ export default function App() {
               onClick={loadNextLearningPackage}
               disabled={learningBusy || !profile}
             >
-              Start learning
+              开始学习
             </button>
           </div>
           {renderLearningPackage()}
@@ -507,31 +801,31 @@ export default function App() {
       <section className="admin-console">
         <section className="status-panel">
           <div>
-            <span className="label">Backend status</span>
+            <span className="label">后端状态</span>
             <strong>{state === 'success' ? health?.status : state}</strong>
           </div>
           <div>
-            <span className="label">Service</span>
+            <span className="label">服务</span>
             <strong>{health?.service ?? '-'}</strong>
           </div>
           <div>
-            <span className="label">Version</span>
+            <span className="label">版本</span>
             <strong>{health?.version ?? '-'}</strong>
           </div>
         </section>
 
-        {error && <p className="error">Backend request failed: {error}</p>}
+        {error && <p className="error">后端请求失败：{error}</p>}
 
         <button className="refresh-button" type="button" onClick={loadHealth}>
-          Refresh health check
+          刷新健康检查
         </button>
 
         <section className="debug-grid">
           <section className="tool-panel">
             <div className="panel-heading">
               <div>
-                <p className="eyebrow">Admin Debug</p>
-                <h2>Access probes</h2>
+                <p className="eyebrow">管理员</p>
+                <h2>权限检查</h2>
               </div>
             </div>
             <div className="access-actions">
@@ -540,14 +834,14 @@ export default function App() {
                 type="button"
                 onClick={() => checkProtectedEndpoint('/api/learner/probe')}
               >
-                Check learner API
+                检查 learner API
               </button>
               <button
                 className="secondary-button"
                 type="button"
                 onClick={() => checkProtectedEndpoint('/api/admin/probe')}
               >
-                Check admin API
+                检查 admin API
               </button>
             </div>
             {accessProbe && (
@@ -555,17 +849,30 @@ export default function App() {
                 {accessProbe.scope}: {accessProbe.message}
               </p>
             )}
-            {accessError && <p className="error compact">Access denied: {accessError}</p>}
+            {accessError && <p className="error compact">访问失败：{accessError}</p>}
           </section>
 
           <section className="tool-panel">
             <div className="panel-heading">
               <div>
-                <p className="eyebrow">Admin Debug</p>
-                <h2>Placement sandbox</h2>
+                <p className="eyebrow">Agent</p>
+                <h2>运行时</h2>
+              </div>
+              <button className="secondary-button" type="button" onClick={loadAgentRuntime} disabled={agentRuntimeBusy}>
+                刷新
+              </button>
+            </div>
+            {renderAgentRuntimePanel()}
+          </section>
+
+          <section className="tool-panel">
+            <div className="panel-heading">
+              <div>
+                <p className="eyebrow">管理员</p>
+                <h2>测试沙盒</h2>
               </div>
               <button className="secondary-button" type="button" onClick={startPlacement} disabled={placementBusy}>
-                Start test
+                开始测试
               </button>
             </div>
             {renderPlacementQuestion(true)}
@@ -574,14 +881,24 @@ export default function App() {
           <section className="tool-panel">
             <div className="panel-heading">
               <div>
-                <p className="eyebrow">Admin Debug</p>
-                <h2>Raw profile</h2>
+                <p className="eyebrow">管理员</p>
+                <h2>用户画像原始数据</h2>
               </div>
               <button className="secondary-button" type="button" onClick={loadProfile}>
-                Refresh profile
+                刷新画像
               </button>
             </div>
             {renderRawProfile()}
+          </section>
+
+          <section className="tool-panel">
+            <div className="panel-heading">
+              <div>
+                <p className="eyebrow">数据管理</p>
+                <h2>单词管理</h2>
+              </div>
+            </div>
+            {renderAdminWordPanel()}
           </section>
         </section>
       </section>
@@ -594,22 +911,22 @@ export default function App() {
         {placementSession && showDebug && (
           <div className="metrics-row">
             <div>
-              <span className="label">Session</span>
+              <span className="label">会话</span>
               <strong>{placementSession.sessionId}</strong>
             </div>
             <div>
-              <span className="label">Answered</span>
+              <span className="label">已答</span>
               <strong>{placementSession.answeredCount}</strong>
             </div>
             <div>
-              <span className="label">Difficulty</span>
+              <span className="label">难度</span>
               <strong>{placementSession.currentDifficultyScore}</strong>
             </div>
           </div>
         )}
 
         {!currentItem && !placementResult && (
-          <p className="hint">Start the placement test when you are ready.</p>
+          <p className="hint">准备好后开始水平测试。</p>
         )}
 
         {currentItem && itemContent && (
@@ -621,7 +938,7 @@ export default function App() {
                 <span>Difficulty {currentItem.difficultyScore}</span>
               </div>
             )}
-            <h3>{itemContent.question ?? 'Question'}</h3>
+            <h3>{itemContent.question ?? '题目'}</h3>
             {options.length > 0 ? (
               <div className="option-list">
                 {options.map((option, index) => (
@@ -638,7 +955,7 @@ export default function App() {
               </div>
             ) : (
               <label className="text-answer">
-                Answer
+                答案
                 <input value={textAnswer} onChange={(event) => setTextAnswer(event.target.value)} />
               </label>
             )}
@@ -648,34 +965,34 @@ export default function App() {
               onClick={submitCurrentAnswer}
               disabled={placementBusy}
             >
-              Submit answer
+              提交答案
             </button>
           </div>
         )}
 
         {placementResult && (
           <div className="result-panel">
-            <p className="success">Placement finished.</p>
+            <p className="success">水平测试完成。</p>
             <div className="metrics-row">
               <div>
-                <span className="label">Score</span>
+                <span className="label">得分</span>
                 <strong>{placementResult.scorePercent}%</strong>
               </div>
               <div>
-                <span className="label">Correct</span>
+                <span className="label">正确</span>
                 <strong>
                   {placementResult.correctCount}/{placementResult.itemCount}
                 </strong>
               </div>
               <div>
-                <span className="label">Estimated level</span>
+                <span className="label">估计水平</span>
                 <strong>{placementResult.estimatedLevel}</strong>
               </div>
             </div>
           </div>
         )}
 
-        {placementError && <p className="error compact">Placement failed: {placementError}</p>}
+        {placementError && <p className="error compact">测试失败：{placementError}</p>}
 
         {showDebug && answerLog.length > 0 && (
           <ul className="answer-log">
@@ -690,20 +1007,20 @@ export default function App() {
 
   function renderLearnerProfile() {
     if (!profile) {
-      return <p className="hint">{profileError ?? 'Finish the placement test to generate your profile.'}</p>;
+      return <p className="hint">{profileError ?? '完成水平测试后会生成你的画像。'}</p>;
     }
 
     return (
       <div className="profile-content">
         <div className="level-badge">{profile.cefrLevel}</div>
-        <p className="hint">Your learning path will use this level and your weak areas.</p>
+        <p className="hint">后续学习会使用你的水平和薄弱项。</p>
       </div>
     );
   }
 
   function renderRawProfile() {
     if (!profile) {
-      return <p className="hint">{profileError ?? 'No profile has been generated for this account.'}</p>;
+      return <p className="hint">{profileError ?? '当前账号还没有生成画像。'}</p>;
     }
 
     return (
@@ -714,56 +1031,308 @@ export default function App() {
             <strong>{profile.cefrLevel}</strong>
           </div>
           <div>
-            <span className="label">Source session</span>
+            <span className="label">来源会话</span>
             <strong>{profile.lastPlacementSessionId ?? '-'}</strong>
           </div>
         </div>
         <label>
-          Dimension scores
+          维度分数
           <pre>{prettyJson(profile.dimensionScoresJson)}</pre>
         </label>
         <label>
-          Weak scenarios
+          薄弱场景
           <pre>{prettyJson(profile.weakScenariosJson)}</pre>
         </label>
         <label>
-          Weak abilities
+          薄弱能力
           <pre>{prettyJson(profile.weakAbilitiesJson)}</pre>
         </label>
       </div>
     );
   }
 
+  function renderAgentRuntimePanel() {
+    if (agentRuntimeError) {
+      return <p className="error compact">Agent 运行时加载失败：{agentRuntimeError}</p>;
+    }
+
+    if (!agentRuntime) {
+      return <p className="hint">刷新后查看当前 Agent provider 和 Spring AI 状态。</p>;
+    }
+
+    return (
+      <div className="metrics-row">
+        <div>
+          <span className="label">Provider</span>
+          <strong>{agentRuntime.provider}</strong>
+        </div>
+        <div>
+          <span className="label">Spring AI</span>
+          <strong>{agentRuntime.springAiClientAvailable ? '可用' : '不可用'}</strong>
+        </div>
+        <div>
+          <span className="label">契约</span>
+          <strong>{agentRuntime.contractVersion}</strong>
+        </div>
+      </div>
+    );
+  }
+
+  function renderVocabularyPanel() {
+    return (
+      <div className="vocabulary-content">
+        <form
+          className="inline-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void loadVocabulary();
+          }}
+        >
+          <select
+            value={vocabularyStatus}
+            onChange={(event) => setVocabularyStatus(event.target.value as VocabularyStatusFilter)}
+          >
+            <option value="ALL">全部</option>
+            <option value="LEARNED">已学</option>
+            <option value="UNLEARNED">未学</option>
+          </select>
+          <input
+            value={vocabularyQuery}
+            onChange={(event) => setVocabularyQuery(event.target.value)}
+            placeholder="搜索单词，例如 go"
+          />
+          <button className="secondary-button" type="submit" disabled={vocabularyBusy}>
+            查询
+          </button>
+        </form>
+
+        <p className="hint">
+          当前测试词库是按有效频率排名取前 500 个清洗候选，不是原始 CSV 的前 500 行。
+        </p>
+
+        {vocabularyError && <p className="error compact">词库加载失败：{vocabularyError}</p>}
+
+        {!vocabulary && !vocabularyError && <p className="hint">登录后会加载当前测试词库。</p>}
+
+        {vocabulary && (
+          <div className="vocabulary-window">
+            <p className="hint">
+              匹配 {vocabulary.totalMatchedWords} 个单词，当前显示 {vocabulary.items.length} 个。
+            </p>
+            <div className="vocabulary-list">
+              {vocabulary.items.map((word) => (
+                <article className="vocabulary-card" key={word.learningUnitId}>
+                  <div className="word-row">
+                    <strong>{word.canonicalText}</strong>
+                    <span className={`target-type ${word.learnedStatus.toLowerCase()}`}>
+                      {word.learnedStatus === 'UNLEARNED' ? '未学' : word.learnedStatus === 'PARTIAL' ? '部分已学' : '已学'}
+                    </span>
+                  </div>
+                  <small>
+                    {word.learnedSenseCount}/{word.totalSenseCount} 个词义已学习
+                  </small>
+                  <div className="sense-list">
+                    {word.senses.map((sense) => (
+                      <div className="sense-line" key={sense.senseId}>
+                        <span>{sense.partOfSpeech ?? 'OTHER'}</span>
+                        <p>{sense.definitionZh ?? sense.definitionEn}</p>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function renderAdminWordPanel() {
+    return (
+      <div className="admin-word-content">
+        <form className="inline-form" onSubmit={searchAdminWordByQuery}>
+          <input
+            value={adminWordQuery}
+            onChange={(event) => setAdminWordQuery(event.target.value)}
+            placeholder="查询已有单词"
+          />
+          <button className="secondary-button" type="submit" disabled={adminWordBusy}>
+            查询
+          </button>
+        </form>
+
+        <form className="admin-form-grid" onSubmit={createAdminWordFromForm}>
+          <h3>新增单个单词</h3>
+          <input
+            value={adminWordForm.canonicalText}
+            onChange={(event) => setAdminWordForm({ ...adminWordForm, canonicalText: event.target.value })}
+            placeholder="单词，例如 wallet"
+          />
+          <select
+            value={adminWordForm.partOfSpeech}
+            onChange={(event) => setAdminWordForm({ ...adminWordForm, partOfSpeech: event.target.value })}
+          >
+            {partOfSpeechOptions().map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+          <textarea
+            value={adminWordForm.definitionEn}
+            onChange={(event) => setAdminWordForm({ ...adminWordForm, definitionEn: event.target.value })}
+            placeholder="英文释义"
+            rows={2}
+          />
+          <textarea
+            value={adminWordForm.definitionZh}
+            onChange={(event) => setAdminWordForm({ ...adminWordForm, definitionZh: event.target.value })}
+            placeholder="中文释义"
+            rows={2}
+          />
+          <button className="refresh-button compact-button" type="submit" disabled={adminWordBusy}>
+            新增单词
+          </button>
+        </form>
+
+        {adminWordDetail && (
+          <div className="admin-edit-block">
+            <div className="word-row">
+              <strong>{adminWordDetail.canonicalText}</strong>
+              <span className="status-pill">{adminWordDetail.status}</span>
+            </div>
+
+            <form className="admin-form-grid" onSubmit={updateAdminWordFromForm}>
+              <h3>编辑单词</h3>
+              <input
+                value={adminWordUpdateForm.canonicalText}
+                onChange={(event) =>
+                  setAdminWordUpdateForm({ ...adminWordUpdateForm, canonicalText: event.target.value })
+                }
+                placeholder="标准单词"
+              />
+              <select
+                value={adminWordUpdateForm.status}
+                onChange={(event) => setAdminWordUpdateForm({ ...adminWordUpdateForm, status: event.target.value })}
+              >
+                <option value="ACTIVE">启用</option>
+                <option value="OFFLINE">下线</option>
+                <option value="REVIEW">待复核</option>
+              </select>
+              <button className="secondary-button" type="submit" disabled={adminWordBusy}>
+                保存单词
+              </button>
+            </form>
+
+            {adminWordDetail.senses[0] && (
+              <form className="admin-form-grid" onSubmit={updateAdminSenseFromForm}>
+                <h3>编辑首个词义</h3>
+                <select
+                  value={adminSenseForm.partOfSpeech}
+                  onChange={(event) => setAdminSenseForm({ ...adminSenseForm, partOfSpeech: event.target.value })}
+                >
+                  <option value="">未设置词性</option>
+                  {partOfSpeechOptions().map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+                <textarea
+                  value={adminSenseForm.definitionEn}
+                  onChange={(event) => setAdminSenseForm({ ...adminSenseForm, definitionEn: event.target.value })}
+                  placeholder="英文释义"
+                  rows={2}
+                />
+                <textarea
+                  value={adminSenseForm.definitionZh}
+                  onChange={(event) => setAdminSenseForm({ ...adminSenseForm, definitionZh: event.target.value })}
+                  placeholder="中文释义"
+                  rows={2}
+                />
+                <select
+                  value={adminSenseForm.status}
+                  onChange={(event) => setAdminSenseForm({ ...adminSenseForm, status: event.target.value })}
+                >
+                  <option value="ACTIVE">启用</option>
+                  <option value="OFFLINE">下线</option>
+                  <option value="REVIEW">待复核</option>
+                </select>
+                <button className="secondary-button" type="submit" disabled={adminWordBusy}>
+                  保存词义
+                </button>
+              </form>
+            )}
+
+            <div className="sense-list">
+              {adminWordDetail.senses.map((sense) => (
+                <div className="sense-line" key={sense.id}>
+                  <span>{sense.partOfSpeech ?? 'OTHER'}</span>
+                  <p>{sense.definitionZh ?? sense.definitionEn}</p>
+                </div>
+              ))}
+            </div>
+
+            <button className="danger-button" type="button" onClick={deleteAdminWordFromDetail} disabled={adminWordBusy}>
+              删除单词
+            </button>
+          </div>
+        )}
+
+        {adminWordError && <p className="error compact">单词管理失败：{adminWordError}</p>}
+      </div>
+    );
+  }
+
+  function partOfSpeechOptions() {
+    return [
+      'NOUN',
+      'VERB',
+      'ADJECTIVE',
+      'ADVERB',
+      'PRONOUN',
+      'DETERMINER',
+      'PREPOSITION',
+      'CONJUNCTION',
+      'INTERJECTION',
+      'NUMERAL',
+      'AUXILIARY',
+      'PARTICLE',
+      'OTHER'
+    ];
+  }
+
   function renderReviewPlan() {
     if (!profile) {
-      return <p className="hint">Finish the placement test first. Your plan will use your profile level.</p>;
+      return <p className="hint">请先完成水平测试，学习计划会使用你的画像。</p>;
     }
 
     if (reviewError) {
-      return <p className="error compact">Review plan failed: {reviewError}</p>;
+      return <p className="error compact">学习计划加载失败：{reviewError}</p>;
     }
 
     if (!reviewPlan) {
-      return <p className="hint">Your learning plan will load automatically when the scenario starts.</p>;
+      return <p className="hint">开始学习时会自动加载学习计划。</p>;
     }
 
     if (reviewPlan.items.length === 0) {
-      return <p className="hint">No review or new sense targets are available yet.</p>;
+      return <p className="hint">当前还没有可用的复习或新词义目标。</p>;
     }
 
     return (
       <div className="review-plan-content">
         <div className="metrics-row">
           <div>
-            <span className="label">Review</span>
+            <span className="label">复习</span>
             <strong>{reviewPlan.reviewTargetCount}</strong>
           </div>
           <div>
-            <span className="label">New</span>
+            <span className="label">新词义</span>
             <strong>{reviewPlan.newTargetCount}</strong>
           </div>
           <div>
-            <span className="label">Overdue</span>
+            <span className="label">逾期复习</span>
             <strong>{reviewPlan.overdueReviewCount}</strong>
           </div>
         </div>

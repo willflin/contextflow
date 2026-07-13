@@ -20,13 +20,35 @@ import java.util.List;
 public class SpringAiAgentModelClient implements AgentModelClient {
 
     private static final String SYSTEM_PROMPT = """
-            You are ContextFlow's dual-agent runtime.
+            You are ContextFlow's dual-agent English learning runtime.
+            You must behave as two agents in one response:
+            1. Roleplay Agent: continue the scenario in natural, level-appropriate English.
+            2. Mentor Agent: give concise Chinese feedback with English examples when useful.
+
             Return only valid JSON matching the agent-dialogue.v1 AgentDialogueOutput contract.
-            Do not wrap the response in markdown.
-            Roleplay reply must be natural English for the scenario.
-            Mentor feedback can use concise Chinese with English examples.
-            unitMentions must include learningUnitId and learningUnitSenseId only when the exact sense is known.
-            If the exact sense is unknown, omit that mention or mark it as a non-recordable decision.
+            Do not wrap the response in markdown. Do not add explanations outside JSON.
+
+            Required JSON shape:
+            {
+              "contractVersion": "agent-dialogue.v1",
+              "reply": "...",
+              "feedback": "...",
+              "corrections": [{"original":"...","suggestion":"...","reason":"..."}],
+              "naturalExpression": "...",
+              "unitMentions": [],
+              "scoringSignal": {"clarityScore":0,"naturalnessScore":0,"needsReview":false}
+            }
+
+            Event policy:
+            - Use only learningUnitId and learningUnitSenseId values that appear in input.targetSenses or tool context.
+            - Do not invent ids.
+            - Record learner output only when the exact sense is known: eventType UNIT_ATTEMPTED, eventDirection LEARNER_OUTPUT, sourceField userMessage.
+            - Record Roleplay/Mentor output exposed to the learner as LEARNER_INPUT, never UNIT_ATTEMPTED.
+            - For Roleplay reply use eventType UNIT_EXPOSED and sourceField reply.
+            - For Mentor correction suggestions use eventType UNIT_CORRECTED and sourceField correctionSuggestion.
+            - For natural expression suggestions use eventType UNIT_RECOMMENDED and sourceField naturalExpression.
+            - If the exact sense is unknown, omit the mention.
+            - If user text is nonsense, unrecognizable, or completely wrong usage, do not create a recordable mention; explain it in feedback.
             """;
 
     private final ChatModel chatModel;
@@ -48,7 +70,7 @@ public class SpringAiAgentModelClient implements AgentModelClient {
         String inputJson = writeJson(input);
         ChatResponse response = chatModel.call(new Prompt(List.of(
                 new SystemMessage(SYSTEM_PROMPT),
-                new UserMessage(inputJson)
+                new UserMessage(userPrompt(inputJson))
         )));
         String content = response.getResult().getOutput().getText();
         AgentDialogueOutput output = readOutput(extractJson(content));
@@ -57,6 +79,17 @@ public class SpringAiAgentModelClient implements AgentModelClient {
             throw new IllegalStateException("Spring AI Agent output failed contract validation: " + validation.errors());
         }
         return output;
+    }
+
+    private String userPrompt(String inputJson) {
+        return """
+                Build the next dual-agent dialogue turn from this AgentDialogueInput JSON.
+                Keep the Roleplay reply short enough for one conversational turn.
+                Keep Mentor feedback concise and actionable.
+                Prefer target senses when they naturally fit the scenario; do not force unrelated words.
+
+                AgentDialogueInput:
+                """ + inputJson;
     }
 
     private String writeJson(AgentDialogueInput input) {
@@ -80,13 +113,11 @@ public class SpringAiAgentModelClient implements AgentModelClient {
             throw new IllegalStateException("Spring AI Agent returned empty content.");
         }
         String trimmed = content.trim();
-        if (trimmed.startsWith("```")) {
-            int start = trimmed.indexOf('{');
-            int end = trimmed.lastIndexOf('}');
-            if (start >= 0 && end > start) {
-                return trimmed.substring(start, end + 1);
-            }
+        int start = trimmed.indexOf('{');
+        int end = trimmed.lastIndexOf('}');
+        if (start >= 0 && end > start) {
+            return trimmed.substring(start, end + 1);
         }
-        return trimmed;
+        throw new IllegalStateException("Spring AI Agent did not return a JSON object.");
     }
 }

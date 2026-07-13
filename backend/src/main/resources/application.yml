@@ -45,7 +45,7 @@ contextflow:
   scenario:
     seed-demo-templates: true
   content:
-    seed-demo-units: true
+    seed-demo-units: ${CONTEXTFLOW_SEED_DEMO_UNITS:false}
   review:
     priority-refresh-enabled: true
     priority-refresh-initial-delay-ms: 60000

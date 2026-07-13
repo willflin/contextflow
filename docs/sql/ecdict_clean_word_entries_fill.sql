@@ -1,8 +1,8 @@
 -- ECDICT 清洗单词表填充 / Fill ECDICT cleaned word table
 -- 不修改 ecdict_import_entries 原始表。
 -- Does not modify the raw ecdict_import_entries table.
--- word-frequency-v2 规则：只保留普通单词形态、必须有有效频率，并排除缩写和专名。
--- word-frequency-v2 rule: keep ordinary word-shaped entries with valid frequency, excluding abbreviations and proper names.
+-- word-frequency-v3 规则：只保留普通单词形态、必须有有效频率，并排除缩写、专名和重复字母噪声。
+-- word-frequency-v3 rule: keep ordinary word-shaped entries with valid frequency, excluding abbreviations, proper names, and repeated-letter noise.
 
 TRUNCATE TABLE ecdict_clean_word_entries;
 
@@ -38,11 +38,15 @@ SELECT
     bnc_rank,
     frq_rank,
     exchange_raw,
-    'word-frequency-v2'
+    'word-frequency-v3'
 FROM ecdict_import_entries
 WHERE word REGEXP '^[A-Za-z]+$'
   AND (frq_rank IS NOT NULL OR bnc_rank IS NOT NULL)
   AND (word IN ('a', 'I') OR BINARY word = LOWER(word))
+  AND NOT (
+      CHAR_LENGTH(LOWER(word)) > 1
+      AND REPLACE(LOWER(word), LEFT(LOWER(word), 1), '') = ''
+  )
   AND NOT (
       LOWER(COALESCE(translation_raw, '')) LIKE 'abbr.%'
       OR LOWER(COALESCE(translation_raw, '')) LIKE 'abbr[%'

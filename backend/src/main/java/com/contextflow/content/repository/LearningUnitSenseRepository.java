@@ -14,6 +14,8 @@ public interface LearningUnitSenseRepository extends JpaRepository<LearningUnitS
 
     List<LearningUnitSenseEntity> findByLearningUnitIdAndStatusOrderByIdAsc(Long learningUnitId, LearningUnitStatus status);
 
+    List<LearningUnitSenseEntity> findByLearningUnitIdOrderByIdAsc(Long learningUnitId);
+
     Optional<LearningUnitSenseEntity> findByLearningUnitIdAndSenseKey(Long learningUnitId, String senseKey);
 
     @Query("""

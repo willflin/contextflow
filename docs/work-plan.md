@@ -138,8 +138,11 @@ Phase 5.3 changes `/api/review/plan` to read persisted `review_priority_score`; 
 
 - 固定 Agent 对话输入/输出 JSON 契约。 / Fix the Agent dialogue input/output JSON contract. ✅ Phase 6.1
 - 引入 Spring AI + DeepSeek 运行时入口。 / Add the Spring AI + DeepSeek runtime entry. ✅ Phase 6.1.1
+- 接入真实 Agent 对话运行链路。 / Wire the real Agent dialogue runtime. ✅ Phase 6.3
 - 导入 ECDICT 原始词典表。 / Import ECDICT raw dictionary tables. ✅ Phase 6.2 raw
 - 清洗 ECDICT 单词候选表。 / Clean ECDICT word candidate table. ✅ Phase 6.2 clean
+- 小批量导入 ECDICT 正式语言单元表。 / Import a small ECDICT batch into formal language-unit tables. ✅ Phase 6.2 formal-test
+- 添加 admin 单词数据管理和 learner 词库查询。 / Add admin word-data management and learner vocabulary search. ✅ Phase 6.2 app-data
 - 添加生成任务。 / Add generation jobs.
 - 添加 Prompt 模板。 / Add prompt templates.
 - 添加结构化 JSON 校验。 / Add structured JSON validation.
@@ -157,9 +160,13 @@ Phase 6.2 raw 新增 ECDICT 原始导入批次表和原始词条表，只保存�
 
 Phase 6.2 raw adds ECDICT raw import batch and entry tables, storing external CSV fields and frequency ranks without writing directly into business sense tables.
 
-Phase 6.2 clean 新增 `ecdict_clean_word_entries`，只保留普通单词形态且有有效频率的候选项，排除短语、数字、连字符、撇号、缩写、专名和词根前后缀，不写入正式学习单元表。
+Phase 6.2 clean 新增 `ecdict_clean_word_entries`，只保留普通单词形态且有有效频率的候选项，排除短语、数字、连字符、撇号、缩写、专名、重复字母噪声和词根前后缀，不写入正式学习单元表。
 
-Phase 6.2 clean adds `ecdict_clean_word_entries`, keeping ordinary word candidates with valid frequency and excluding phrases, digits, hyphens, apostrophes, abbreviations, proper names, and affix/root noise without writing into formal learning unit tables.
+Phase 6.2 clean adds `ecdict_clean_word_entries`, keeping ordinary word candidates with valid frequency and excluding phrases, digits, hyphens, apostrophes, abbreviations, proper names, repeated-letter noise, and affix/root noise without writing into formal learning unit tables.
+
+Phase 6.2 formal-test 将清洗表 top 500 候选受控导入正式语言单元表，并关闭 demo 语言单元默认种子，避免旧测试数据混入。
+
+Phase 6.2 formal-test imports the top 500 cleaned candidates into formal language-unit tables and disables demo language-unit seeding by default to avoid mixing old test data.
 
 ## Phase 7：Redis
 
