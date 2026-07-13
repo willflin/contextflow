@@ -194,3 +194,52 @@ Add only after READY package caching and AI rate limiting are needed.
 只有当数据库任务轮询不够用时，才加入 Kafka 或 RabbitMQ。
 
 Kafka or RabbitMQ is added only after database task polling is not enough.
+
+## Next Phase：真实 Agent 工作流稳定化 / Real Agent Workflow Stabilization
+
+### 目标 / Goal
+
+- 让 DeepSeek/Spring AI 从“能调用”进入“可用于学习闭环”的状态。 / Move DeepSeek/Spring AI from callable to usable in the learning loop.
+- 所有学习事件继续以词义级 `learning_unit_sense_id` 为核心，不引入语言单元本体掌握度。 / Keep all learning events centered on sense-level `learning_unit_sense_id`, with no language-unit-level mastery.
+- 在引入 AI 预生成任务前，先保证实时对话链路的契约、fallback、事件写入和调试信息可靠。 / Before adding AI pre-generation jobs, make the real-time dialogue path reliable in contract validation, fallback, event writes, and diagnostics.
+
+### Phase 6.3.5：Agent 输出契约稳定化 / Agent Output Contract Stabilization
+
+- 修正 probe 样例，使 `targetSenses`、`reply` 和 `unitMentions` 一致。 / Fix the probe sample so `targetSenses`, `reply`, and `unitMentions` are consistent.
+- `unitMentions` 只允许可记录事件：`RECORD_EVENT` 或 `RECORD_SPELLING_OR_FORM_ERROR`。 / Allow only recordable event decisions in `unitMentions`: `RECORD_EVENT` or `RECORD_SPELLING_OR_FORM_ERROR`.
+- 未命中、错误用法、不可识别输入不进入 `unitMentions`，只在 Mentor feedback 中解释。 / Unmatched, wrong-usage, or unrecognizable input must not enter `unitMentions`; Mentor feedback explains it instead.
+- 后端校验 `occurrenceText` 必须真实出现在对应 `sourceField`。 / Backend validation requires `occurrenceText` to appear in the referenced `sourceField`.
+- probe 页面区分模型实际输出、契约错误、最终 fallback 输出。 / The probe page distinguishes model output, contract errors, and final fallback output.
+
+### Phase 6.4：真实学习对话验收 / Real Learning Dialogue Acceptance
+
+- learner 正常对话时真实模型返回 `reply/feedback/corrections/naturalExpression`。 / Real model returns `reply/feedback/corrections/naturalExpression` in learner dialogue.
+- 当模型输出合约且含 recordable `unitMentions` 时，写入 `learning_events`。 / Write `learning_events` when model output is valid and contains recordable `unitMentions`.
+- 当模型输出不合约时，保留本地 fallback，不写错误事件。 / Keep local fallback and avoid bad event writes when model output fails the contract.
+- 检查 `learning_dialogue_turns`、`learning_events`、`user_learning_unit_sense_stats` 三张表的闭环变化。 / Verify the loop across `learning_dialogue_turns`, `learning_events`, and `user_learning_unit_sense_stats`.
+
+### Phase 6.5：AI 调用审计 / AI Call Audit
+
+- 新增 AI 调用日志表，记录 provider、model、调用场景、耗时、是否 fallback、错误类型。 / Add an AI call log table for provider, model, use case, latency, fallback flag, and error type.
+- 日志不保存 API key；原始 prompt/output 是否保存要按调试价值和隐私风险再决定。 / Logs never store API keys; storing raw prompt/output will be decided by debugging value and privacy risk.
+- admin 只读查看近期 AI 调用，不直接修改学习事件或掌握度。 / Admin can read recent AI calls but cannot modify learning events or mastery.
+
+### Phase 6.6：AI 预生成任务模型 / AI Pre-generation Job Model
+
+- 设计内容预生成任务表：场景、目标词义、状态、重试次数、错误信息、READY 内容版本。 / Design pre-generation job tables for scenario, target senses, status, retry count, error, and READY content version.
+- 状态流：`PENDING -> RUNNING -> SUCCEEDED/FAILED/CANCELLED`。 / Status flow: `PENDING -> RUNNING -> SUCCEEDED/FAILED/CANCELLED`.
+- 用户只消费 READY 学习包，不等待实时生成。 / Learners consume only READY packages and never wait for real-time generation.
+- 先用数据库轮询，不引入 Redis/Kafka。 / Use database polling first; do not add Redis/Kafka yet.
+
+### Phase 7：遗忘曲线与复习调度强化 / Forgetting Curve and Review Scheduling
+
+- 保持 `reviewPriorityScore` 作为唯一复习优先级依据。 / Keep `reviewPriorityScore` as the only review priority basis.
+- 定期任务根据掌握度、遗忘风险、输入/输出事件、词频反相关、难度和近期曝光刷新分数。 / A scheduled job refreshes scores from mastery, forgetting risk, input/output events, inverse frequency, difficulty, and recent exposure.
+- 学习计划继续按比例混合复习词义和新词义。 / Learning plans continue to mix review senses and new senses by ratio.
+- 新词义按频率、等级匹配、场景标签和未学状态排序。 / New senses are ranked by frequency, level fit, scenario tags, and unlearned state.
+# 当前设计补充：学习任务目标 / Current Design Addendum: Learning Task Goal
+
+- `scenario` 不再代表完整学习流程，只保留分类、标签和种子来源含义。/ `scenario` no longer represents the full learning flow; it remains only as category, tag, and seed-source metadata.
+- READY 学习包通过 `learningTask.goal` 表达 AI 给用户提出的任务目标。/ READY packages express the AI-proposed learner task through `learningTask.goal`.
+- 后续 AI 预生成应按目标词义生成或选择多个合适任务，再生成对应对话内容。/ Future AI pre-generation should generate or select multiple suitable tasks from target senses, then generate matching dialogue content.
+- 当前实现暂不新增 SQL；任务目标保存在学习包 JSON 中，后续预生成任务模型再决定是否独立建表。/ The current implementation adds no SQL; task goals are stored in package JSON, and later pre-generation job modeling can decide whether a dedicated table is needed.

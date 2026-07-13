@@ -9,6 +9,7 @@ import com.contextflow.ai.agent.dto.AgentDialogueInput;
 import com.contextflow.ai.agent.dto.AgentDialogueOutput;
 import com.contextflow.ai.agent.dto.AgentLearnerProfileContext;
 import com.contextflow.ai.agent.dto.AgentLearningPackageContext;
+import com.contextflow.ai.agent.dto.AgentOutputSanitizationResult;
 import com.contextflow.ai.agent.dto.AgentRole;
 import com.contextflow.ai.agent.dto.AgentTargetSenseContext;
 import com.contextflow.ai.agent.dto.AgentToolAccessContext;
@@ -25,6 +26,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @Service
@@ -78,12 +80,42 @@ public class AgentDialogueContractService {
         if (output.unitMentions() == null) {
             errors.add("unitMentions must be an array");
         } else {
-            validateUnitMentions(output.unitMentions(), errors);
+            validateUnitMentions(output, errors);
         }
         if (output.scoringSignal() == null) {
             errors.add("scoringSignal is required");
         }
         return new AgentContractValidationResult(errors.isEmpty(), errors);
+    }
+
+    public AgentOutputSanitizationResult sanitizeOutput(AgentDialogueOutput output) {
+        if (output == null || output.unitMentions() == null || output.unitMentions().isEmpty()) {
+            return new AgentOutputSanitizationResult(output, List.of());
+        }
+
+        List<AgentUnitMention> keptMentions = new ArrayList<>();
+        List<String> droppedErrors = new ArrayList<>();
+        for (int index = 0; index < output.unitMentions().size(); index++) {
+            AgentUnitMention mention = output.unitMentions().get(index);
+            List<String> mentionErrors = new ArrayList<>();
+            validateUnitMention(output, mention, "unitMentions[" + index + "].", mentionErrors);
+            if (mentionErrors.isEmpty()) {
+                keptMentions.add(mention);
+            } else {
+                droppedErrors.addAll(mentionErrors);
+            }
+        }
+
+        AgentDialogueOutput sanitizedOutput = new AgentDialogueOutput(
+                output.contractVersion(),
+                output.reply(),
+                output.feedback(),
+                output.corrections(),
+                output.naturalExpression(),
+                keptMentions,
+                output.scoringSignal()
+        );
+        return new AgentOutputSanitizationResult(sanitizedOutput, droppedErrors);
     }
 
     public AgentDialogueContractSampleResponse sample() {
@@ -102,17 +134,23 @@ public class AgentDialogueContractService {
                         "Bank account roleplay",
                         "bank_account",
                         "Open a bank account",
-                        "{\"scenario\":{\"code\":\"bank_account\"}}"
+                        "你需要去银行开一个账户，并询问需要哪些材料。",
+                        "zh-CN",
+                        "用英语说明想开户，并询问所需材料或下一步。",
+                        "Bank service representative. You help the learner open an account.",
+                        "Customer who wants banking service.",
+                        "Good morning. What kind of account would you like to open?",
+                        "{\"scenario\":{\"code\":\"bank_account\"},\"learningTask\":{\"goal\":\"你需要去银行开一个账户，并询问需要哪些材料。\",\"instructionLanguage\":\"zh-CN\",\"expectedLearnerAction\":\"用英语说明想开户，并询问所需材料或下一步。\"},\"roleplayAgent\":{\"persona\":\"Bank service representative. You help the learner open an account.\",\"learnerRole\":\"Customer who wants banking service.\",\"openingLine\":\"Good morning. What kind of account would you like to open?\"}}"
                 ),
                 List.of(new AgentTargetSenseContext(
                         "review",
-                        1L,
-                        1L,
-                        "go",
-                        "go:move",
-                        "VERB",
-                        "move or travel from one place to another",
-                        "go; move",
+                        3L,
+                        4L,
+                        "bank",
+                        "bank:financial-institution",
+                        "NOUN",
+                        "a financial institution",
+                        "bank; financial institution",
                         "A1",
                         "HIGH",
                         new BigDecimal("0.92"),
@@ -133,7 +171,7 @@ public class AgentDialogueContractService {
 
         AgentDialogueOutput output = new AgentDialogueOutput(
                 CONTRACT_VERSION,
-                "Certainly. Do you have your ID and proof of address with you today?",
+                "Certainly. I can help you open a bank account. Do you have your ID and proof of address with you today?",
                 "This is clear and polite.",
                 List.of(),
                 "Could you help me open a bank account?",
@@ -200,35 +238,63 @@ public class AgentDialogueContractService {
                 .toList();
     }
 
-    private void validateUnitMentions(List<AgentUnitMention> unitMentions, List<String> errors) {
+    private void validateUnitMentions(AgentDialogueOutput output, List<String> errors) {
+        List<AgentUnitMention> unitMentions = output.unitMentions();
         for (int index = 0; index < unitMentions.size(); index++) {
             AgentUnitMention mention = unitMentions.get(index);
             String prefix = "unitMentions[" + index + "].";
-            if (mention.agentRole() == null) {
-                errors.add(prefix + "agentRole is required");
-            }
-            if (isBlank(mention.sourceField())) {
-                errors.add(prefix + "sourceField is required");
-            }
-            if (mention.eventType() == null) {
-                errors.add(prefix + "eventType is required");
-            }
-            if (mention.eventDirection() == null) {
-                errors.add(prefix + "eventDirection is required");
-            }
-            if (isBlank(mention.occurrenceText())) {
-                errors.add(prefix + "occurrenceText is required");
-            }
-            if (mention.occurrenceIndex() == null || mention.occurrenceIndex() < 1) {
-                errors.add(prefix + "occurrenceIndex must be >= 1");
-            }
-            if (mention.agentDecision() == null) {
-                errors.add(prefix + "agentDecision is required");
-            }
-            validateConfidence(mention, prefix, errors);
-            validateRecordableMention(mention, prefix, errors);
-            validateEventDirection(mention, prefix, errors);
+            validateUnitMention(output, mention, prefix, errors);
         }
+    }
+
+    private void validateUnitMention(
+            AgentDialogueOutput output,
+            AgentUnitMention mention,
+            String prefix,
+            List<String> errors
+    ) {
+        if (mention == null) {
+            errors.add(prefix + "mention is required");
+            return;
+        }
+        if (mention.agentRole() == null) {
+            errors.add(prefix + "agentRole is required");
+        }
+        if (isBlank(mention.sourceField())) {
+            errors.add(prefix + "sourceField is required");
+        }
+        if (mention.eventType() == null) {
+            errors.add(prefix + "eventType is required");
+        }
+        if (mention.eventDirection() == null) {
+            errors.add(prefix + "eventDirection is required");
+        }
+        if (isBlank(mention.occurrenceText())) {
+            errors.add(prefix + "occurrenceText is required");
+        }
+        if (mention.occurrenceIndex() == null || mention.occurrenceIndex() < 1) {
+            errors.add(prefix + "occurrenceIndex must be >= 1");
+        }
+        if (mention.agentDecision() == null) {
+            errors.add(prefix + "agentDecision is required");
+        }
+        validateMentionDecision(mention, prefix, errors);
+        validateConfidence(mention, prefix, errors);
+        validateRecordableMention(mention, prefix, errors);
+        validateEventDirection(mention, prefix, errors);
+        validateSourceField(mention, prefix, errors);
+        validateSourceOccurrence(output, mention, prefix, errors);
+    }
+
+    private void validateMentionDecision(AgentUnitMention mention, String prefix, List<String> errors) {
+        if (mention.agentDecision() == null) {
+            return;
+        }
+        if (mention.agentDecision() == AgentUnitMentionDecision.RECORD_EVENT
+                || mention.agentDecision() == AgentUnitMentionDecision.RECORD_SPELLING_OR_FORM_ERROR) {
+            return;
+        }
+        errors.add(prefix + "non-recordable decisions must be omitted from unitMentions");
     }
 
     private void validateConfidence(AgentUnitMention mention, String prefix, List<String> errors) {
@@ -239,6 +305,11 @@ public class AgentDialogueContractService {
         if (mention.confidence().compareTo(BigDecimal.ZERO) < 0
                 || mention.confidence().compareTo(BigDecimal.ONE) > 0) {
             errors.add(prefix + "confidence must be between 0 and 1");
+        }
+        if ((mention.agentDecision() == AgentUnitMentionDecision.RECORD_EVENT
+                || mention.agentDecision() == AgentUnitMentionDecision.RECORD_SPELLING_OR_FORM_ERROR)
+                && mention.confidence().compareTo(new BigDecimal("0.50")) < 0) {
+            errors.add(prefix + "recordable mention confidence must be >= 0.50");
         }
     }
 
@@ -267,9 +338,79 @@ public class AgentDialogueContractService {
                 && mention.eventType() == LearningEventType.UNIT_ATTEMPTED) {
             errors.add(prefix + "learner input cannot use UNIT_ATTEMPTED");
         }
+        String sourceField = normalizeSourceField(mention.sourceField());
+        if (mention.eventDirection() == LearningEventDirection.LEARNER_OUTPUT
+                && !"usermessage".equals(sourceField)
+                && !"learnermessage".equals(sourceField)) {
+            errors.add(prefix + "learner output must use sourceField userMessage");
+        }
+        if (mention.eventType() == LearningEventType.UNIT_EXPOSED && !"reply".equals(sourceField)) {
+            errors.add(prefix + "UNIT_EXPOSED must use sourceField reply");
+        }
+        if (mention.eventType() == LearningEventType.UNIT_CORRECTED && !"correctionsuggestion".equals(sourceField)) {
+            errors.add(prefix + "UNIT_CORRECTED must use sourceField correctionSuggestion");
+        }
+        if (mention.eventType() == LearningEventType.UNIT_RECOMMENDED && !"naturalexpression".equals(sourceField)) {
+            errors.add(prefix + "UNIT_RECOMMENDED must use sourceField naturalExpression");
+        }
+    }
+
+    private void validateSourceField(AgentUnitMention mention, String prefix, List<String> errors) {
+        String sourceField = normalizeSourceField(mention.sourceField());
+        if (sourceField.isBlank()) {
+            return;
+        }
+        if (!List.of(
+                "usermessage",
+                "learnermessage",
+                "reply",
+                "feedback",
+                "naturalexpression",
+                "correctionsuggestion"
+        ).contains(sourceField)) {
+            errors.add(prefix + "sourceField is not supported");
+        }
+    }
+
+    private void validateSourceOccurrence(
+            AgentDialogueOutput output,
+            AgentUnitMention mention,
+            String prefix,
+            List<String> errors
+    ) {
+        if (isBlank(mention.occurrenceText()) || isBlank(mention.sourceField())) {
+            return;
+        }
+        String sourceField = normalizeSourceField(mention.sourceField());
+        boolean found = switch (sourceField) {
+            case "reply" -> containsIgnoreCase(output.reply(), mention.occurrenceText());
+            case "feedback" -> containsIgnoreCase(output.feedback(), mention.occurrenceText());
+            case "naturalexpression" -> containsIgnoreCase(output.naturalExpression(), mention.occurrenceText());
+            case "correctionsuggestion" -> output.corrections() != null && output.corrections().stream()
+                    .anyMatch(correction -> containsIgnoreCase(correction.suggestion(), mention.occurrenceText()));
+            case "usermessage", "learnermessage" -> true;
+            default -> false;
+        };
+        if (!found) {
+            errors.add(prefix + "occurrenceText must appear in the referenced sourceField");
+        }
     }
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private boolean containsIgnoreCase(String value, String fragment) {
+        if (value == null || fragment == null) {
+            return false;
+        }
+        return value.toLowerCase(Locale.ROOT).contains(fragment.toLowerCase(Locale.ROOT));
+    }
+
+    private String normalizeSourceField(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.trim().toLowerCase(Locale.ROOT).replace("_", "");
     }
 }

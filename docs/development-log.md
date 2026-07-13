@@ -808,3 +808,163 @@
 
 - 前端 `npm run typecheck` 通过。 / Frontend `npm run typecheck` passed.
 - 使用 JDK 21 和临时 Maven settings 执行 `mvn -q -DskipTests compile` 通过。 / Backend `mvn -q -DskipTests compile` passed with JDK 21 and a temporary Maven settings file.
+
+## Phase 6.3.5：Agent 工作流语义调试 / Agent Workflow Semantic Debugging
+
+### 问题 / Problem
+
+- DeepSeek API 已成功调用且契约校验通过，但模型返回了 `go/show/SKIP_UNRECOGNIZABLE` 这类未命中却带词义 id 的 `unitMention`。 / DeepSeek was called and contract validation passed, but the model returned a `unitMention` like `go/show/SKIP_UNRECOGNIZABLE`, carrying sense ids for an unmatched target.
+- probe 样例自身不一致：输入目标词义是 `go`，样例输出却写 `bank`，且 `bank` 未真实出现在样例 reply 中。 / The probe sample was internally inconsistent: the target sense was `go`, while the sample output used `bank`, and `bank` did not actually appear in the sample reply.
+
+### 操作 / Operations
+
+- 修正 probe 样例，使目标词义、reply 文本和 `unitMention` 都指向 `bank:financial-institution`。 / Fixed the probe sample so the target sense, reply text, and `unitMention` all point to `bank:financial-institution`.
+- 后端契约校验改为只允许 `RECORD_EVENT` 和 `RECORD_SPELLING_OR_FORM_ERROR` 出现在 `unitMentions`。 / Backend contract validation now allows only `RECORD_EVENT` and `RECORD_SPELLING_OR_FORM_ERROR` inside `unitMentions`.
+- 后端新增 `sourceField` 与 `occurrenceText` 校验，要求 occurrence 真实出现在对应输出字段。 / Added backend validation for `sourceField` and `occurrenceText`, requiring the occurrence to actually appear in the referenced output field.
+- Spring AI prompt 明确未命中、错误用法、不可识别输入必须返回 `unitMentions: []`，不能返回 SKIP mention。 / The Spring AI prompt now requires unmatched, wrong-usage, or unrecognizable input to return `unitMentions: []`, not SKIP mentions.
+
+### 说明 / Notes
+
+- 本次仍不新增依赖，未新增 SQL。 / No dependency or SQL change was added.
+- 合约不合格时仍 fallback，不写学习事件。 / Invalid contract output still falls back and does not write learning events.
+
+### 验证 / Verification
+
+- 前端 `npm run typecheck` 通过。 / Frontend `npm run typecheck` passed.
+- 使用 JDK 21 和临时 Maven settings 执行 `mvn -q -DskipTests compile` 通过。 / Backend `mvn -q -DskipTests compile` passed with JDK 21 and a temporary Maven settings file.
+
+## Phase 6.3.6：Agent Mention 安全过滤 / Agent Mention Safety Filter
+
+### 问题 / Problem
+
+- 真实模型仍可能生成顶层合规但局部错误的 `unitMention`，例如声称 `reply` 中出现了 `bank`，但实际 `reply` 没有该词。 / The real model can still produce a top-level valid response with locally wrong `unitMention` items, such as claiming `bank` appears in `reply` when it does not.
+- 如果整轮 fallback，会浪费已经可用的真实 Roleplay/Mentor 回复。 / Falling back for the whole turn wastes usable real Roleplay/Mentor output.
+
+### 操作 / Operations
+
+- 新增 `AgentOutputSanitizationResult`，在模型输出后先逐条过滤 `unitMentions`。 / Added `AgentOutputSanitizationResult` to filter `unitMentions` item by item after model output.
+- 无效 mention 会被丢弃；顶层字段合约通过时继续使用真实模型回复。 / Invalid mentions are dropped; if top-level fields pass the contract, the real model reply is still used.
+- 顶层 JSON 或必填输出字段不合约时仍 fallback。 / Top-level JSON or required output-field failures still fall back.
+
+### 说明 / Notes
+
+- 过滤策略只减少误写事件，不放宽学习事件写入条件。 / The filter only reduces false event writes and does not loosen learning-event write requirements.
+- 未新增依赖，未新增 SQL。 / No dependency or SQL change was added.
+
+### 验证 / Verification
+
+- 前端 `npm run typecheck` 通过。 / Frontend `npm run typecheck` passed.
+- 使用 JDK 21 和临时 Maven settings 执行 `mvn -q -DskipTests compile` 通过。 / Backend `mvn -q -DskipTests compile` passed with JDK 21 and a temporary Maven settings file.
+
+## Phase 6.3.7：Agent 调试面板布局修复 / Agent Debug Panel Layout Fix
+
+### 问题 / Problem
+
+- admin Agent 运行时面板中的诊断 JSON 和 probe 输出过长，在三列调试网格中被右侧遮挡。 / Long diagnostics JSON and probe output in the admin Agent runtime panel were clipped in the three-column debug grid.
+
+### 操作 / Operations
+
+- Agent 运行时面板改为横跨 admin 调试区整行。 / The Agent runtime panel now spans the full admin debug grid width.
+- 为面板、指标卡、JSON `pre` 和输出 label 增加 `min-width: 0`、换行和滚动约束。 / Added `min-width: 0`, wrapping, and scrolling constraints to panels, metric cards, JSON `pre`, and output labels.
+
+### 说明 / Notes
+
+- 仅前端布局调整，未新增依赖，未新增 SQL。 / Frontend layout change only; no dependency or SQL change was added.
+
+### 验证 / Verification
+
+- 前端 `npm run typecheck` 通过。 / Frontend `npm run typecheck` passed.
+- `git diff --check` 通过，仅有 Windows 换行提示。 / `git diff --check` passed with only Windows line-ending warnings.
+
+## Phase 6.3.8：Admin 控制台清理 / Admin Console Cleanup
+
+### 问题 / Problem
+
+- admin 页面仍展示水平测试沙盒和管理员账号画像原始数据，但 admin 不作为具体学习者使用这些流程。 / The admin page still showed the placement sandbox and raw admin profile data, but admin does not use learner-specific flows.
+
+### 操作 / Operations
+
+- 移除 admin 控制台中的“测试沙盒”和“用户画像原始数据”面板。 / Removed the "Test sandbox" and "Raw user profile" panels from the admin console.
+- admin 登录后不再自动加载自己的 learner profile；learner 登录仍正常加载画像和词库。 / Admin login no longer auto-loads its own learner profile; learner login still loads the profile and vocabulary normally.
+
+### 说明 / Notes
+
+- learner 的正式水平测试和画像展示未移除。 / The learner placement flow and profile display were not removed.
+- 仅前端调整，未新增依赖，未新增 SQL。 / Frontend change only; no dependency or SQL change was added.
+
+### 验证 / Verification
+
+- 前端 `npm run typecheck` 通过。 / Frontend `npm run typecheck` passed.
+- `git diff --check` 通过，仅有 Windows 换行提示。 / `git diff --check` passed with only Windows line-ending warnings.
+
+## Phase 6.3.9：Learner 词库二级页面 / Learner Vocabulary Secondary Page
+
+### 问题 / Problem
+
+- learner 首页直接展示完整词库，占用主学习界面空间。 / The learner home page displayed the full vocabulary list directly, taking space from the main learning interface.
+
+### 操作 / Operations
+
+- learner 首页改为只展示“进入词库”入口。 / The learner home page now shows only an "Enter vocabulary" entry.
+- 新增词库二级页面，包含返回学习首页、刷新、筛选和查询。 / Added a secondary vocabulary page with return, refresh, filter, and search actions.
+- learner 登录后不再自动加载词库；进入词库页时再加载。 / Learner login no longer auto-loads vocabulary; it loads when entering the vocabulary page.
+
+### 说明 / Notes
+
+- learner 正式学习、水平测试和画像流程不变。 / Learner learning, placement, and profile flows are unchanged.
+- 仅前端调整，未新增依赖，未新增 SQL。 / Frontend change only; no dependency or SQL change was added.
+
+### 验证 / Verification
+
+- 前端 `npm run typecheck` 通过。 / Frontend `npm run typecheck` passed.
+- `git diff --check` 通过，仅有 Windows 换行提示。 / `git diff --check` passed with only Windows line-ending warnings.
+# Phase 6.3.10：学习任务目标契约 / Learning Task Goal Contract
+
+## 问题 / Problem
+
+- 原实现把 `scenario` 同时当分类和完整学习场景，无法表达“AI 根据待学词义提出任务目标”的真实流程。/ The previous implementation used `scenario` as both category and full learning scenario, which did not express the real flow where AI proposes a task goal from target senses.
+
+## 操作 / Operations
+
+- READY 学习包内容新增 `learningTask.goal`、`learningTask.instructionLanguage`、`learningTask.expectedLearnerAction`。/ Added `learningTask.goal`, `learningTask.instructionLanguage`, and `learningTask.expectedLearnerAction` to READY package content.
+- Agent 输入契约新增 `taskGoal`、`taskInstructionLanguage`、`expectedLearnerAction`。/ Added `taskGoal`, `taskInstructionLanguage`, and `expectedLearnerAction` to the Agent input contract.
+- Spring AI prompt 改为按学习任务推进对话，`scenarioCode`/`scenarioName` 只作为分类和种子标签。/ Updated the Spring AI prompt to advance the dialogue by learning task; `scenarioCode`/`scenarioName` are only category and seed labels.
+- 前端学习区改为展示“任务目标”，旧包缺少 `learningTask` 时回退到 `scenario.description`。/ Updated the frontend learning area to show "task goal", with fallback to `scenario.description` for older packages.
+- 新增 `docs/learning-task-design.md` 记录任务目标设计约束。/ Added `docs/learning-task-design.md` for learning-task design constraints.
+
+## 说明 / Notes
+
+- 未新增依赖，未新增 SQL；任务目标先作为 READY 学习包 JSON 缓存。/ No dependency or SQL change was added; task goals are cached in READY package JSON for now.
+# Phase 6.3.11：旧 READY 包中文任务兜底 / Chinese Task Fallback for Old READY Packages
+
+## 问题 / Problem
+
+- 旧 READY 包缺少 `learningTask`，前端回退到英文 `scenario.description`，导致低水平任务目标显示英文。/ Old READY packages lacked `learningTask`, so the frontend fell back to English `scenario.description`, causing lower-level task goals to appear in English.
+
+## 操作 / Operations
+
+- 前端为旧包按 `scenario.code` 提供中文 `taskGoal` 和 `expectedLearnerAction` 兜底。/ Added frontend Chinese fallbacks for `taskGoal` and `expectedLearnerAction` by `scenario.code`.
+- 后端 Agent 输入为旧包提供同样的中文任务目标兜底，避免模型收到英文旧描述。/ Added backend Agent-input fallbacks so old packages do not send English legacy descriptions to the model.
+- 清理当前数据库中缺少 `learningTask` 的旧 READY 包。/ Cleaned current READY packages missing `learningTask`.
+
+## 说明 / Notes
+
+- 未新增依赖，未新增 SQL 迁移。/ No dependency or SQL migration was added.
+# Phase 6.3.12：Agent 角色连续性与 Mentor 历史 / Agent Role Continuity and Mentor History
+
+## 问题 / Problem
+
+- Roleplay Agent 可能重复 opening line，或在用户输入模糊时替 learner 说话，破坏沉浸式角色体验。/ The Roleplay Agent could repeat the opening line or speak for the learner when input was unclear, breaking immersion.
+- Mentor 面板只显示最新反馈，用户无法回看历史 Mentor 建议。/ The Mentor panel only showed the latest feedback, so learners could not review past Mentor guidance.
+
+## 操作 / Operations
+
+- Agent 输入契约新增 `roleplayPersona`、`learnerRole`、`openingLine`。/ Added `roleplayPersona`, `learnerRole`, and `openingLine` to the Agent input contract.
+- `openingLine` 作为第 0 条历史传给模型，避免模型重复开场。/ Added `openingLine` as turn 0 in dialogue history to prevent repeated openings.
+- Spring AI prompt 增加角色边界：Roleplay 不能替 learner 说话，不能编造用户事实，模糊输入要原角色澄清。/ Hardened the Spring AI prompt: Roleplay must not speak for the learner, invent learner facts, or mishandle unclear input.
+- 后端增加轻量 guard：重复 opening line/近期回复或明显说话人错位时，替换为安全角色回复并丢弃该轮 `unitMentions`。/ Added a lightweight backend guard: repeated openings/recent replies or clear speaker-role breaks are replaced with safe in-character replies and the turn's `unitMentions` are dropped.
+- 前端 Mentor 面板改为滚动历史窗口，每轮同时显示用户输入和 Mentor 回复。/ Changed the Mentor panel into a scrollable history window showing both learner input and Mentor reply for each turn.
+
+## 说明 / Notes
+
+- 未新增依赖，未新增 SQL 迁移。/ No dependency or SQL migration was added.

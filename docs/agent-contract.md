@@ -36,7 +36,13 @@ Real dialogue requests read the user's current review/new-sense targets from `/a
     "title": "Bank account roleplay",
     "scenarioCode": "bank_account",
     "scenarioName": "Open a bank account",
-    "contentJson": "{\"scenario\":{\"code\":\"bank_account\"}}"
+    "taskGoal": "你需要去银行开一个账户，并询问需要哪些材料。",
+    "taskInstructionLanguage": "zh-CN",
+    "expectedLearnerAction": "用英语说明想开户，并询问所需材料或下一步。",
+    "roleplayPersona": "Bank service representative. You help the learner open an account.",
+    "learnerRole": "Customer who wants banking service.",
+    "openingLine": "Good morning. What kind of account would you like to open?",
+    "contentJson": "{\"scenario\":{\"code\":\"bank_account\"},\"learningTask\":{\"goal\":\"你需要去银行开一个账户，并询问需要哪些材料。\",\"instructionLanguage\":\"zh-CN\",\"expectedLearnerAction\":\"用英语说明想开户，并询问所需材料或下一步。\"},\"roleplayAgent\":{\"persona\":\"Bank service representative. You help the learner open an account.\",\"learnerRole\":\"Customer who wants banking service.\",\"openingLine\":\"Good morning. What kind of account would you like to open?\"}}"
   },
   "targetSenses": [
     {
@@ -55,7 +61,16 @@ Real dialogue requests read the user's current review/new-sense targets from `/a
       "scenarioCode": "bank_account"
     }
   ],
-  "dialogueHistory": [],
+  "dialogueHistory": [
+    {
+      "turnId": 0,
+      "turnIndex": 0,
+      "userMessage": "",
+      "reply": "Good morning. What kind of account would you like to open?",
+      "feedback": "",
+      "createdAt": "1970-01-01T00:00:00Z"
+    }
+  ],
   "userMessage": "Could you help me open a bank account?",
   "toolAccess": {
     "wordSensesEndpoint": "/api/learning/agent-tools/word-senses",
@@ -111,6 +126,9 @@ Real dialogue requests read the user's current review/new-sense targets from `/a
 - `unitMentions` 是真实 Agent 直接写入 `learning_events` 的主要依据。 / `unitMentions` is the main source for writing `learning_events` from the real Agent.
 - 可记录事件必须有 `learningUnitId` 和 `learningUnitSenseId`；掌握度只更新到词义级。 / Recordable events must include `learningUnitId` and `learningUnitSenseId`; mastery is updated only at sense level.
 - Agent 只能使用输入中已给出的词义 id，不能编造 `learningUnitId` 或 `learningUnitSenseId`。 / The Agent may use only sense ids provided in the input and must not invent `learningUnitId` or `learningUnitSenseId`.
+- `unitMentions` 只允许可记录事件；未命中、不可识别或错误用法不进入 `unitMentions`。 / `unitMentions` allows only recordable events; unmatched, unrecognizable, or wrong-usage cases must not enter `unitMentions`.
+- `occurrenceText` 必须真实出现在对应 `sourceField` 中。 / `occurrenceText` must actually appear in the referenced `sourceField`.
+- 后端会丢弃不安全的单条 `unitMention`，但保留顶层合规的模型回复。 / The backend drops unsafe individual `unitMention` items while keeping the top-level valid model response.
 - 用户输出只在 Agent 能判断具体词义时记录 `UNIT_ATTEMPTED`。 / Learner output records `UNIT_ATTEMPTED` only when the Agent can identify the exact sense.
 - 拼写或变形错误但可识别为某个词义时，可以记录事件并在 `agentDecision` 标记。 / Spelling or form errors can be recorded when the Agent can map them to a known sense.
 - 乱输入、无法辨认、或用法完全错误时，不写学习事件，由 Mentor 反馈。 / Nonsense, unrecognizable text, or completely wrong usage does not create learning events and should be handled by Mentor feedback.

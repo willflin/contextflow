@@ -21,6 +21,12 @@ export type LearningPackageContent = {
     name?: string;
     description?: string;
   };
+  learningTask?: {
+    goal?: string;
+    instructionLanguage?: string;
+    expectedLearnerAction?: string;
+    source?: string;
+  };
   learnerProfile?: {
     cefrLevel?: string;
     dimensionScores?: Record<string, number>;
@@ -30,6 +36,8 @@ export type LearningPackageContent = {
   goals?: string[];
   roleplayAgent?: {
     role?: string;
+    persona?: string;
+    learnerRole?: string;
     openingLine?: string;
   };
   mentorAgent?: {

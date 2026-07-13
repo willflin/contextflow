@@ -133,6 +133,12 @@ public class LearningPackageService {
                         "name", scenario.getName(),
                         "description", scenario.getDescription()
                 ),
+                "learningTask", Map.of(
+                        "goal", taskGoal(scenario.getCode(), profile.getCefrLevel().name()),
+                        "instructionLanguage", taskInstructionLanguage(profile.getCefrLevel().name()),
+                        "expectedLearnerAction", expectedLearnerAction(scenario.getCode(), profile.getCefrLevel().name()),
+                        "source", "scenario_template_seed"
+                ),
                 "learnerProfile", Map.of(
                         "cefrLevel", profile.getCefrLevel().name(),
                         "dimensionScores", parseJson(profile.getDimensionScoresJson()),
@@ -146,6 +152,8 @@ public class LearningPackageService {
                 ),
                 "roleplayAgent", Map.of(
                         "role", scenario.getName() + " partner",
+                        "persona", roleplayPersona(scenario.getCode()),
+                        "learnerRole", learnerRole(scenario.getCode()),
                         "openingLine", openingLine(scenario.getCode())
                 ),
                 "mentorAgent", Map.of(
@@ -180,6 +188,56 @@ public class LearningPackageService {
         }
     }
 
+    private String taskInstructionLanguage(String cefrLevel) {
+        return advancedLevel(cefrLevel) ? "en" : "zh-CN";
+    }
+
+    private String taskGoal(String scenarioCode, String cefrLevel) {
+        boolean english = advancedLevel(cefrLevel);
+        return switch (scenarioCode) {
+            case "hotel_check_in" -> english
+                    ? "Check in at a hotel and confirm your reservation details."
+                    : "你需要办理酒店入住，并确认预订信息。";
+            case "shopping_return" -> english
+                    ? "Explain a problem with an item and ask for a return or exchange."
+                    : "你需要向店员描述商品问题，并申请退货或换货。";
+            case "bank_account" -> english
+                    ? "Open a bank account and ask what documents are needed."
+                    : "你需要去银行开一个账户，并询问需要哪些材料。";
+            case "police_stop" -> english
+                    ? "Stay calm, ask why you were stopped, and answer basic questions."
+                    : "你需要冷静询问被拦下的原因，并回答基本问题。";
+            default -> english
+                    ? "Complete a realistic communication task using the target senses naturally."
+                    : "你需要根据本轮目标词义完成一个真实沟通任务，并尽量自然地使用相关表达。";
+        };
+    }
+
+    private String expectedLearnerAction(String scenarioCode, String cefrLevel) {
+        boolean english = advancedLevel(cefrLevel);
+        return switch (scenarioCode) {
+            case "hotel_check_in" -> english
+                    ? "Ask to check in, give the reservation name, and respond to room questions."
+                    : "用英语提出入住请求，说明预订姓名，并回答房间相关问题。";
+            case "shopping_return" -> english
+                    ? "Describe the item issue and ask politely for a return or exchange."
+                    : "用英语描述商品问题，并礼貌提出退货或换货请求。";
+            case "bank_account" -> english
+                    ? "Ask to open an account and clarify the documents or next steps."
+                    : "用英语说明想开户，并询问所需材料或下一步。";
+            case "police_stop" -> english
+                    ? "Ask for the reason calmly and answer the officer's follow-up questions."
+                    : "用英语冷静询问原因，并回答对方的后续问题。";
+            default -> english
+                    ? "Reply in English and move the task forward."
+                    : "用英语回复，并推动任务继续。";
+        };
+    }
+
+    private boolean advancedLevel(String cefrLevel) {
+        return cefrLevel != null && (cefrLevel.startsWith("B2") || cefrLevel.startsWith("C"));
+    }
+
     private String openingLine(String scenarioCode) {
         return switch (scenarioCode) {
             case "hotel_check_in" -> "Good evening. Welcome to the hotel. Do you have a reservation?";
@@ -187,6 +245,26 @@ public class LearningPackageService {
             case "bank_account" -> "Good morning. What kind of account would you like to open?";
             case "police_stop" -> "Hello. Do you know why I stopped you?";
             default -> "Hello. How can I help you today?";
+        };
+    }
+
+    private String roleplayPersona(String scenarioCode) {
+        return switch (scenarioCode) {
+            case "hotel_check_in" -> "Hotel front-desk staff. You help the learner check in or ask about a room.";
+            case "shopping_return" -> "Store clerk. You help the learner return or exchange an item.";
+            case "bank_account" -> "Bank service representative. You help the learner open an account.";
+            case "police_stop" -> "Police officer. You ask calm, basic questions and explain the stop.";
+            default -> "Task partner. You help the learner complete the communication task.";
+        };
+    }
+
+    private String learnerRole(String scenarioCode) {
+        return switch (scenarioCode) {
+            case "hotel_check_in" -> "Hotel guest or walk-in customer.";
+            case "shopping_return" -> "Customer with an item problem.";
+            case "bank_account" -> "Customer who wants banking service.";
+            case "police_stop" -> "Person being stopped and questioned.";
+            default -> "Learner trying to complete the task.";
         };
     }
 

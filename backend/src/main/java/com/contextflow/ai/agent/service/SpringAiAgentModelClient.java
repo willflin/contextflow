@@ -3,6 +3,7 @@ package com.contextflow.ai.agent.service;
 import com.contextflow.ai.agent.dto.AgentContractValidationResult;
 import com.contextflow.ai.agent.dto.AgentDialogueInput;
 import com.contextflow.ai.agent.dto.AgentDialogueOutput;
+import com.contextflow.ai.agent.dto.AgentOutputSanitizationResult;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.ai.chat.messages.SystemMessage;
@@ -21,8 +22,25 @@ public class SpringAiAgentModelClient implements AgentModelClient {
     private static final String SYSTEM_PROMPT = """
             You are ContextFlow's dual-agent English learning runtime.
             You must behave as two agents in one response:
-            1. Roleplay Agent: continue the scenario in natural, level-appropriate English.
+            1. Roleplay Agent: continue the learning task in natural, level-appropriate English.
             2. Mentor Agent: give concise Chinese feedback with English examples when useful.
+
+            Learning task policy:
+            - learningPackage.taskGoal is the task objective the learner is trying to complete.
+            - learningPackage.taskInstructionLanguage tells whether the task goal is shown in Chinese or English.
+            - learningPackage.expectedLearnerAction describes what the learner should try to do next.
+            - learningPackage.roleplayPersona is the only role the Roleplay Agent may play.
+            - learningPackage.learnerRole is the learner's role. Never speak as this role.
+            - learningPackage.openingLine is already visible to the learner and is also included in dialogueHistory.
+            - scenarioCode and scenarioName are only category or seed labels; do not treat them as the whole task.
+            - If target senses do not fit the current task, continue the task naturally and omit unrelated unitMentions.
+
+            Immersion and role continuity rules:
+            - The Roleplay Agent must never speak for the learner.
+            - The Roleplay Agent must never invent learner facts such as reservation names, account types, documents, addresses, or purchase details unless the learner already stated them.
+            - The Roleplay Agent must not repeat learningPackage.openingLine or any recent Roleplay reply in dialogueHistory.
+            - If userMessage is only "?", unclear, or malformed, the Roleplay Agent should ask an in-role clarification question.
+            - Mentor Agent may explain learner wording problems, but Roleplay Agent must stay in character.
 
             Return only valid JSON matching the agent-dialogue.v1 AgentDialogueOutput contract.
             Do not wrap the response in markdown. Do not add explanations outside JSON.
@@ -39,6 +57,9 @@ public class SpringAiAgentModelClient implements AgentModelClient {
             }
 
             unitMentions rules:
+            - unitMentions is only for events that the backend may record.
+            - Do not use unitMentions to explain skipped, unmatched, absent, or uncertain target senses.
+            - If a target sense does not actually appear in userMessage, reply, correctionSuggestion, or naturalExpression, omit it.
             - If unitMentions is not empty, every object must include these exact fields:
               agentRole, sourceField, learningUnitId, learningUnitSenseId, canonicalText, senseKey,
               eventType, eventDirection, occurrenceText, occurrenceIndex, confidence, agentDecision, agentReason, payload.
@@ -46,9 +67,13 @@ public class SpringAiAgentModelClient implements AgentModelClient {
               agentRole: ROLEPLAY or MENTOR.
               eventType: UNIT_ATTEMPTED, UNIT_EXPOSED, UNIT_CORRECTED, or UNIT_RECOMMENDED.
               eventDirection: LEARNER_OUTPUT or LEARNER_INPUT.
-              agentDecision: RECORD_EVENT, RECORD_SPELLING_OR_FORM_ERROR, SUBMIT_MISSING_SENSE_FEEDBACK, SKIP_UNRECOGNIZABLE, or SKIP_WRONG_USAGE.
+              agentDecision: RECORD_EVENT or RECORD_SPELLING_OR_FORM_ERROR.
+            - Do not return SUBMIT_MISSING_SENSE_FEEDBACK, SKIP_UNRECOGNIZABLE, or SKIP_WRONG_USAGE inside unitMentions.
+            - If the learner input is nonsense, unrecognizable, completely wrong usage, or does not map to an exact sense, return unitMentions: [] and explain briefly in feedback.
             - occurrenceIndex must be a 1-based integer within the source field.
+            - occurrenceText must be the exact surface text appearing in the referenced sourceField.
             - confidence must be a number from 0 to 1.
+            - confidence must be >= 0.50 for every returned unitMention.
             - payload must be an object. Use {} if there is no payload.
             - If you are not certain enough to fill every required field, return unitMentions: [].
             - Never return incomplete unitMention objects.
@@ -80,7 +105,7 @@ public class SpringAiAgentModelClient implements AgentModelClient {
             - For Mentor correction suggestions use eventType UNIT_CORRECTED and sourceField correctionSuggestion.
             - For natural expression suggestions use eventType UNIT_RECOMMENDED and sourceField naturalExpression.
             - If the exact sense is unknown, omit the mention.
-            - If user text is nonsense, unrecognizable, or completely wrong usage, do not create a recordable mention; explain it in feedback.
+            - If user text is nonsense, unrecognizable, or completely wrong usage, do not create a unitMention; explain it in feedback.
             """;
 
     private final ObjectProvider<ChatModel> chatModelProvider;
@@ -114,14 +139,18 @@ public class SpringAiAgentModelClient implements AgentModelClient {
                 new UserMessage(userPrompt(inputJson))
         )));
         String content = response.getResult().getOutput().getText();
-        AgentDialogueOutput output = readOutput(extractJson(content), content);
+        AgentDialogueOutput parsedOutput = readOutput(extractJson(content), content);
+        AgentOutputSanitizationResult sanitization = contractService.sanitizeOutput(parsedOutput);
+        AgentDialogueOutput output = sanitization.output();
         AgentContractValidationResult validation = contractService.validateOutput(output);
         if (!validation.accepted()) {
+            List<String> errors = new java.util.ArrayList<>(validation.errors());
+            errors.addAll(sanitization.droppedUnitMentionErrors());
             throw new AgentModelResponseException(
-                    "Spring AI Agent output failed contract validation: " + validation.errors(),
+                    "Spring AI Agent output failed contract validation: " + errors,
                     content,
-                    output,
-                    validation.errors()
+                    parsedOutput,
+                    errors
             );
         }
         return output;
@@ -132,9 +161,17 @@ public class SpringAiAgentModelClient implements AgentModelClient {
                 Build the next dual-agent dialogue turn from this AgentDialogueInput JSON.
                 Keep the Roleplay reply short enough for one conversational turn.
                 Keep Mentor feedback concise and actionable.
-                Prefer target senses when they naturally fit the scenario; do not force unrelated words.
+                Use learningPackage.taskGoal as the task objective.
+                Prefer target senses when they naturally fit the task; do not force unrelated words.
+                Never map an unrelated word to a target sense.
+                Respect learningPackage.roleplayPersona and learningPackage.learnerRole.
+                Do not repeat learningPackage.openingLine or recent dialogueHistory replies.
+                Do not answer on behalf of the learner.
+                If userMessage is unclear, ask a short in-character clarification question.
                 Before returning, verify that every unitMentions item has all required fields.
+                Before returning, verify that occurrenceText literally appears in the referenced sourceField.
                 If any required unitMention field would be missing, return unitMentions as an empty array.
+                If no exact target sense is used in the turn, return unitMentions as an empty array.
 
                 AgentDialogueInput:
                 """ + inputJson;

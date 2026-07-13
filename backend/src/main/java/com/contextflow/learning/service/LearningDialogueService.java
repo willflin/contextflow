@@ -110,6 +110,7 @@ public class LearningDialogueService {
                         scoringSignal
                 )
         );
+        agentOutput = guardRoleplayOutput(agentOutput, packageEntity.getId(), packageContent, scenarioCode, userMessage, turnIndex);
         List<CorrectionResponse> outputCorrections = correctionResponses(agentOutput.corrections());
 
         LearningDialogueTurnEntity saved = learningDialogueTurnRepository.save(new LearningDialogueTurnEntity(
@@ -165,6 +166,8 @@ public class LearningDialogueService {
             String userMessage
     ) {
         JsonNode scenario = packageContent.path("scenario");
+        JsonNode learningTask = packageContent.path("learningTask");
+        JsonNode roleplayAgent = packageContent.path("roleplayAgent");
         JsonNode learnerProfile = packageContent.path("learnerProfile");
         return new AgentDialogueInput(
                 AgentDialogueContractService.CONTRACT_VERSION,
@@ -181,13 +184,171 @@ public class LearningDialogueService {
                         packageEntity.getTitle(),
                         scenario.path("code").asText("general"),
                         scenario.path("name").asText("General English"),
+                        taskGoal(learningTask, scenario),
+                        learningTask.path("instructionLanguage").asText("zh-CN"),
+                        expectedLearnerAction(learningTask, scenario),
+                        roleplayAgent.path("persona").asText(roleplayPersona(scenario.path("code").asText("general"))),
+                        roleplayAgent.path("learnerRole").asText(learnerRole(scenario.path("code").asText("general"))),
+                        roleplayAgent.path("openingLine").asText(openingLine(scenario.path("code").asText("general"))),
                         packageEntity.getContent()
                 ),
                 targetSenses(user.getUsername()),
-                dialogueHistory(packageEntity.getId()),
+                dialogueHistory(packageEntity.getId(), packageContent),
                 userMessage,
                 agentDialogueContractService.toolAccess()
         );
+    }
+
+    private String taskGoal(JsonNode learningTask, JsonNode scenario) {
+        String goal = learningTask.path("goal").asText("");
+        if (!goal.isBlank()) {
+            return goal;
+        }
+        String generatedGoal = fallbackTaskGoal(scenario.path("code").asText("general"));
+        if (!generatedGoal.isBlank()) {
+            return generatedGoal;
+        }
+        String description = scenario.path("description").asText("");
+        if (!description.isBlank()) {
+            return description;
+        }
+        return "Complete this English learning task naturally.";
+    }
+
+    private String fallbackTaskGoal(String scenarioCode) {
+        return switch (scenarioCode) {
+            case "hotel_check_in" -> "你需要办理酒店入住，并确认预订信息。";
+            case "shopping_return" -> "你需要向店员描述商品问题，并申请退货或换货。";
+            case "bank_account" -> "你需要去银行开一个账户，并询问需要哪些材料。";
+            case "police_stop" -> "你需要冷静询问被拦下的原因，并回答基本问题。";
+            default -> "";
+        };
+    }
+
+    private String expectedLearnerAction(JsonNode learningTask, JsonNode scenario) {
+        String action = learningTask.path("expectedLearnerAction").asText("");
+        if (!action.isBlank()) {
+            return action;
+        }
+        return switch (scenario.path("code").asText("general")) {
+            case "hotel_check_in" -> "用英语提出入住请求，说明预订姓名，并回答房间相关问题。";
+            case "shopping_return" -> "用英语描述商品问题，并礼貌提出退货或换货请求。";
+            case "bank_account" -> "用英语说明想开户，并询问所需材料或下一步。";
+            case "police_stop" -> "用英语冷静询问原因，并回答对方的后续问题。";
+            default -> "用英语回复，并推动任务继续。";
+        };
+    }
+
+    private String openingLine(String scenarioCode) {
+        return switch (scenarioCode) {
+            case "hotel_check_in" -> "Good evening. Welcome to the hotel. Do you have a reservation?";
+            case "shopping_return" -> "Hi, how can I help you with this item today?";
+            case "bank_account" -> "Good morning. What kind of account would you like to open?";
+            case "police_stop" -> "Hello. Do you know why I stopped you?";
+            default -> "Hello. How can I help you today?";
+        };
+    }
+
+    private String roleplayPersona(String scenarioCode) {
+        return switch (scenarioCode) {
+            case "hotel_check_in" -> "Hotel front-desk staff. You help the learner check in or ask about a room.";
+            case "shopping_return" -> "Store clerk. You help the learner return or exchange an item.";
+            case "bank_account" -> "Bank service representative. You help the learner open an account.";
+            case "police_stop" -> "Police officer. You ask calm, basic questions and explain the stop.";
+            default -> "Task partner. You help the learner complete the communication task.";
+        };
+    }
+
+    private String learnerRole(String scenarioCode) {
+        return switch (scenarioCode) {
+            case "hotel_check_in" -> "Hotel guest or walk-in customer.";
+            case "shopping_return" -> "Customer with an item problem.";
+            case "bank_account" -> "Customer who wants banking service.";
+            case "police_stop" -> "Person being stopped and questioned.";
+            default -> "Learner trying to complete the task.";
+        };
+    }
+
+    private AgentDialogueOutput guardRoleplayOutput(
+            AgentDialogueOutput output,
+            Long packageId,
+            JsonNode packageContent,
+            String scenarioCode,
+            String userMessage,
+            int turnIndex
+    ) {
+        if (output == null || output.reply() == null) {
+            return output;
+        }
+        String openingLine = packageContent.path("roleplayAgent").path("openingLine").asText(openingLine(scenarioCode));
+        boolean duplicate = sameMeaning(output.reply(), openingLine)
+                || learningDialogueTurnRepository.findTop6ByLearningPackageIdOrderByTurnIndexDesc(packageId)
+                .stream()
+                .anyMatch(turn -> sameMeaning(output.reply(), turn.getRoleplayReply()));
+        boolean roleBreak = roleplaySpeaksAsLearner(output.reply(), scenarioCode);
+        if (!duplicate && !roleBreak) {
+            return output;
+        }
+        return new AgentDialogueOutput(
+                output.contractVersion(),
+                repairedRoleplayReply(scenarioCode, userMessage, turnIndex),
+                output.feedback(),
+                output.corrections(),
+                output.naturalExpression(),
+                List.of(),
+                output.scoringSignal()
+        );
+    }
+
+    private boolean sameMeaning(String left, String right) {
+        String normalizedLeft = normalizeDialogueText(left);
+        String normalizedRight = normalizeDialogueText(right);
+        return !normalizedLeft.isBlank()
+                && !normalizedRight.isBlank()
+                && (normalizedLeft.equals(normalizedRight)
+                || normalizedLeft.contains(normalizedRight)
+                || normalizedRight.contains(normalizedLeft));
+    }
+
+    private String normalizeDialogueText(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "");
+    }
+
+    private boolean roleplaySpeaksAsLearner(String reply, String scenarioCode) {
+        String lower = reply == null ? "" : reply.toLowerCase(Locale.ROOT);
+        if ("hotel_check_in".equals(scenarioCode)) {
+            return lower.contains("i have a reservation")
+                    || lower.contains("my reservation")
+                    || lower.contains("under smith");
+        }
+        return lower.matches("^(yes|yeah|sure|of course)[,.! ]+i\\b.*");
+    }
+
+    private String repairedRoleplayReply(String scenarioCode, String userMessage, int turnIndex) {
+        String trimmed = userMessage == null ? "" : userMessage.trim();
+        boolean unclear = trimmed.isBlank() || trimmed.matches("\\?+");
+        return switch (scenarioCode) {
+            case "hotel_check_in" -> unclear
+                    ? "Could you clarify your request? Are you checking in with a reservation, or would you like to book a room for tonight?"
+                    : turnIndex <= 1
+                    ? "Of course. Are you checking in with a reservation, or would you like to book a room for tonight?"
+                    : "I can help with that. Could you tell me the name on the reservation?";
+            case "shopping_return" -> unclear
+                    ? "Could you tell me what is wrong with the item?"
+                    : "I can help with that. Do you have the receipt with you?";
+            case "bank_account" -> unclear
+                    ? "Could you tell me what kind of account you would like to open?"
+                    : "I can help with that. Do you have your ID and proof of address with you?";
+            case "police_stop" -> unclear
+                    ? "Could you please tell me what you want to ask?"
+                    : "Please stay calm. Could you answer a few basic questions first?";
+            default -> unclear
+                    ? "Could you clarify what you mean?"
+                    : "I understand. Could you tell me a little more?";
+        };
     }
 
     private List<AgentTargetSenseContext> targetSenses(String username) {
@@ -290,8 +451,20 @@ public class LearningDialogueService {
         return payload;
     }
 
-    private List<AgentDialogueHistoryTurn> dialogueHistory(Long packageId) {
-        return learningDialogueTurnRepository.findTop6ByLearningPackageIdOrderByTurnIndexDesc(packageId)
+    private List<AgentDialogueHistoryTurn> dialogueHistory(Long packageId, JsonNode packageContent) {
+        List<AgentDialogueHistoryTurn> history = new ArrayList<>();
+        String openingLine = packageContent.path("roleplayAgent").path("openingLine").asText("");
+        if (!openingLine.isBlank()) {
+            history.add(new AgentDialogueHistoryTurn(
+                    0L,
+                    0,
+                    "",
+                    openingLine,
+                    "",
+                    Instant.EPOCH
+            ));
+        }
+        history.addAll(learningDialogueTurnRepository.findTop6ByLearningPackageIdOrderByTurnIndexDesc(packageId)
                 .stream()
                 .sorted(Comparator.comparing(LearningDialogueTurnEntity::getTurnIndex))
                 .map(turn -> new AgentDialogueHistoryTurn(
@@ -302,7 +475,8 @@ public class LearningDialogueService {
                         turn.getMentorFeedback(),
                         turn.getCreatedAt()
                 ))
-                .toList();
+                .toList());
+        return history;
     }
 
     private Map<String, Object> objectMap(JsonNode node) {

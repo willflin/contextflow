@@ -6,6 +6,12 @@ public record AgentLearningPackageContext(
         String title,
         String scenarioCode,
         String scenarioName,
+        String taskGoal,
+        String taskInstructionLanguage,
+        String expectedLearnerAction,
+        String roleplayPersona,
+        String learnerRole,
+        String openingLine,
         String contentJson
 ) {
 }

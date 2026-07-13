@@ -30,11 +30,12 @@ import {
   startAdaptivePlacement
 } from './api/placement';
 import { fetchReviewPlan, ReviewPlan } from './api/review';
-import { fetchUserLevelProfile, prettyJson, UserLevelProfile } from './api/userProfile';
+import { fetchUserLevelProfile, UserLevelProfile } from './api/userProfile';
 import { fetchVocabulary, VocabularyList, VocabularyStatusFilter } from './api/vocabulary';
 
 type LoadState = 'idle' | 'loading' | 'success' | 'error';
 type AuthMode = 'login' | 'register';
+type LearnerView = 'home' | 'vocabulary';
 
 const emptyAdminWordForm: AdminWordPayload = {
   canonicalText: '',
@@ -63,6 +64,7 @@ export default function App() {
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [authMode, setAuthMode] = useState<AuthMode>('login');
+  const [learnerView, setLearnerView] = useState<LearnerView>('home');
   const [username, setUsername] = useState('learner');
   const [password, setPassword] = useState('learner123');
   const [displayName, setDisplayName] = useState('New Learner');
@@ -122,12 +124,11 @@ export default function App() {
 
   useEffect(() => {
     if (currentUser) {
-      void loadProfile();
       if (currentUser.role === 'ADMIN') {
         void loadHealth();
         void loadAgentRuntime();
       } else {
-        void loadVocabulary();
+        void loadProfile();
       }
     }
   }, [currentUser]);
@@ -183,6 +184,7 @@ export default function App() {
       resetVocabulary();
       resetAdminWords();
       resetAgentRuntime();
+      setLearnerView('home');
     } catch (exception) {
       setAuthError(exception instanceof Error ? exception.message : 'Login failed.');
       setCurrentUser(null);
@@ -202,6 +204,7 @@ export default function App() {
     resetLearning();
     resetReviewPlan();
     resetAgentRuntime();
+    setLearnerView('home');
   }
 
   async function loadAgentRuntime() {
@@ -449,6 +452,13 @@ export default function App() {
     setVocabularyError(null);
   }
 
+  async function openVocabularyPage() {
+    setLearnerView('vocabulary');
+    if (!vocabulary && !vocabularyBusy) {
+      await loadVocabulary();
+    }
+  }
+
   async function searchAdminWordByQuery(event?: React.FormEvent<HTMLFormElement>) {
     event?.preventDefault();
     const token = tokenOrNull();
@@ -653,12 +663,12 @@ export default function App() {
     const trimmedMessage = dialogueMessage.trim();
 
     if (!token || !learningPackage) {
-      setDialogueError('Load a learning scenario first.');
+      setDialogueError('请先开始学习并加载任务。');
       return;
     }
 
     if (!trimmedMessage) {
-      setDialogueError('Please enter an English reply.');
+      setDialogueError('请输入英文回复。');
       return;
     }
 
@@ -769,6 +779,10 @@ export default function App() {
   }
 
   function renderLearnerExperience() {
+    if (learnerView === 'vocabulary') {
+      return renderVocabularyPage();
+    }
+
     return (
       <section className="learner-grid">
         <section className="tool-panel primary-flow">
@@ -803,11 +817,13 @@ export default function App() {
               <p className="eyebrow">词库</p>
               <h2>已学与未学单词</h2>
             </div>
-            <button className="secondary-button" type="button" onClick={loadVocabulary} disabled={vocabularyBusy}>
-              刷新
+          </div>
+          <div className="secondary-entry">
+            <p className="hint">查看当前测试词库、已学状态，并搜索指定单词。</p>
+            <button className="primary-button" type="button" onClick={openVocabularyPage} disabled={vocabularyBusy}>
+              进入词库
             </button>
           </div>
-          {renderVocabularyPanel()}
         </section>
 
         <section className="tool-panel learning-panel">
@@ -826,6 +842,30 @@ export default function App() {
             </button>
           </div>
           {renderLearningPackage()}
+        </section>
+      </section>
+    );
+  }
+
+  function renderVocabularyPage() {
+    return (
+      <section className="learner-secondary-page">
+        <section className="tool-panel">
+          <div className="panel-heading">
+            <div>
+              <p className="eyebrow">词库</p>
+              <h2>已学与未学单词</h2>
+            </div>
+            <div className="button-row">
+              <button className="secondary-button" type="button" onClick={() => setLearnerView('home')}>
+                返回学习首页
+              </button>
+              <button className="secondary-button" type="button" onClick={loadVocabulary} disabled={vocabularyBusy}>
+                刷新
+              </button>
+            </div>
+          </div>
+          {renderVocabularyPanel()}
         </section>
       </section>
     );
@@ -856,7 +896,7 @@ export default function App() {
         </button>
 
         <section className="debug-grid">
-          <section className="tool-panel">
+          <section className="tool-panel agent-runtime-panel">
             <div className="panel-heading">
               <div>
                 <p className="eyebrow">管理员</p>
@@ -908,32 +948,6 @@ export default function App() {
               </div>
             </div>
             {renderAgentRuntimePanel()}
-          </section>
-
-          <section className="tool-panel">
-            <div className="panel-heading">
-              <div>
-                <p className="eyebrow">管理员</p>
-                <h2>测试沙盒</h2>
-              </div>
-              <button className="secondary-button" type="button" onClick={startPlacement} disabled={placementBusy}>
-                开始测试
-              </button>
-            </div>
-            {renderPlacementQuestion(true)}
-          </section>
-
-          <section className="tool-panel">
-            <div className="panel-heading">
-              <div>
-                <p className="eyebrow">管理员</p>
-                <h2>用户画像原始数据</h2>
-              </div>
-              <button className="secondary-button" type="button" onClick={loadProfile}>
-                刷新画像
-              </button>
-            </div>
-            {renderRawProfile()}
           </section>
 
           <section className="tool-panel">
@@ -1059,39 +1073,6 @@ export default function App() {
       <div className="profile-content">
         <div className="level-badge">{profile.cefrLevel}</div>
         <p className="hint">后续学习会使用你的水平和薄弱项。</p>
-      </div>
-    );
-  }
-
-  function renderRawProfile() {
-    if (!profile) {
-      return <p className="hint">{profileError ?? '当前账号还没有生成画像。'}</p>;
-    }
-
-    return (
-      <div className="profile-content">
-        <div className="metrics-row">
-          <div>
-            <span className="label">CEFR</span>
-            <strong>{profile.cefrLevel}</strong>
-          </div>
-          <div>
-            <span className="label">来源会话</span>
-            <strong>{profile.lastPlacementSessionId ?? '-'}</strong>
-          </div>
-        </div>
-        <label>
-          维度分数
-          <pre>{prettyJson(profile.dimensionScoresJson)}</pre>
-        </label>
-        <label>
-          薄弱场景
-          <pre>{prettyJson(profile.weakScenariosJson)}</pre>
-        </label>
-        <label>
-          薄弱能力
-          <pre>{prettyJson(profile.weakAbilitiesJson)}</pre>
-        </label>
       </div>
     );
   }
@@ -1489,30 +1470,37 @@ export default function App() {
     }
 
     if (!learningPackage) {
-      return <p className="hint">Your next READY learning scenario will appear here.</p>;
+      return <p className="hint">点击开始学习后，将显示下一份 READY 学习任务。</p>;
     }
 
     const content = parseLearningPackageContent(learningPackage);
-    const latestTurn = dialogueTurns.length > 0 ? dialogueTurns[dialogueTurns.length - 1] : null;
-
+    const scenarioCode = content.scenario?.code;
+    const taskGoal = content.learningTask?.goal ?? fallbackTaskGoal(scenarioCode) ?? content.scenario?.description;
+    const expectedLearnerAction = content.learningTask?.expectedLearnerAction ?? fallbackExpectedLearnerAction(scenarioCode);
     return (
       <div className="learning-content">
         <div className="scenario-header">
           <div>
-            <span className="label">Scenario</span>
+            <span className="label">任务分类</span>
             <strong>{learningPackage.scenarioName}</strong>
           </div>
           <span className="status-pill">{learningPackage.status}</span>
         </div>
 
-        {content.scenario?.description && <p className="hint">{content.scenario.description}</p>}
+        {taskGoal && (
+          <section className="task-goal-panel">
+            <span className="label">任务目标</span>
+            <p>{taskGoal}</p>
+            {expectedLearnerAction && <small>{expectedLearnerAction}</small>}
+          </section>
+        )}
 
         <section className="dual-agent-layout">
           <div className="roleplay-area">
             <div className="agent-heading">
               <div>
                 <span className="label">Roleplay Agent</span>
-                <strong>{content.roleplayAgent?.role ?? 'Scenario partner'}</strong>
+                <strong>{content.roleplayAgent?.role ?? 'Task partner'}</strong>
               </div>
             </div>
 
@@ -1552,38 +1540,57 @@ export default function App() {
                 rows={3}
               />
               <button className="refresh-button compact-button" type="submit" disabled={dialogueBusy}>
-                Send
+                发送
               </button>
             </form>
-            {dialogueError && <p className="error compact">Dialogue failed: {dialogueError}</p>}
+            {dialogueError && <p className="error compact">对话失败：{dialogueError}</p>}
           </div>
 
           <aside className="mentor-panel">
-            <span className="label">Mentor Agent</span>
-            {!latestTurn ? (
-              <p className="hint">Mentor feedback will appear after your first reply.</p>
-            ) : (
-              <div className="mentor-content">
-                <p>{latestTurn.mentorFeedback}</p>
-                {latestTurn.corrections.length > 0 && (
-                  <div>
-                    <h3>Corrections</h3>
-                    <div className="correction-list">
-                      {latestTurn.corrections.map((correction) => (
-                        <div className="correction-item" key={`${correction.original}-${correction.suggestion}`}>
-                          <strong>{correction.suggestion}</strong>
-                          <p>{correction.reason}</p>
+            <div className="agent-heading">
+              <div>
+                <span className="label">Mentor Agent</span>
+                <strong>Feedback history</strong>
+              </div>
+            </div>
+
+            <div className="dialogue-thread mentor-thread">
+              {dialogueTurns.length === 0 ? (
+                <p className="hint">Mentor feedback will appear after your first reply.</p>
+              ) : (
+                dialogueTurns.map((turn) => (
+                  <div className="turn-group" key={`mentor-${turn.turnId}`}>
+                    <div className="message-row user">
+                      <div className="message-bubble">
+                        <span>You</span>
+                        <p>{turn.userMessage}</p>
+                      </div>
+                    </div>
+                    <div className="message-row agent">
+                      <div className="message-bubble mentor-bubble">
+                        <span>Mentor</span>
+                        <p>{turn.mentorFeedback}</p>
+                        {turn.corrections.length > 0 && (
+                          <div className="mentor-detail">
+                            <span className="label">Corrections</span>
+                            {turn.corrections.map((correction) => (
+                              <div className="correction-item" key={`${turn.turnId}-${correction.original}-${correction.suggestion}`}>
+                                <strong>{correction.suggestion}</strong>
+                                <p>{correction.reason}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <div className="mentor-detail natural-expression">
+                          <span className="label">Natural expression</span>
+                          <p>{turn.naturalExpression}</p>
                         </div>
-                      ))}
+                      </div>
                     </div>
                   </div>
-                )}
-                <div className="natural-expression">
-                  <span className="label">Natural expression</span>
-                  <p>{latestTurn.naturalExpression}</p>
-                </div>
-              </div>
-            )}
+                ))
+              )}
+            </div>
           </aside>
         </section>
 
@@ -1624,5 +1631,35 @@ export default function App() {
         )}
       </div>
     );
+  }
+
+  function fallbackTaskGoal(scenarioCode?: string) {
+    switch (scenarioCode) {
+      case 'hotel_check_in':
+        return '你需要办理酒店入住，并确认预订信息。';
+      case 'shopping_return':
+        return '你需要向店员描述商品问题，并申请退货或换货。';
+      case 'bank_account':
+        return '你需要去银行开一个账户，并询问需要哪些材料。';
+      case 'police_stop':
+        return '你需要冷静询问被拦下的原因，并回答基本问题。';
+      default:
+        return undefined;
+    }
+  }
+
+  function fallbackExpectedLearnerAction(scenarioCode?: string) {
+    switch (scenarioCode) {
+      case 'hotel_check_in':
+        return '用英语提出入住请求，说明预订姓名，并回答房间相关问题。';
+      case 'shopping_return':
+        return '用英语描述商品问题，并礼貌提出退货或换货请求。';
+      case 'bank_account':
+        return '用英语说明想开户，并询问所需材料或下一步。';
+      case 'police_stop':
+        return '用英语冷静询问原因，并回答对方的后续问题。';
+      default:
+        return undefined;
+    }
   }
 }
