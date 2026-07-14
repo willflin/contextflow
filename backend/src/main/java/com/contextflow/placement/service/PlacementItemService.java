@@ -38,6 +38,8 @@ public class PlacementItemService {
             String abilityDimension,
             String status,
             String query,
+            Integer minDifficulty,
+            Integer maxDifficulty,
             int page,
             int size
     ) {
@@ -51,6 +53,8 @@ public class PlacementItemService {
                 .stream()
                 .filter(item -> normalizedAbility == null || normalizedAbility.equals(normalize(item.getAbilityDimension())))
                 .filter(item -> normalizedStatus == null || normalizedStatus.equals(normalize(item.getStatus().name())))
+                .filter(item -> minDifficulty == null || item.getDifficultyScore() >= minDifficulty)
+                .filter(item -> maxDifficulty == null || item.getDifficultyScore() <= maxDifficulty)
                 .filter(item -> normalizedQuery == null
                         || normalize(item.getScenarioTag()).contains(normalizedQuery)
                         || normalize(item.getTargetSkill()).contains(normalizedQuery)

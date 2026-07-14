@@ -24,9 +24,19 @@ public class AdminPlacementItemController {
             @RequestParam(required = false) String abilityDimension,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String query,
+            @RequestParam(required = false) Integer minDifficulty,
+            @RequestParam(required = false) Integer maxDifficulty,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        return ApiResponse.ok(placementItemService.searchAdminItems(abilityDimension, status, query, page, size));
+        return ApiResponse.ok(placementItemService.searchAdminItems(
+                abilityDimension,
+                status,
+                query,
+                minDifficulty,
+                maxDifficulty,
+                page,
+                size
+        ));
     }
 }

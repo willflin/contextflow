@@ -47,6 +47,8 @@ export async function fetchAdminPlacementItems(
     abilityDimension?: string;
     status?: string;
     query?: string;
+    minDifficulty?: string;
+    maxDifficulty?: string;
     page?: number;
     size?: number;
   }
@@ -60,6 +62,12 @@ export async function fetchAdminPlacementItems(
   }
   if (params.query?.trim()) {
     search.set('query', params.query.trim());
+  }
+  if (params.minDifficulty?.trim()) {
+    search.set('minDifficulty', params.minDifficulty.trim());
+  }
+  if (params.maxDifficulty?.trim()) {
+    search.set('maxDifficulty', params.maxDifficulty.trim());
   }
   search.set('page', String(params.page ?? 0));
   search.set('size', String(params.size ?? 20));

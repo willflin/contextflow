@@ -154,6 +154,8 @@ export default function App() {
   const [adminPlacementQuery, setAdminPlacementQuery] = useState('');
   const [adminPlacementAbility, setAdminPlacementAbility] = useState('vocabulary_size');
   const [adminPlacementStatus, setAdminPlacementStatus] = useState('READY');
+  const [adminPlacementMinDifficulty, setAdminPlacementMinDifficulty] = useState('');
+  const [adminPlacementMaxDifficulty, setAdminPlacementMaxDifficulty] = useState('');
   const [adminPlacementBusy, setAdminPlacementBusy] = useState(false);
   const [adminPlacementError, setAdminPlacementError] = useState<string | null>(null);
   const [learningPackage, setLearningPackage] = useState<LearningPackage | null>(null);
@@ -838,6 +840,8 @@ export default function App() {
         abilityDimension: adminPlacementAbility || undefined,
         status: adminPlacementStatus || undefined,
         query: adminPlacementQuery,
+        minDifficulty: adminPlacementMinDifficulty,
+        maxDifficulty: adminPlacementMaxDifficulty,
         page,
         size: ADMIN_PAGE_SIZE
       });
@@ -863,6 +867,8 @@ export default function App() {
     setAdminPlacementQuery('');
     setAdminPlacementAbility('vocabulary_size');
     setAdminPlacementStatus('READY');
+    setAdminPlacementMinDifficulty('');
+    setAdminPlacementMaxDifficulty('');
     setAdminPlacementBusy(false);
     setAdminPlacementError(null);
   }
@@ -1925,7 +1931,7 @@ export default function App() {
     return (
       <div className="vocabulary-content">
         <form
-          className="inline-form"
+          className="admin-filter-form"
           onSubmit={(event) => {
             event.preventDefault();
             void loadVocabulary();
@@ -2045,7 +2051,7 @@ export default function App() {
     return (
       <div className="admin-placement-content">
         <form
-          className="inline-form"
+          className="admin-filter-form"
           onSubmit={(event) => {
             event.preventDefault();
             void loadAdminPlacementItems(0);
@@ -2069,6 +2075,22 @@ export default function App() {
             value={adminPlacementQuery}
             onChange={(event) => setAdminPlacementQuery(event.target.value)}
             placeholder="搜索题干、场景或技能"
+          />
+          <input
+            type="number"
+            min="1"
+            max="100"
+            value={adminPlacementMinDifficulty}
+            onChange={(event) => setAdminPlacementMinDifficulty(event.target.value)}
+            placeholder="最低难度"
+          />
+          <input
+            type="number"
+            min="1"
+            max="100"
+            value={adminPlacementMaxDifficulty}
+            onChange={(event) => setAdminPlacementMaxDifficulty(event.target.value)}
+            placeholder="最高难度"
           />
           <button className="secondary-button" type="submit" disabled={adminPlacementBusy}>
             查询

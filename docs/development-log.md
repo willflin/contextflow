@@ -1443,3 +1443,20 @@
 ### 说明 / Notes
 
 - 未新增依赖，未新增数据库表；本次无新增 SQL 文件。 / No dependency or database table was added; no new SQL file was needed.
+## Phase 7.1.9：词汇测试估算与难度筛选修正 / Vocabulary Estimate and Difficulty Filter Fix
+
+### 问题 / Problem
+
+- 词汇量估算使用平滑正确率，导致全错时仍会估出一部分词汇量，水平结果偏高。 / Vocabulary-size estimation used smoothed accuracy, so even all-wrong answers still produced a non-trivial estimate, making results too high.
+- 管理员题库不能按题目难度范围筛选。 / The admin question bank could not filter items by difficulty range.
+
+### 操作 / Operations
+
+- 估算公式改为按每个频率层的直接正确率计算：`correct / total`。 / Changed the estimate formula to use direct per-band accuracy: `correct / total`.
+- 词汇测试保持 40 题、每个频率层最多 5 题，用 8 个频率层形成完整覆盖。 / The vocabulary test remains 40 items, capped at 5 items per frequency band, covering all 8 bands.
+- 管理员题库接口新增 `minDifficulty` / `maxDifficulty` 参数。 / Added `minDifficulty` / `maxDifficulty` to the admin question-bank API.
+- 管理员题库页面新增最低难度和最高难度筛选输入框。 / Added minimum and maximum difficulty filters to the admin question-bank page.
+
+### 说明 / Notes
+
+- 未新增依赖，未新增数据库表；本次无新增 SQL 文件。 / No dependency or database table was added; no new SQL file was needed.

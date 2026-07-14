@@ -646,7 +646,7 @@ public class PlacementSessionService {
             if (counter == null) {
                 continue;
             }
-            double masteryProbability = (counter.correct + 0.5d) / (counter.total + 1.0d);
+            double masteryProbability = counter.total == 0 ? 0 : (double) counter.correct / counter.total;
             estimate += Math.round((float) (bandWidth(band) * masteryProbability));
         }
         return Math.max(500, Math.min(20000, estimate));

@@ -767,8 +767,17 @@ strong {
   align-items: center;
 }
 
+.admin-filter-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  align-items: center;
+}
+
 .inline-form input,
 .inline-form select,
+.admin-filter-form input,
+.admin-filter-form select,
 .admin-form-grid input,
 .admin-form-grid select,
 .admin-form-grid textarea {
