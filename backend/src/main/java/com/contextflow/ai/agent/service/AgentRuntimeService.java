@@ -11,9 +11,11 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.env.Environment;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.StringUtils;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Arrays;
 import java.util.List;
@@ -59,6 +61,26 @@ public class AgentRuntimeService {
             return client.generateDialogue(input);
         } catch (RuntimeException exception) {
             return fallbackOrThrow(localFallback, exception);
+        }
+    }
+
+    public AgentDialogueOutput generateLearnerDialogue(
+            AgentDialogueInput input,
+            Supplier<AgentDialogueOutput> localFallback
+    ) {
+        if (agentProperties.getProvider() != AgentProperties.Provider.SPRING_AI) {
+            return localFallback.get();
+        }
+
+        AgentModelClient client = agentModelClientProvider.getIfAvailable();
+        if (!isClientAvailable(client)) {
+            throw modelBusy();
+        }
+
+        try {
+            return client.generateDialogue(input);
+        } catch (RuntimeException exception) {
+            throw modelBusy();
         }
     }
 
@@ -151,6 +173,10 @@ public class AgentRuntimeService {
             return localFallback.get();
         }
         throw exception;
+    }
+
+    private ResponseStatusException modelBusy() {
+        return new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "模型繁忙，请稍后再试。");
     }
 
     private AgentRuntimeProbeResponse probeFallback(

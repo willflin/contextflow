@@ -89,6 +89,7 @@ public class LearningDialogueService {
         }
 
         String userMessage = request.message().trim();
+        validateUserInputQuality(userMessage);
         int turnIndex = Math.toIntExact(learningDialogueTurnRepository.countByLearningPackageId(packageId) + 1);
         JsonNode packageContent = readPackageContent(packageEntity);
         String scenarioCode = packageContent.path("scenario").path("code").asText("general");
@@ -101,7 +102,7 @@ public class LearningDialogueService {
         String naturalExpression = naturalExpression(scenarioCode);
         Map<String, Object> scoringSignal = scoringSignal(scenarioCode, features, corrections, turnIndex);
         AgentDialogueInput agentInput = agentInput(user, packageEntity, packageContent, turnIndex, userMessage);
-        AgentDialogueOutput agentOutput = agentRuntimeService.generateDialogue(
+        AgentDialogueOutput agentOutput = agentRuntimeService.generateLearnerDialogue(
                 agentInput,
                 () -> agentDialogueContractService.localOutput(
                         roleplayReply,
@@ -148,6 +149,88 @@ public class LearningDialogueService {
                 deserializeScoringSignal(saved.getScoringSignal()),
                 saved.getCreatedAt()
         );
+    }
+
+    private void validateUserInputQuality(String userMessage) {
+        InputQualityResult result = inputQuality(userMessage);
+        if (!result.accepted()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, result.message());
+        }
+    }
+
+    private InputQualityResult inputQuality(String userMessage) {
+        if (userMessage == null || userMessage.isBlank()) {
+            return InputQualityResult.rejected("请输入英文内容。");
+        }
+        if (userMessage.length() > 500) {
+            return InputQualityResult.rejected("输入过长，请缩短后再发送。");
+        }
+        int visible = 0;
+        int letters = 0;
+        int digits = 0;
+        int punctuation = 0;
+        for (int i = 0; i < userMessage.length(); i++) {
+            char value = userMessage.charAt(i);
+            if (Character.isWhitespace(value)) {
+                continue;
+            }
+            visible++;
+            if ((value >= 'A' && value <= 'Z') || (value >= 'a' && value <= 'z')) {
+                letters++;
+            } else if (Character.isDigit(value)) {
+                digits++;
+            } else {
+                punctuation++;
+            }
+        }
+        if (letters == 0) {
+            return InputQualityResult.rejected("请输入可识别的英文内容。");
+        }
+        if (visible >= 6 && letters * 100 < visible * 35) {
+            return InputQualityResult.rejected("输入内容无法识别，请用英文短句重新表达。");
+        }
+        if (visible >= 6 && punctuation * 100 > visible * 70) {
+            return InputQualityResult.rejected("输入内容标点过多，请用英文短句重新表达。");
+        }
+        if (visible >= 6 && digits * 100 > visible * 50) {
+            return InputQualityResult.rejected("输入内容数字过多，请用英文短句重新表达。");
+        }
+        if (isRepeatedSingleCharacter(userMessage) || isRepeatedSingleToken(userMessage)) {
+            return InputQualityResult.rejected("输入内容重复度过高，请用英文短句重新表达。");
+        }
+        return InputQualityResult.accepted();
+    }
+
+    private boolean isRepeatedSingleCharacter(String value) {
+        Character first = null;
+        int count = 0;
+        for (int i = 0; i < value.length(); i++) {
+            char current = Character.toLowerCase(value.charAt(i));
+            if (Character.isWhitespace(current)) {
+                continue;
+            }
+            if (first == null) {
+                first = current;
+            } else if (!first.equals(current)) {
+                return false;
+            }
+            count++;
+        }
+        return count >= 6;
+    }
+
+    private boolean isRepeatedSingleToken(String value) {
+        String[] tokens = value.trim().toLowerCase(Locale.ROOT).split("\\s+");
+        if (tokens.length < 5) {
+            return false;
+        }
+        String first = tokens[0];
+        for (String token : tokens) {
+            if (!first.equals(token)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private UserEntity activeUser(String username) {
@@ -909,6 +992,19 @@ public class LearningDialogueService {
             int wordCount,
             boolean likelyFragment
     ) {
+    }
+
+    private record InputQualityResult(
+            boolean accepted,
+            String message
+    ) {
+        static InputQualityResult accepted() {
+            return new InputQualityResult(true, "");
+        }
+
+        static InputQualityResult rejected(String message) {
+            return new InputQualityResult(false, message);
+        }
     }
 
     private record TaskProgress(

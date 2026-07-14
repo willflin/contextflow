@@ -1,5 +1,23 @@
 # 开发日志 / Development Log
 
+## Phase 7.4：学习对话输入质量与模型繁忙提示 / Dialogue Input Quality and Model Busy Handling
+
+### 问题 / Problem
+
+- 学习对话缺少后端输入质量判断，乱码、纯符号、重复刷屏等低质量输入可能进入 Agent 流程。 / Learner dialogue lacked backend input-quality checks, so garbage text, symbol-only input, and repeated spam could enter the Agent workflow.
+- Spring AI 模型不可用或调用失败时，真实学习对话可能静默使用本地 fallback，容易误导用户。 / When Spring AI was unavailable or failed, learner dialogue could silently use local fallback, which could mislead learners.
+
+### 操作 / Operations
+
+- 在 `LearningDialogueService` 增加保守输入质量判断：拦截空输入、超长输入、无英文字符、符号/数字占比过高、单字符或单词重复刷屏。 / Added conservative input-quality validation in `LearningDialogueService`: blocks blank text, overly long text, no English letters, excessive symbols/digits, and repeated single-character/token spam.
+- 保留短句学习输入，例如 `yes`、`ok`、`quiet room please`，避免伤害初学者对话体验。 / Preserved valid short learner replies such as `yes`, `ok`, and `quiet room please` to avoid hurting beginner dialogue flow.
+- 新增学习对话专用的 Spring AI 调用路径：模型不可用或调用失败时返回 `503` 与“模型繁忙，请稍后再试。”，不再在学习对话中静默模拟真实 Agent。 / Added a learner-dialogue-specific Spring AI path: when the model is unavailable or fails, returns `503` with "模型繁忙，请稍后再试。" instead of silently simulating a real Agent.
+- Admin Agent 探测接口继续保留 fallback 和详细诊断，便于排查模型配置。 / Admin Agent probe still keeps fallback and diagnostics for configuration debugging.
+
+### 说明 / Notes
+
+- 未新增依赖，未新增 SQL。 / No dependency or SQL was added.
+
 ## Phase 6.3.19：Admin 对话记录管理 / Admin Dialogue Record Management
 
 ### 问题 / Problem
