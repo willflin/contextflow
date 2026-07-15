@@ -11,6 +11,7 @@ public record VocabularySenseProgressResponse(
         String definitionZh,
         String difficultyLevel,
         String frequencyBand,
+        boolean inLearningPlan,
         boolean learned,
         String masteryLevel,
         BigDecimal masteryScore,

@@ -37,6 +37,14 @@ export type LearningPackageContent = {
     weakScenarios?: string[];
     weakAbilities?: string[];
   };
+  targetVocabulary?: Array<{
+    senseId?: number;
+    word?: string;
+    definitionEn?: string;
+    definitionZh?: string;
+    difficultyLevel?: string;
+    frequencyBand?: string;
+  }>;
   goals?: string[];
   roleplayAgent?: {
     role?: string;

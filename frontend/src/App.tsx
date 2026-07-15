@@ -19,6 +19,7 @@ import {
   fetchAdminDialogues,
   updateAdminDialogue
 } from './api/adminDialogues';
+import { EcdictImportResult, importLocalEcdict } from './api/adminEcdict';
 import { AdminPlacementItem, fetchAdminPlacementItems } from './api/adminPlacementItems';
 import { CurrentUser, fetchCurrentUser, login, register } from './api/auth';
 import { fetchHealth, HealthStatus } from './api/health';
@@ -41,12 +42,18 @@ import {
 } from './api/placement';
 import { fetchReviewPlan, ReviewPlan } from './api/review';
 import { fetchUserLevelProfile, UserLevelProfile } from './api/userProfile';
-import { fetchVocabulary, VocabularyList, VocabularyStatusFilter } from './api/vocabulary';
+import {
+  addVocabularyWordToLearningPlan,
+  fetchVocabulary,
+  VocabularyList,
+  VocabularyStatusFilter
+} from './api/vocabulary';
 
 type LoadState = 'idle' | 'loading' | 'success' | 'error';
 type AuthMode = 'login' | 'register';
 type LearnerView = 'home' | 'vocabulary';
 type AdminView = 'home' | 'runtime' | 'words' | 'dialogues' | 'placementItems';
+type ThemeMode = 'light' | 'dark';
 const ADMIN_PAGE_SIZE = 20;
 type MentorHint = {
   id: number;
@@ -97,6 +104,13 @@ export default function App() {
   const [authMode, setAuthMode] = useState<AuthMode>('login');
   const [learnerView, setLearnerView] = useState<LearnerView>('home');
   const [adminView, setAdminView] = useState<AdminView>('home');
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
+    const storedTheme = window.localStorage.getItem('contextflow_theme');
+    if (storedTheme === 'light' || storedTheme === 'dark') {
+      return storedTheme;
+    }
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  });
   const [username, setUsername] = useState('learner');
   const [password, setPassword] = useState('learner123');
   const [displayName, setDisplayName] = useState('New Learner');
@@ -110,6 +124,9 @@ export default function App() {
   const [agentRuntimeProbe, setAgentRuntimeProbe] = useState<AgentRuntimeProbe | null>(null);
   const [agentRuntimeProbeBusy, setAgentRuntimeProbeBusy] = useState(false);
   const [agentRuntimeProbeError, setAgentRuntimeProbeError] = useState<string | null>(null);
+  const [ecdictImportBusy, setEcdictImportBusy] = useState(false);
+  const [ecdictImportResult, setEcdictImportResult] = useState<EcdictImportResult | null>(null);
+  const [ecdictImportError, setEcdictImportError] = useState<string | null>(null);
   const [placementSession, setPlacementSession] = useState<AdaptivePlacementSession | null>(null);
   const [currentItem, setCurrentItem] = useState<PlacementTestItem | null>(null);
   const [selectedOptionIndex, setSelectedOptionIndex] = useState<number | null>(null);
@@ -128,6 +145,8 @@ export default function App() {
   const [vocabularyStatus, setVocabularyStatus] = useState<VocabularyStatusFilter>('ALL');
   const [vocabularyBusy, setVocabularyBusy] = useState(false);
   const [vocabularyError, setVocabularyError] = useState<string | null>(null);
+  const [learningPlanBusyWordId, setLearningPlanBusyWordId] = useState<number | null>(null);
+  const [learningPlanMessage, setLearningPlanMessage] = useState<string | null>(null);
   const [adminWordQuery, setAdminWordQuery] = useState('');
   const [adminWordDetail, setAdminWordDetail] = useState<LearningUnitDetail | null>(null);
   const [adminWordForm, setAdminWordForm] = useState<AdminWordPayload>(emptyAdminWordForm);
@@ -185,6 +204,11 @@ export default function App() {
   }, []);
 
   useEffect(() => () => clearMentorHintTimer(), []);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = themeMode;
+    window.localStorage.setItem('contextflow_theme', themeMode);
+  }, [themeMode]);
 
   useEffect(() => {
     if (currentUser) {
@@ -346,6 +370,31 @@ export default function App() {
     setAgentRuntimeProbe(null);
     setAgentRuntimeProbeBusy(false);
     setAgentRuntimeProbeError(null);
+    setEcdictImportBusy(false);
+    setEcdictImportResult(null);
+    setEcdictImportError(null);
+  }
+
+  async function runEcdictImport() {
+    const token = tokenOrNull();
+
+    if (!token) {
+      setEcdictImportError('请先登录。');
+      return;
+    }
+
+    setEcdictImportBusy(true);
+    setEcdictImportError(null);
+
+    try {
+      const result = await importLocalEcdict(token);
+      setEcdictImportResult(result);
+    } catch (exception) {
+      setEcdictImportResult(null);
+      setEcdictImportError(exception instanceof Error ? exception.message : 'ECDICT 导入失败。');
+    } finally {
+      setEcdictImportBusy(false);
+    }
   }
 
   async function checkProtectedEndpoint(path: '/api/learner/probe' | '/api/admin/probe') {
@@ -531,6 +580,33 @@ export default function App() {
     setVocabularyStatus('ALL');
     setVocabularyBusy(false);
     setVocabularyError(null);
+    setLearningPlanBusyWordId(null);
+    setLearningPlanMessage(null);
+  }
+
+  async function addWordToLearningPlan(learningUnitId: number) {
+    const token = tokenOrNull();
+
+    if (!token) {
+      setVocabularyError('请先登录。');
+      return;
+    }
+
+    setLearningPlanBusyWordId(learningUnitId);
+    setLearningPlanMessage(null);
+    setVocabularyError(null);
+
+    try {
+      const result = await addVocabularyWordToLearningPlan(token, learningUnitId);
+      setLearningPlanMessage(
+        `${result.message} 加入 ${result.addedSenseCount} 个词义，剔除 ${result.skippedOutOfLevelCount} 个词义。`
+      );
+      await loadVocabulary();
+    } catch (exception) {
+      setVocabularyError(exception instanceof Error ? exception.message : '加入学习计划失败。');
+    } finally {
+      setLearningPlanBusyWordId(null);
+    }
   }
 
   async function openVocabularyPage() {
@@ -1200,14 +1276,23 @@ export default function App() {
     return window.localStorage.getItem('contextflow_token');
   }
 
+  function toggleTheme() {
+    setThemeMode((previous) => (previous === 'light' ? 'dark' : 'light'));
+  }
+
   return (
-    <main className="app-shell">
+    <main className="app-shell" data-theme={themeMode}>
       <section className="hero">
-        <p className="eyebrow">ContextFlow</p>
-        <h1>语境化英语学习</h1>
-        <p className="summary">
-          先完成水平测试，再基于用户画像进入对话学习、词义掌握度和复习闭环。
-        </p>
+        <div>
+          <p className="eyebrow">ContextFlow</p>
+          <h1>语境化英语学习</h1>
+          <p className="summary">
+            先完成水平测试，再基于用户画像进入对话学习、词义掌握度和复习闭环。
+          </p>
+        </div>
+        <button className="theme-toggle" type="button" onClick={toggleTheme} aria-pressed={themeMode === 'dark'}>
+          {themeMode === 'dark' ? '白天模式' : '夜间模式'}
+        </button>
       </section>
 
       {currentUser ? (
@@ -1526,6 +1611,40 @@ export default function App() {
         )}
         {accessError && <p className="error compact">访问失败：{accessError}</p>}
         {renderAgentRuntimePanel()}
+
+        <section className="tool-panel">
+          <div className="panel-heading">
+            <div>
+              <p className="eyebrow">ECDICT</p>
+              <h2>完整词表导入</h2>
+            </div>
+            <button className="secondary-button" type="button" onClick={runEcdictImport} disabled={ecdictImportBusy}>
+              {ecdictImportBusy ? '导入中' : '导入本地 CSV'}
+            </button>
+          </div>
+          <p className="hint">读取项目根目录的 data/ecdict.csv，导入 raw/clean 表并同步到系统学习词表。</p>
+          {ecdictImportError && <p className="error compact">ECDICT 导入失败：{ecdictImportError}</p>}
+          {ecdictImportResult && (
+            <div className="metrics-row compact-metrics">
+              <div>
+                <span className="label">Batch</span>
+                <strong>#{ecdictImportResult.batchId}</strong>
+              </div>
+              <div>
+                <span className="label">原始行</span>
+                <strong>{ecdictImportResult.loadedRows}</strong>
+              </div>
+              <div>
+                <span className="label">清洗词</span>
+                <strong>{ecdictImportResult.cleanRows}</strong>
+              </div>
+              <div>
+                <span className="label">系统词义</span>
+                <strong>{ecdictImportResult.learningSenseRows}</strong>
+              </div>
+            </div>
+          )}
+        </section>
       </div>
     );
   }
@@ -1973,6 +2092,7 @@ export default function App() {
         </p>
 
         {vocabularyError && <p className="error compact">词库加载失败：{vocabularyError}</p>}
+        {learningPlanMessage && <p className="success">{learningPlanMessage}</p>}
 
         {!vocabulary && !vocabularyError && <p className="hint">登录后会加载当前测试词库。</p>}
 
@@ -1986,9 +2106,22 @@ export default function App() {
                 <article className="vocabulary-card" key={word.learningUnitId}>
                   <div className="word-row">
                     <strong>{word.canonicalText}</strong>
-                    <span className={`target-type ${word.learnedStatus.toLowerCase()}`}>
-                      {word.learnedStatus === 'UNLEARNED' ? '未学' : word.learnedStatus === 'PARTIAL' ? '部分已学' : '已学'}
-                    </span>
+                    <div className="word-actions">
+                      {word.plannedSenseCount > 0 && (
+                        <span className="target-type learned">计划中 {word.plannedSenseCount}</span>
+                      )}
+                      <span className={`target-type ${word.learnedStatus.toLowerCase()}`}>
+                        {word.learnedStatus === 'UNLEARNED' ? '未学' : word.learnedStatus === 'PARTIAL' ? '部分已学' : '已学'}
+                      </span>
+                      <button
+                        className="secondary-button compact-button"
+                        type="button"
+                        onClick={() => void addWordToLearningPlan(word.learningUnitId)}
+                        disabled={learningPlanBusyWordId === word.learningUnitId}
+                      >
+                        {learningPlanBusyWordId === word.learningUnitId ? '加入中' : '加入计划'}
+                      </button>
+                    </div>
                   </div>
                   <small>
                     {word.learnedSenseCount}/{word.totalSenseCount} 个词义已学习
@@ -1997,7 +2130,10 @@ export default function App() {
                     {word.senses.map((sense) => (
                       <div className="sense-line" key={sense.senseId}>
                         <span>{sense.partOfSpeech ?? 'OTHER'}</span>
-                        <p>{sense.definitionZh ?? sense.definitionEn}</p>
+                        <p>
+                          {sense.definitionZh ?? sense.definitionEn}
+                          {sense.inLearningPlan && <small>已在学习计划</small>}
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -2690,6 +2826,23 @@ export default function App() {
             </div>
           </aside>
         </section>
+
+        {content.targetVocabulary && content.targetVocabulary.length > 0 && (
+          <section>
+            <h3>本轮目标词</h3>
+            <div className="expression-list">
+              {content.targetVocabulary.map((target) => (
+                <div className="expression-item" key={String(target.senseId ?? target.word ?? 'target-vocabulary')}>
+                  <strong>{target.word}</strong>
+                  <p>{target.definitionZh || target.definitionEn}</p>
+                  <small>
+                    {target.difficultyLevel || '未分级'} · {target.frequencyBand || '未分频'}
+                  </small>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {preciseHintPromptVisible && (
           <div className="hint-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="precise-hint-title">

@@ -16,6 +16,7 @@ export type VocabularySenseProgress = {
   definitionZh: string | null;
   difficultyLevel: string | null;
   frequencyBand: string | null;
+  inLearningPlan: boolean;
   learned: boolean;
   masteryLevel: string | null;
   masteryScore: number | null;
@@ -30,9 +31,17 @@ export type VocabularyWord = {
   canonicalText: string;
   normalizedText: string;
   learnedStatus: 'LEARNED' | 'PARTIAL' | 'UNLEARNED';
+  plannedSenseCount: number;
   learnedSenseCount: number;
   totalSenseCount: number;
   senses: VocabularySenseProgress[];
+};
+
+export type LearningPlanAddWordResult = {
+  learningUnitId: number;
+  addedSenseCount: number;
+  skippedOutOfLevelCount: number;
+  message: string;
 };
 
 export type VocabularyList = {
@@ -77,5 +86,24 @@ export async function fetchVocabulary(
   }
 
   const result = (await response.json()) as ApiResponse<VocabularyList>;
+  return result.data;
+}
+
+export async function addVocabularyWordToLearningPlan(
+  token: string,
+  learningUnitId: number
+): Promise<LearningPlanAddWordResult> {
+  const response = await fetch(`/api/learning/vocabulary/${learningUnitId}/plan`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, 'Failed to add word to learning plan.'));
+  }
+
+  const result = (await response.json()) as ApiResponse<LearningPlanAddWordResult>;
   return result.data;
 }

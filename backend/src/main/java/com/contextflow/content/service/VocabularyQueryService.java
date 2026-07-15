@@ -3,6 +3,7 @@ package com.contextflow.content.service;
 import com.contextflow.content.dto.VocabularyListResponse;
 import com.contextflow.content.dto.VocabularySenseProgressResponse;
 import com.contextflow.content.dto.VocabularyWordResponse;
+import com.contextflow.learning.service.LearningPlanService;
 import com.contextflow.user.domain.UserEntity;
 import com.contextflow.user.repository.UserRepository;
 import org.springframework.http.HttpStatus;
@@ -27,10 +28,16 @@ public class VocabularyQueryService {
 
     private final JdbcTemplate jdbcTemplate;
     private final UserRepository userRepository;
+    private final LearningPlanService learningPlanService;
 
-    public VocabularyQueryService(JdbcTemplate jdbcTemplate, UserRepository userRepository) {
+    public VocabularyQueryService(
+            JdbcTemplate jdbcTemplate,
+            UserRepository userRepository,
+            LearningPlanService learningPlanService
+    ) {
         this.jdbcTemplate = jdbcTemplate;
         this.userRepository = userRepository;
+        this.learningPlanService = learningPlanService;
     }
 
     @Transactional(readOnly = true)
@@ -99,6 +106,7 @@ public class VocabularyQueryService {
                     rows.getString("definition_zh"),
                     rows.getString("difficulty_level"),
                     rows.getString("frequency_band"),
+                    false,
                     learned,
                     rows.getString("mastery_level"),
                     rows.getBigDecimal("mastery_score"),
@@ -109,9 +117,18 @@ public class VocabularyQueryService {
             ));
         }, user.getId(), normalizedQuery, like(normalizedQuery), like(normalizedQuery), rowLimit);
 
+        List<Long> plannedSenseIds = learningPlanService.activePlannedSenseIds(
+                user.getId(),
+                words.values()
+                        .stream()
+                        .flatMap(word -> word.senses.stream())
+                        .map(VocabularySenseProgressResponse::senseId)
+                        .toList()
+        );
+
         List<VocabularyWordResponse> matched = words.values()
                 .stream()
-                .map(WordBuilder::toResponse)
+                .map(word -> word.toResponse(plannedSenseIds))
                 .filter(word -> matchesStatus(word, statusFilter))
                 .toList();
 
@@ -182,8 +199,11 @@ public class VocabularyQueryService {
             this.normalizedText = normalizedText;
         }
 
-        private VocabularyWordResponse toResponse() {
+        private VocabularyWordResponse toResponse(List<Long> plannedSenseIds) {
             int learnedSenseCount = (int) senses.stream().filter(VocabularySenseProgressResponse::learned).count();
+            int plannedSenseCount = (int) senses.stream()
+                    .filter(sense -> plannedSenseIds.contains(sense.senseId()))
+                    .count();
             String learnedStatus;
             if (learnedSenseCount == 0) {
                 learnedStatus = "UNLEARNED";
@@ -197,9 +217,28 @@ public class VocabularyQueryService {
                     canonicalText,
                     normalizedText,
                     learnedStatus,
+                    plannedSenseCount,
                     learnedSenseCount,
                     senses.size(),
-                    senses
+                    senses.stream()
+                            .map(sense -> new VocabularySenseProgressResponse(
+                                    sense.senseId(),
+                                    sense.senseKey(),
+                                    sense.partOfSpeech(),
+                                    sense.definitionEn(),
+                                    sense.definitionZh(),
+                                    sense.difficultyLevel(),
+                                    sense.frequencyBand(),
+                                    plannedSenseIds.contains(sense.senseId()),
+                                    sense.learned(),
+                                    sense.masteryLevel(),
+                                    sense.masteryScore(),
+                                    sense.exposureCount(),
+                                    sense.attemptCount(),
+                                    sense.lastSeenAt(),
+                                    sense.nextReviewAt()
+                            ))
+                            .toList()
             );
         }
     }

@@ -1,5 +1,6 @@
 package com.contextflow.learning.service;
 
+import com.contextflow.content.domain.LearningUnitSenseEntity;
 import com.contextflow.learning.domain.LearningDialogueTurnEntity;
 import com.contextflow.learning.domain.LearningEventSourceType;
 import com.contextflow.learning.domain.LearningPackageEntity;
@@ -41,6 +42,7 @@ public class LearningPackageService {
     private final LearningDialogueTurnRepository learningDialogueTurnRepository;
     private final LearningEventRepository learningEventRepository;
     private final ReviewPlanService reviewPlanService;
+    private final LearningPlanService learningPlanService;
     private final ObjectMapper objectMapper;
 
     public LearningPackageService(
@@ -51,6 +53,7 @@ public class LearningPackageService {
             LearningDialogueTurnRepository learningDialogueTurnRepository,
             LearningEventRepository learningEventRepository,
             ReviewPlanService reviewPlanService,
+            LearningPlanService learningPlanService,
             ObjectMapper objectMapper
     ) {
         this.userRepository = userRepository;
@@ -60,6 +63,7 @@ public class LearningPackageService {
         this.learningDialogueTurnRepository = learningDialogueTurnRepository;
         this.learningEventRepository = learningEventRepository;
         this.reviewPlanService = reviewPlanService;
+        this.learningPlanService = learningPlanService;
         this.objectMapper = objectMapper;
     }
 
@@ -137,7 +141,8 @@ public class LearningPackageService {
                 .map(LearningPackageEntity::getScenarioTemplateId)
                 .collect(java.util.stream.Collectors.toSet());
         ScenarioTemplateEntity scenario = selectScenario(profile, assignedScenarioIds);
-        String content = buildSeededContent(profile, scenario);
+        List<LearningUnitSenseEntity> targetSenses = learningPlanService.selectTargetSenses(user, profile, 5);
+        String content = buildSeededContent(profile, scenario, targetSenses);
 
         return learningPackageRepository.save(new LearningPackageEntity(
                 user.getId(),
@@ -183,7 +188,11 @@ public class LearningPackageService {
         }
     }
 
-    private String buildSeededContent(UserLevelProfileEntity profile, ScenarioTemplateEntity scenario) {
+    private String buildSeededContent(
+            UserLevelProfileEntity profile,
+            ScenarioTemplateEntity scenario,
+            List<LearningUnitSenseEntity> targetSenses
+    ) {
         Map<String, Object> content = Map.of(
                 "scenario", Map.of(
                         "code", scenario.getCode(),
@@ -206,6 +215,7 @@ public class LearningPackageService {
                         "weakScenarios", parseJson(profile.getWeakScenariosJson()),
                         "weakAbilities", parseJson(profile.getWeakAbilitiesJson())
                 ),
+                "targetVocabulary", targetVocabulary(targetSenses),
                 "goals", List.of(
                         "Understand the situation and respond naturally.",
                         "Use one polite request and one clarification question.",
@@ -239,6 +249,19 @@ public class LearningPackageService {
         } catch (JsonProcessingException exception) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to build learning package.");
         }
+    }
+
+    private List<Map<String, Object>> targetVocabulary(List<LearningUnitSenseEntity> targetSenses) {
+        return targetSenses.stream()
+                .map(sense -> Map.<String, Object>of(
+                        "senseId", sense.getId(),
+                        "word", sense.getLearningUnit().getCanonicalText(),
+                        "definitionEn", sense.getDefinitionEn(),
+                        "definitionZh", sense.getDefinitionZh() == null ? "" : sense.getDefinitionZh(),
+                        "difficultyLevel", sense.getDifficultyLevel() == null ? "" : sense.getDifficultyLevel().name(),
+                        "frequencyBand", sense.getFrequencyBand() == null ? "" : sense.getFrequencyBand().name()
+                ))
+                .toList();
     }
 
     private Object parseJson(String json) {

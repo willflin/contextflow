@@ -1,5 +1,21 @@
 # 开发日志 / Development Log
 
+## Phase 7.5：模型契约异常后端处理 / Backend Handling for Model Contract Failures
+
+### 问题 / Problem
+
+- 学习对话把模型连接失败和 JSON 契约失败都提示为“模型繁忙”，错误归因不准确。 / Learner dialogue reported both model connectivity failures and JSON contract failures as "model busy", which was inaccurate.
+
+### 操作 / Operations
+
+- 在学习对话专用模型调用中区分异常类型：连接、超时、客户端运行时失败返回“模型繁忙，请稍后再试。” / Distinguished failure types in learner dialogue model calls: connectivity, timeout, and runtime client failures return "模型繁忙，请稍后再试。"
+- 对 `AgentModelResponseException` 执行一次后端自动重试；重试仍失败时返回“模型回复格式异常，请重试。” / Added one backend retry for `AgentModelResponseException`; if it still fails, returns "模型回复格式异常，请重试。"
+- 后端日志记录契约失败原因，前端不暴露技术细节。 / Backend logs contract failure reasons while the frontend keeps technical details hidden.
+
+### 说明 / Notes
+
+- 未新增依赖，未新增 SQL。 / No dependency or SQL was added.
+
 ## Phase 7.4：学习对话输入质量与模型繁忙提示 / Dialogue Input Quality and Model Busy Handling
 
 ### 问题 / Problem
@@ -1387,6 +1403,46 @@
 ### 说明 / Notes
 
 - 未新增依赖，未新增数据库表；本次无新增 SQL 文件。 / No dependency or database table was added; no new SQL file was needed.
+
+## Phase 7.1.10：前端 UI 与主题优化 / Frontend UI and Theme Refresh
+
+### 问题 / Problem
+
+- 前端页面已经承载完整学习和管理流程，但视觉层级仍偏原型化，亮色/暗色主题不可切换。 / The frontend already carries the full learner and admin flows, but the visual hierarchy still felt prototype-like and did not support light/dark switching.
+- Windows PowerShell 输出 UTF-8 文件时可能显示乱码，需要确认源码编码并补强页面语言声明。 / Windows PowerShell can display UTF-8 files as mojibake, so the source encoding needed confirmation and the page language metadata needed tightening.
+
+### 操作 / Operations
+
+- 确认 `frontend/src/App.tsx` 源码按 UTF-8 读取时中文正常；将页面 `lang` 改为 `zh-CN`。 / Confirmed `frontend/src/App.tsx` renders Chinese correctly when read as UTF-8; changed the page `lang` to `zh-CN`.
+- 新增前端主题状态、`localStorage` 持久化和页面主题切换按钮。 / Added frontend theme state, `localStorage` persistence, and a page-level theme toggle button.
+- 重整全局 CSS 设计 token，优化主面板、登录区、学习对话、Mentor 面板、管理员入口、表单、状态标签和移动端表现。 / Refreshed global CSS design tokens and improved panels, auth, learner dialogue, Mentor panel, admin entry cards, forms, status tags, and mobile behavior.
+- 新增暗色主题变量和关键组件覆盖样式。 / Added dark-theme variables and key component overrides.
+
+### 说明 / Notes
+
+- 未新增依赖，未新增数据库表；本次无新增 SQL 文件。 / No dependency or database table was added; no new SQL file was needed.
+- 前端生产构建已通过；本机后台启动 Vite dev server 受 Windows `Start-Process`/PATH 环境冲突影响，未保持运行。 / The frontend production build passed; keeping the Vite dev server running in the background was blocked by this machine's Windows `Start-Process`/PATH environment conflict.
+
+## Phase 8.1：完整词表导入与用户学习计划 / Full Vocabulary Import and User Learning Plan
+
+### 问题 / Problem
+
+- `data/ecdict.csv` 已存在，但系统缺少管理员触发的完整词表导入入口，词表与学习单元同步仍依赖手工 SQL。 / `data/ecdict.csv` already exists, but the system lacked an admin-triggered full vocabulary import path; synchronizing vocabulary into learning units still depended on manual SQL.
+- 学习包生成没有显式学习计划队列，无法把用户主动选择的已学/未学单词纳入下一轮学习。 / Learning package generation had no explicit learning-plan queue, so user-selected learned or unlearned words could not be included in the next learning round.
+- 单词难度与用户 CEFR 等级差距过大时，系统没有在学习计划层自动剔除。 / When word difficulty was too far from the user's CEFR level, the system did not exclude it at the learning-plan layer.
+
+### 操作 / Operations
+
+- 新增 `learning_plan_items` 表，记录用户学习计划词义、来源、状态和剔除原因。 / Added `learning_plan_items` to store planned user word senses, source, status, and exclusion reason.
+- 新增管理员 ECDICT 本地导入接口：读取 `data/ecdict.csv`，写入 raw/clean 表，并同步到 `learning_units`、`learning_unit_senses`、`learning_unit_forms` 和来源记录。 / Added an admin local ECDICT import endpoint that reads `data/ecdict.csv`, fills raw/clean tables, and synchronizes `learning_units`, `learning_unit_senses`, `learning_unit_forms`, and source links.
+- 新增用户词库加入学习计划接口；前端词库页可从已学/未学词库把单词加入学习计划。 / Added a learner vocabulary-to-plan endpoint; the frontend vocabulary page can add learned or unlearned words to the learning plan.
+- 学习计划按用户 CEFR 等级过滤目标词义，默认只保留相差不超过 1 档的词义；超出范围的计划项标记为 `SKIPPED_OUT_OF_LEVEL`。 / The learning plan filters target senses by user CEFR level, keeping senses within one level by default; out-of-range items are marked `SKIPPED_OUT_OF_LEVEL`.
+- 学习包生成优先读取用户学习计划目标词，并在学习任务中展示本轮目标词。 / Learning package generation now prefers user learning-plan targets and shows target vocabulary in the learning task.
+
+### 说明 / Notes
+
+- 未新增依赖；新增 Flyway 迁移 `V21__create_learning_plan_items.sql`，同步 SQL 位于 `docs/sql/phase8_learning_plan_items_schema.sql`。 / No dependency was added. Added Flyway migration `V21__create_learning_plan_items.sql`; synchronized SQL is in `docs/sql/phase8_learning_plan_items_schema.sql`.
+- 前端构建和后端编译已通过；后端普通沙箱编译曾被 `backend/target` 写入权限拦截，已使用非沙箱编译完成验证。 / Frontend build and backend compile passed. The regular sandbox backend compile was blocked by `backend/target` write permissions, then verified outside the sandbox.
 ## Phase 7.1.5：题库规模扩容与随机出题修正 / Question Bank Scale-Up and Random Item Order Fix
 
 ### 问题 / Problem

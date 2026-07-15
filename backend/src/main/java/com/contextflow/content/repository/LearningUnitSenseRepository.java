@@ -16,6 +16,23 @@ public interface LearningUnitSenseRepository extends JpaRepository<LearningUnitS
 
     List<LearningUnitSenseEntity> findByLearningUnitIdOrderByIdAsc(Long learningUnitId);
 
+    @Query("""
+            select sense
+            from LearningUnitSenseEntity sense
+            join fetch sense.learningUnit unit
+            where unit.id = :learningUnitId
+              and unit.status = :unitStatus
+              and unit.unitType = :unitType
+              and sense.status = :senseStatus
+            order by sense.id asc
+            """)
+    List<LearningUnitSenseEntity> findActiveWordSensesByLearningUnitId(
+            @Param("learningUnitId") Long learningUnitId,
+            @Param("unitType") LearningUnitType unitType,
+            @Param("unitStatus") LearningUnitStatus unitStatus,
+            @Param("senseStatus") LearningUnitStatus senseStatus
+    );
+
     Optional<LearningUnitSenseEntity> findByLearningUnitIdAndSenseKey(Long learningUnitId, String senseKey);
 
     @Query("""

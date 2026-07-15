@@ -12,6 +12,8 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.StringUtils;
@@ -23,6 +25,8 @@ import java.util.function.Supplier;
 
 @Service
 public class AgentRuntimeService {
+
+    private static final Logger log = LoggerFactory.getLogger(AgentRuntimeService.class);
 
     private final AgentProperties agentProperties;
     private final ObjectProvider<AgentModelClient> agentModelClientProvider;
@@ -77,11 +81,26 @@ public class AgentRuntimeService {
             throw modelBusy();
         }
 
-        try {
-            return client.generateDialogue(input);
-        } catch (RuntimeException exception) {
-            throw modelBusy();
+        AgentModelResponseException contractException = null;
+        for (int attempt = 1; attempt <= 2; attempt++) {
+            try {
+                return client.generateDialogue(input);
+            } catch (AgentModelResponseException exception) {
+                contractException = exception;
+                log.warn("Spring AI Agent output contract failed on attempt {}: {}", attempt, exception.getMessage());
+            } catch (RuntimeException exception) {
+                log.warn("Spring AI Agent call failed: {}", compactError(exception));
+                throw modelBusy();
+            }
         }
+        throw modelOutputInvalid(contractException);
+    }
+
+    private ResponseStatusException modelOutputInvalid(AgentModelResponseException exception) {
+        if (exception != null) {
+            log.warn("Spring AI Agent output contract failed after retry: {}", exception.validationErrors());
+        }
+        return new ResponseStatusException(HttpStatus.BAD_GATEWAY, "模型回复格式异常，请重试。");
     }
 
     public AgentRuntimeProbeResponse probeDialogue(

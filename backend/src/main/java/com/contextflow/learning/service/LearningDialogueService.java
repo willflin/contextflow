@@ -198,7 +198,7 @@ public class LearningDialogueService {
         if (isRepeatedSingleCharacter(userMessage) || isRepeatedSingleToken(userMessage)) {
             return InputQualityResult.rejected("输入内容重复度过高，请用英文短句重新表达。");
         }
-        return InputQualityResult.accepted();
+        return InputQualityResult.ok();
     }
 
     private boolean isRepeatedSingleCharacter(String value) {
@@ -994,11 +994,24 @@ public class LearningDialogueService {
     ) {
     }
 
-    private record InputQualityResult(
-            boolean accepted,
-            String message
-    ) {
-        static InputQualityResult accepted() {
+    private static final class InputQualityResult {
+        private final boolean accepted;
+        private final String message;
+
+        private InputQualityResult(boolean accepted, String message) {
+            this.accepted = accepted;
+            this.message = message;
+        }
+
+        boolean accepted() {
+            return accepted;
+        }
+
+        String message() {
+            return message;
+        }
+
+        static InputQualityResult ok() {
             return new InputQualityResult(true, "");
         }
 
