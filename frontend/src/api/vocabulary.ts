@@ -6,7 +6,7 @@ type ApiResponse<T> = {
   timestamp: string;
 };
 
-export type VocabularyStatusFilter = 'ALL' | 'LEARNED' | 'UNLEARNED';
+export type VocabularyStatusFilter = 'ALL' | 'LEARNED' | 'UNLEARNED' | 'LOW_LEVEL';
 
 export type VocabularySenseProgress = {
   senseId: number;
@@ -17,6 +17,8 @@ export type VocabularySenseProgress = {
   difficultyLevel: string | null;
   frequencyBand: string | null;
   inLearningPlan: boolean;
+  lowLevelCandidate: boolean;
+  learnerLevelGap: number | null;
   learned: boolean;
   masteryLevel: string | null;
   masteryScore: number | null;
@@ -32,9 +34,16 @@ export type VocabularyWord = {
   normalizedText: string;
   learnedStatus: 'LEARNED' | 'PARTIAL' | 'UNLEARNED';
   plannedSenseCount: number;
+  lowLevelCandidateSenseCount: number;
   learnedSenseCount: number;
   totalSenseCount: number;
   senses: VocabularySenseProgress[];
+};
+
+export type LowLevelMasteryResult = {
+  markedSenseCount: number;
+  skippedSenseCount: number;
+  message: string;
 };
 
 export type LearningPlanAddWordResult = {
@@ -47,8 +56,10 @@ export type LearningPlanAddWordResult = {
 export type VocabularyList = {
   statusFilter: VocabularyStatusFilter;
   query: string | null;
-  limit: number;
+  page: number;
+  pageSize: number;
   totalMatchedWords: number;
+  totalPages: number;
   items: VocabularyWord[];
 };
 
@@ -65,11 +76,13 @@ export async function fetchVocabulary(
   token: string,
   status: VocabularyStatusFilter,
   query: string,
-  limit = 500
+  page = 0,
+  pageSize = 100
 ): Promise<VocabularyList> {
   const params = new URLSearchParams({
     status,
-    limit: String(limit)
+    page: String(page),
+    size: String(pageSize)
   });
   if (query.trim()) {
     params.set('query', query.trim());
@@ -105,5 +118,26 @@ export async function addVocabularyWordToLearningPlan(
   }
 
   const result = (await response.json()) as ApiResponse<LearningPlanAddWordResult>;
+  return result.data;
+}
+
+export async function markLowLevelSensesMastered(
+  token: string,
+  senseIds: number[]
+): Promise<LowLevelMasteryResult> {
+  const response = await fetch('/api/learning/vocabulary/low-level/mastered', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ senseIds })
+  });
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, 'Failed to mark low-level vocabulary as mastered.'));
+  }
+
+  const result = (await response.json()) as ApiResponse<LowLevelMasteryResult>;
   return result.data;
 }

@@ -186,6 +186,27 @@ public class UserLearningUnitSenseStatsEntity {
         this.lastPriorityCalculatedAt = calculatedAt;
     }
 
+    public void markMasteredByUserLevelGap(
+            Instant occurredAt,
+            Instant nextReviewAt,
+            int reviewIntervalHours,
+            BigDecimal reviewPriorityScore
+    ) {
+        if (this.firstSeenAt == null) {
+            this.firstSeenAt = occurredAt;
+        }
+        this.lastSeenAt = occurredAt;
+        this.lastReviewedAt = occurredAt;
+        this.nextReviewAt = nextReviewAt;
+        this.reviewIntervalHours = reviewIntervalHours;
+        this.masteryScore = BigDecimal.ONE.setScale(4, RoundingMode.HALF_UP);
+        this.masteryLevel = MasteryLevel.MASTERED;
+        this.stabilityScore = BigDecimal.ONE.setScale(4, RoundingMode.HALF_UP);
+        this.difficultyScore = BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP);
+        this.reviewPriorityScore = reviewPriorityScore.setScale(4, RoundingMode.HALF_UP);
+        this.lastPriorityCalculatedAt = occurredAt;
+    }
+
     @PrePersist
     void prePersist() {
         Instant now = Instant.now();

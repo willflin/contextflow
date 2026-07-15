@@ -1182,6 +1182,10 @@ strong {
   box-shadow: 0 24px 70px rgb(23 32 38 / 0.22);
 }
 
+.wide-modal {
+  width: min(720px, 100%);
+}
+
 .hint-modal h3,
 .hint-modal p {
   margin: 0;
@@ -1197,6 +1201,45 @@ strong {
   justify-content: flex-end;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.mastery-sense-list {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.mastery-sense-item {
+  display: grid;
+  grid-template-columns: auto 84px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-muted);
+  padding: 12px;
+}
+
+.mastery-sense-item.locked {
+  opacity: 0.62;
+}
+
+.mastery-sense-item span {
+  color: var(--brand);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.mastery-sense-item p {
+  margin: 0;
+  color: var(--text-main);
+  line-height: 1.5;
+}
+
+.mastery-sense-item small {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-weight: 700;
 }
 
 .mentor-content {

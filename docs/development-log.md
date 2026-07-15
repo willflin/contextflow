@@ -1443,6 +1443,67 @@
 
 - 未新增依赖；新增 Flyway 迁移 `V21__create_learning_plan_items.sql`，同步 SQL 位于 `docs/sql/phase8_learning_plan_items_schema.sql`。 / No dependency was added. Added Flyway migration `V21__create_learning_plan_items.sql`; synchronized SQL is in `docs/sql/phase8_learning_plan_items_schema.sql`.
 - 前端构建和后端编译已通过；后端普通沙箱编译曾被 `backend/target` 写入权限拦截，已使用非沙箱编译完成验证。 / Frontend build and backend compile passed. The regular sandbox backend compile was blocked by `backend/target` write permissions, then verified outside the sandbox.
+
+## Phase 8.2：完整词库分页浏览 / Full Vocabulary Pagination
+
+### 问题 / Problem
+
+- 词库页面仍按固定 `500` 条加载，容易误解为完整词表只导入了 500 个单词。 / The vocabulary page still loaded a fixed `500` rows, which made it look like only 500 words had been imported.
+- 一次性返回完整 ECDICT 词库会给后端、前端和浏览器渲染带来不必要压力。 / Returning the entire ECDICT vocabulary in one response would put unnecessary pressure on the backend, frontend, and browser rendering.
+
+### 操作 / Operations
+
+- 词库接口改为数据库层分页：先统计总匹配单词数，再按 `page` / `size` 查询当前页。 / Changed the vocabulary API to database-level pagination: count total matched words first, then fetch the current page by `page` / `size`.
+- 前端词库页新增每页数量下拉框，支持每页 50 / 100 / 200 / 500。 / Added a page-size selector on the frontend vocabulary page: 50 / 100 / 200 / 500 per page.
+- 搜索、已学/未学筛选会回到第一页，列表底部提供上一页/下一页。 / Search and learned/unlearned filters reset to page one, and the list footer provides previous/next navigation.
+- 页面文案改为“完整导入 + 分页浏览”，不再描述为固定 500 个候选词。 / Updated page copy to describe full import plus paginated browsing instead of a fixed 500-candidate list.
+
+### 说明 / Notes
+
+- 未新增依赖，未新增数据库表；本次无新增 SQL 文件。 / No dependency or database table was added; no new SQL file was needed.
+- 前端构建和后端编译已通过；后端普通沙箱编译仍受 `backend/target` 写入权限影响，已使用非沙箱编译完成验证。 / Frontend build and backend compile passed. Regular sandbox backend compile is still affected by `backend/target` write permissions, then verified outside the sandbox.
+
+## Phase 8.3：正式词表全量同步 / Full Formal Vocabulary Sync
+
+### 问题 / Problem
+
+- ECDICT raw 表已有 770,611 行、clean 表已有 46,552 行，但正式 `learning_units` 中只有 499 个 WORD，词库页面因此只能看到少量正式语言单元。 / ECDICT raw already had 770,611 rows and the clean table had 46,552 rows, but formal `learning_units` only contained 499 WORD units, so the vocabulary page could only show a small formal subset.
+
+### 操作 / Operations
+
+- 将 `ecdict_clean_word_entries` 全量增量同步到正式表：`learning_units`、`learning_unit_forms`、`learning_unit_senses`、`learning_unit_sense_sources`。 / Incrementally synchronized all `ecdict_clean_word_entries` into formal tables: `learning_units`, `learning_unit_forms`, `learning_unit_senses`, and `learning_unit_sense_sources`.
+- 同步方式不清空用户学习事件、掌握度、学习计划或已有词义，只补齐缺失的正式 ECDICT 语言单元。 / The sync did not clear user learning events, mastery stats, learning plans, or existing senses; it only filled missing formal ECDICT language units.
+
+### 结果 / Result
+
+- `ecdict_import_entries`: 770,611 行。 / `ecdict_import_entries`: 770,611 rows.
+- `ecdict_clean_word_entries`: 46,552 行。 / `ecdict_clean_word_entries`: 46,552 rows.
+- `learning_units` 中 WORD: 46,552 个。 / WORD rows in `learning_units`: 46,552.
+- `learning_unit_senses` 中 WORD 词义: 48,190 个；其中本次 ECDICT 来源链接 46,552 条，额外数量来自原有测试词义。 / WORD senses in `learning_unit_senses`: 48,190; 46,552 ECDICT source links were created in this sync, and the extra rows come from existing test senses.
+
+### 说明 / Notes
+
+- 未新增依赖，未新增数据库表；本次是数据库数据同步操作。 / No dependency or database table was added; this was a database data-sync operation.
+
+## Phase 8.4：低难未学词手动标记掌握 / Low-Level Unlearned Vocabulary Mastery
+
+### 问题 / Problem
+
+- 完整词库导入后，用户的未学词库中会包含大量明显低于当前 CEFR 水平的词义，如果全部进入学习/复习流程，会稀释真正需要学习的目标。 / After the full vocabulary import, a learner's unlearned vocabulary can contain many senses far below the current CEFR level; sending all of them into learning/review would dilute the real targets.
+- 低难词不应该被后台静默标记为掌握，需要用户手动确认，避免污染掌握度数据。 / Low-level words should not be silently marked mastered by the backend; the learner should confirm them manually to avoid polluting mastery data.
+
+### 操作 / Operations
+
+- 词库筛选新增 `LOW_LEVEL` / “远低于当前水平”，只显示整个单词未学且至少一个词义低于用户等级 2 档及以上的单词。 / Added `LOW_LEVEL` / "far below current level" vocabulary filtering; it only shows fully unlearned words with at least one sense two or more CEFR levels below the learner.
+- 词库返回每个词义的 `lowLevelCandidate` 和 `learnerLevelGap`，前端按单词聚合展示。 / Vocabulary responses now include `lowLevelCandidate` and `learnerLevelGap` per sense, while the frontend still groups by word.
+- 前端在低难筛选视图中显示“标记掌握”按钮；确认界面展示该单词所有词义，候选词义默认勾选，非候选词义不可勾选，并提供“一键全选候选词义”。 / The frontend shows a "mark mastered" button in the low-level filter view; the confirmation dialog shows all senses, preselects candidate senses, locks non-candidates, and provides a select-all-candidates action.
+- 后端按词义写入 `user_learning_unit_sense_stats`，不写 `learning_events`。 / The backend writes mastery at the sense level into `user_learning_unit_sense_stats` and does not write `learning_events`.
+- 标记后设置 `MASTERED` / `1.0000`，使用稳定 hash 分散 `next_review_at`，并按 `exp(-0.9 * gap^2)` 降低复习优先级，使 gap >= 4 的复习概率趋近于 0。 / Marked senses become `MASTERED` / `1.0000`; `next_review_at` is dispersed by a stable hash, and review priority is reduced with `exp(-0.9 * gap^2)`, making gap >= 4 review probability approach zero.
+
+### 说明 / Notes
+
+- 未新增依赖，未新增数据库表；复用现有掌握度和复习字段。 / No dependency or database table was added; existing mastery and review fields are reused.
+- 前端构建和后端编译已通过；后端普通沙箱编译仍受 `backend/target` 写入权限影响，已使用非沙箱编译完成验证。 / Frontend build and backend compile passed. Regular sandbox backend compile is still affected by `backend/target` write permissions, then verified outside the sandbox.
 ## Phase 7.1.5：题库规模扩容与随机出题修正 / Question Bank Scale-Up and Random Item Order Fix
 
 ### 问题 / Problem

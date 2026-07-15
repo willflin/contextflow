@@ -47,6 +47,15 @@ public interface LearningUnitSenseRepository extends JpaRepository<LearningUnitS
             select sense
             from LearningUnitSenseEntity sense
             join fetch sense.learningUnit unit
+            where sense.id in :ids
+            order by unit.normalizedText asc, sense.id asc
+            """)
+    List<LearningUnitSenseEntity> findByIdInWithUnit(@Param("ids") List<Long> ids);
+
+    @Query("""
+            select sense
+            from LearningUnitSenseEntity sense
+            join fetch sense.learningUnit unit
             where sense.status = :senseStatus
               and unit.status = :unitStatus
               and unit.unitType = :unitType

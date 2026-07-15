@@ -12,6 +12,8 @@ public record VocabularySenseProgressResponse(
         String difficultyLevel,
         String frequencyBand,
         boolean inLearningPlan,
+        boolean lowLevelCandidate,
+        Integer learnerLevelGap,
         boolean learned,
         String masteryLevel,
         BigDecimal masteryScore,

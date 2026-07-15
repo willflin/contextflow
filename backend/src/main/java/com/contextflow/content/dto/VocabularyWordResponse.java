@@ -8,6 +8,7 @@ public record VocabularyWordResponse(
         String normalizedText,
         String learnedStatus,
         int plannedSenseCount,
+        int lowLevelCandidateSenseCount,
         int learnedSenseCount,
         int totalSenseCount,
         List<VocabularySenseProgressResponse> senses

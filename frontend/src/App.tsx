@@ -45,8 +45,10 @@ import { fetchUserLevelProfile, UserLevelProfile } from './api/userProfile';
 import {
   addVocabularyWordToLearningPlan,
   fetchVocabulary,
+  markLowLevelSensesMastered,
   VocabularyList,
-  VocabularyStatusFilter
+  VocabularyStatusFilter,
+  VocabularyWord
 } from './api/vocabulary';
 
 type LoadState = 'idle' | 'loading' | 'success' | 'error';
@@ -54,6 +56,10 @@ type AuthMode = 'login' | 'register';
 type LearnerView = 'home' | 'vocabulary';
 type AdminView = 'home' | 'runtime' | 'words' | 'dialogues' | 'placementItems';
 type ThemeMode = 'light' | 'dark';
+type LowLevelMasteryDraft = {
+  word: VocabularyWord;
+  selectedSenseIds: number[];
+};
 const ADMIN_PAGE_SIZE = 20;
 type MentorHint = {
   id: number;
@@ -143,10 +149,14 @@ export default function App() {
   const [vocabulary, setVocabulary] = useState<VocabularyList | null>(null);
   const [vocabularyQuery, setVocabularyQuery] = useState('');
   const [vocabularyStatus, setVocabularyStatus] = useState<VocabularyStatusFilter>('ALL');
+  const [vocabularyPage, setVocabularyPage] = useState(0);
+  const [vocabularyPageSize, setVocabularyPageSize] = useState(100);
   const [vocabularyBusy, setVocabularyBusy] = useState(false);
   const [vocabularyError, setVocabularyError] = useState<string | null>(null);
   const [learningPlanBusyWordId, setLearningPlanBusyWordId] = useState<number | null>(null);
   const [learningPlanMessage, setLearningPlanMessage] = useState<string | null>(null);
+  const [lowLevelMasteryDraft, setLowLevelMasteryDraft] = useState<LowLevelMasteryDraft | null>(null);
+  const [lowLevelMasteryBusy, setLowLevelMasteryBusy] = useState(false);
   const [adminWordQuery, setAdminWordQuery] = useState('');
   const [adminWordDetail, setAdminWordDetail] = useState<LearningUnitDetail | null>(null);
   const [adminWordForm, setAdminWordForm] = useState<AdminWordPayload>(emptyAdminWordForm);
@@ -552,7 +562,7 @@ export default function App() {
     setReviewError(null);
   }
 
-  async function loadVocabulary() {
+  async function loadVocabulary(page = vocabularyPage, pageSize = vocabularyPageSize, status = vocabularyStatus) {
     const token = tokenOrNull();
 
     if (!token) {
@@ -564,7 +574,9 @@ export default function App() {
     setVocabularyError(null);
 
     try {
-      const result = await fetchVocabulary(token, vocabularyStatus, vocabularyQuery, 500);
+      const result = await fetchVocabulary(token, status, vocabularyQuery, page, pageSize);
+      setVocabularyPage(result.page);
+      setVocabularyPageSize(result.pageSize);
       setVocabulary(result);
     } catch (exception) {
       setVocabulary(null);
@@ -578,10 +590,14 @@ export default function App() {
     setVocabulary(null);
     setVocabularyQuery('');
     setVocabularyStatus('ALL');
+    setVocabularyPage(0);
+    setVocabularyPageSize(100);
     setVocabularyBusy(false);
     setVocabularyError(null);
     setLearningPlanBusyWordId(null);
     setLearningPlanMessage(null);
+    setLowLevelMasteryDraft(null);
+    setLowLevelMasteryBusy(false);
   }
 
   async function addWordToLearningPlan(learningUnitId: number) {
@@ -601,11 +617,78 @@ export default function App() {
       setLearningPlanMessage(
         `${result.message} 加入 ${result.addedSenseCount} 个词义，剔除 ${result.skippedOutOfLevelCount} 个词义。`
       );
-      await loadVocabulary();
+      await loadVocabulary(vocabularyPage);
     } catch (exception) {
       setVocabularyError(exception instanceof Error ? exception.message : '加入学习计划失败。');
     } finally {
       setLearningPlanBusyWordId(null);
+    }
+  }
+
+  function openLowLevelMastery(word: VocabularyWord) {
+    setLowLevelMasteryDraft({
+      word,
+      selectedSenseIds: word.senses
+        .filter((sense) => sense.lowLevelCandidate)
+        .map((sense) => sense.senseId)
+    });
+    setLearningPlanMessage(null);
+    setVocabularyError(null);
+  }
+
+  function toggleLowLevelSense(senseId: number) {
+    setLowLevelMasteryDraft((previous) => {
+      if (!previous) {
+        return previous;
+      }
+      const selected = new Set(previous.selectedSenseIds);
+      if (selected.has(senseId)) {
+        selected.delete(senseId);
+      } else {
+        selected.add(senseId);
+      }
+      return {
+        ...previous,
+        selectedSenseIds: Array.from(selected)
+      };
+    });
+  }
+
+  function selectAllLowLevelCandidateSenses() {
+    setLowLevelMasteryDraft((previous) => previous
+      ? {
+          ...previous,
+          selectedSenseIds: previous.word.senses
+            .filter((sense) => sense.lowLevelCandidate)
+            .map((sense) => sense.senseId)
+        }
+      : previous);
+  }
+
+  async function markSelectedLowLevelSensesMastered() {
+    const token = tokenOrNull();
+
+    if (!token) {
+      setVocabularyError('请先登录。');
+      return;
+    }
+    if (!lowLevelMasteryDraft || lowLevelMasteryDraft.selectedSenseIds.length === 0) {
+      setVocabularyError('请选择至少一个候选词义。');
+      return;
+    }
+
+    setLowLevelMasteryBusy(true);
+    setVocabularyError(null);
+
+    try {
+      const result = await markLowLevelSensesMastered(token, lowLevelMasteryDraft.selectedSenseIds);
+      setLearningPlanMessage(`${result.message} 已标记 ${result.markedSenseCount} 个词义，跳过 ${result.skippedSenseCount} 个。`);
+      setLowLevelMasteryDraft(null);
+      await loadVocabulary(vocabularyPage);
+    } catch (exception) {
+      setVocabularyError(exception instanceof Error ? exception.message : '标记掌握失败。');
+    } finally {
+      setLowLevelMasteryBusy(false);
     }
   }
 
@@ -619,19 +702,45 @@ export default function App() {
   async function applyVocabularyStatusFilter(status: VocabularyStatusFilter) {
     const token = tokenOrNull();
     setVocabularyStatus(status);
+    setVocabularyPage(0);
     if (!token) {
       return;
     }
     setVocabularyBusy(true);
     setVocabularyError(null);
     try {
-      const result = await fetchVocabulary(token, status, vocabularyQuery, 500);
+      const result = await fetchVocabulary(token, status, vocabularyQuery, 0, vocabularyPageSize);
       setVocabulary(result);
     } catch (exception) {
       setVocabulary(null);
       setVocabularyError(exception instanceof Error ? exception.message : '词库加载失败。');
     } finally {
       setVocabularyBusy(false);
+    }
+  }
+
+  async function changeVocabularyPage(page: number) {
+    const nextPage = Math.max(page, 0);
+    setVocabularyPage(nextPage);
+    await loadVocabulary(nextPage);
+  }
+
+  async function changeVocabularyPageSize(pageSize: number) {
+    setVocabularyPageSize(pageSize);
+    setVocabularyPage(0);
+    await loadVocabulary(0, pageSize);
+  }
+
+  function formatVocabularyStatus(status: VocabularyStatusFilter) {
+    switch (status) {
+      case 'LEARNED':
+        return '已学';
+      case 'UNLEARNED':
+        return '未学';
+      case 'LOW_LEVEL':
+        return '远低于当前水平';
+      default:
+        return '全部';
     }
   }
 
@@ -1471,7 +1580,7 @@ export default function App() {
               <button className="secondary-button" type="button" onClick={() => setLearnerView('home')}>
                 返回学习首页
               </button>
-              <button className="secondary-button" type="button" onClick={loadVocabulary} disabled={vocabularyBusy}>
+              <button className="secondary-button" type="button" onClick={() => void loadVocabulary()} disabled={vocabularyBusy}>
                 刷新
               </button>
             </div>
@@ -2053,7 +2162,8 @@ export default function App() {
           className="admin-filter-form"
           onSubmit={(event) => {
             event.preventDefault();
-            void loadVocabulary();
+            setVocabularyPage(0);
+            void loadVocabulary(0);
           }}
         >
           <select
@@ -2063,18 +2173,30 @@ export default function App() {
             <option value="ALL">全部</option>
             <option value="LEARNED">已学</option>
             <option value="UNLEARNED">未学</option>
+            <option value="LOW_LEVEL">远低于当前水平</option>
           </select>
           <input
             value={vocabularyQuery}
             onChange={(event) => setVocabularyQuery(event.target.value)}
             placeholder="搜索单词，例如 go"
           />
+          <select
+            value={vocabularyPageSize}
+            onChange={(event) => void changeVocabularyPageSize(Number(event.target.value))}
+            disabled={vocabularyBusy}
+            aria-label="每页显示数量"
+          >
+            <option value={50}>每页 50</option>
+            <option value={100}>每页 100</option>
+            <option value={200}>每页 200</option>
+            <option value={500}>每页 500</option>
+          </select>
           <button className="secondary-button" type="submit" disabled={vocabularyBusy}>
             查询
           </button>
         </form>
         <div className="quick-filter-row" aria-label="词库快捷筛选">
-          {(['ALL', 'LEARNED', 'UNLEARNED'] as VocabularyStatusFilter[]).map((status) => (
+          {(['ALL', 'LEARNED', 'UNLEARNED', 'LOW_LEVEL'] as VocabularyStatusFilter[]).map((status) => (
             <button
               className={`filter-chip ${vocabularyStatus === status ? 'active' : ''}`}
               type="button"
@@ -2082,13 +2204,13 @@ export default function App() {
               onClick={() => void applyVocabularyStatusFilter(status)}
               disabled={vocabularyBusy}
             >
-              {status === 'ALL' ? '全部' : status === 'LEARNED' ? '已学' : '未学'}
+              {formatVocabularyStatus(status)}
             </button>
           ))}
         </div>
 
         <p className="hint">
-          当前测试词库是按有效频率排名取前 500 个清洗候选，不是原始 CSV 的前 500 行。
+          词库已支持完整导入；当前页面按搜索、状态和分页浏览，不再只展示固定 500 个单词。
         </p>
 
         {vocabularyError && <p className="error compact">词库加载失败：{vocabularyError}</p>}
@@ -2099,8 +2221,31 @@ export default function App() {
         {vocabulary && (
           <div className="vocabulary-window">
             <p className="hint">
-              匹配 {vocabulary.totalMatchedWords} 个单词，当前显示 {vocabulary.items.length} 个。
+              匹配 {vocabulary.totalMatchedWords} 个单词，当前第 {vocabulary.totalPages === 0 ? 0 : vocabulary.page + 1}/{Math.max(vocabulary.totalPages, 1)} 页，显示 {vocabulary.items.length} 个。
             </p>
+            <div className="pagination-row">
+              <span>
+                每页 {vocabulary.pageSize} 个
+              </span>
+              <div className="button-row">
+                <button
+                  className="secondary-button compact-button"
+                  type="button"
+                  onClick={() => void changeVocabularyPage(vocabulary.page - 1)}
+                  disabled={vocabularyBusy || vocabulary.page <= 0}
+                >
+                  上一页
+                </button>
+                <button
+                  className="secondary-button compact-button"
+                  type="button"
+                  onClick={() => void changeVocabularyPage(vocabulary.page + 1)}
+                  disabled={vocabularyBusy || vocabulary.page + 1 >= vocabulary.totalPages}
+                >
+                  下一页
+                </button>
+              </div>
+            </div>
             <div className="vocabulary-list">
               {vocabulary.items.map((word) => (
                 <article className="vocabulary-card" key={word.learningUnitId}>
@@ -2113,6 +2258,15 @@ export default function App() {
                       <span className={`target-type ${word.learnedStatus.toLowerCase()}`}>
                         {word.learnedStatus === 'UNLEARNED' ? '未学' : word.learnedStatus === 'PARTIAL' ? '部分已学' : '已学'}
                       </span>
+                      {vocabularyStatus === 'LOW_LEVEL' && word.lowLevelCandidateSenseCount > 0 && (
+                        <button
+                          className="primary-button compact-button"
+                          type="button"
+                          onClick={() => openLowLevelMastery(word)}
+                        >
+                          标记掌握
+                        </button>
+                      )}
                       <button
                         className="secondary-button compact-button"
                         type="button"
@@ -2133,6 +2287,7 @@ export default function App() {
                         <p>
                           {sense.definitionZh ?? sense.definitionEn}
                           {sense.inLearningPlan && <small>已在学习计划</small>}
+                          {sense.lowLevelCandidate && <small>低于当前水平 {sense.learnerLevelGap} 档</small>}
                         </p>
                       </div>
                     ))}
@@ -2142,6 +2297,67 @@ export default function App() {
             </div>
           </div>
         )}
+        {renderLowLevelMasteryDialog()}
+      </div>
+    );
+  }
+
+  function renderLowLevelMasteryDialog() {
+    if (!lowLevelMasteryDraft) {
+      return null;
+    }
+
+    const selected = new Set(lowLevelMasteryDraft.selectedSenseIds);
+    return (
+      <div className="hint-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="low-level-mastery-title">
+        <div className="hint-modal wide-modal">
+          <div className="panel-heading compact-heading">
+            <div>
+              <p className="eyebrow">低难词义确认</p>
+              <h3 id="low-level-mastery-title">{lowLevelMasteryDraft.word.canonicalText}</h3>
+            </div>
+            <span className="status-pill">候选 {lowLevelMasteryDraft.word.lowLevelCandidateSenseCount}</span>
+          </div>
+          <p>
+            只会把已勾选且低于当前水平 2 档及以上的词义标记为已掌握；非候选词义仅展示，不能勾选。
+          </p>
+          <div className="sense-list mastery-sense-list">
+            {lowLevelMasteryDraft.word.senses.map((sense) => (
+              <label className={`mastery-sense-item ${sense.lowLevelCandidate ? 'candidate' : 'locked'}`} key={sense.senseId}>
+                <input
+                  type="checkbox"
+                  checked={selected.has(sense.senseId)}
+                  disabled={!sense.lowLevelCandidate || lowLevelMasteryBusy}
+                  onChange={() => toggleLowLevelSense(sense.senseId)}
+                />
+                <span>{sense.partOfSpeech ?? 'OTHER'}</span>
+                <p>
+                  {sense.definitionZh ?? sense.definitionEn}
+                  <small>
+                    {sense.difficultyLevel ?? '未分级'}
+                    {sense.lowLevelCandidate ? ` · 低于当前水平 ${sense.learnerLevelGap} 档` : ' · 不符合低难候选规则'}
+                  </small>
+                </p>
+              </label>
+            ))}
+          </div>
+          <div className="hint-modal-actions">
+            <button className="secondary-button compact-button" type="button" onClick={() => setLowLevelMasteryDraft(null)} disabled={lowLevelMasteryBusy}>
+              取消
+            </button>
+            <button className="secondary-button compact-button" type="button" onClick={selectAllLowLevelCandidateSenses} disabled={lowLevelMasteryBusy}>
+              全选候选词义
+            </button>
+            <button
+              className="primary-button compact-button"
+              type="button"
+              onClick={() => void markSelectedLowLevelSensesMastered()}
+              disabled={lowLevelMasteryBusy || lowLevelMasteryDraft.selectedSenseIds.length === 0}
+            >
+              {lowLevelMasteryBusy ? '标记中' : '确认标记掌握'}
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
