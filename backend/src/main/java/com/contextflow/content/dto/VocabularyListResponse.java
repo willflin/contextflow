@@ -9,6 +9,7 @@ public record VocabularyListResponse(
         int pageSize,
         int totalMatchedWords,
         int totalPages,
+        boolean hasNextPage,
         List<VocabularyWordResponse> items
 ) {
 }

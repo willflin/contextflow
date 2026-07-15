@@ -2244,7 +2244,7 @@ export default function App() {
         {vocabulary && (
           <div className="vocabulary-window">
             <p className="hint">
-              匹配 {vocabulary.totalMatchedWords} 个单词，当前第 {vocabulary.totalPages === 0 ? 0 : vocabulary.page + 1}/{Math.max(vocabulary.totalPages, 1)} 页，显示 {vocabulary.items.length} 个。
+              当前第 {vocabulary.items.length === 0 ? 0 : vocabulary.page + 1} 页，显示 {vocabulary.items.length} 个单词{vocabulary.hasNextPage ? '，还有下一页。' : '，已到最后一页。'}
             </p>
             <div className="pagination-row">
               <span>
@@ -2263,7 +2263,7 @@ export default function App() {
                   className="secondary-button compact-button"
                   type="button"
                   onClick={() => void changeVocabularyPage(vocabulary.page + 1)}
-                  disabled={vocabularyBusy || vocabulary.page + 1 >= vocabulary.totalPages}
+                  disabled={vocabularyBusy || !vocabulary.hasNextPage}
                 >
                   下一页
                 </button>

@@ -1622,3 +1622,22 @@
 
 - No new dependency or table was added.
 - Automatic cleanup only applies to far-below-level word senses, not words above the learner level.
+
+## Phase 8.6: Lazy Vocabulary Filter Pagination
+
+### Problem / 问题
+
+- Clicking vocabulary status filters such as `未学` and `已学` still triggered an exact total-count query across the full vocabulary table before returning the first page.
+- The UI only needs the current page and whether the next page exists, so exact full-table counts caused avoidable latency.
+
+### Changes / 变更
+
+- Removed the full `COUNT(*)` step from the learner vocabulary query path.
+- The backend now fetches only `pageSize + 1` word ids for the requested page, then uses the extra row to determine `hasNextPage`.
+- Added `hasNextPage` to the vocabulary response and changed the frontend next-page button to use it.
+- Updated the vocabulary page copy to avoid showing an exact total count when the backend intentionally does not compute one.
+
+### Notes / 说明
+
+- No new dependency or database table was added.
+- Pagination still loads page content on demand when the user clicks next page.

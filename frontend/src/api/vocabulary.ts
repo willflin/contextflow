@@ -61,6 +61,7 @@ export type VocabularyList = {
   pageSize: number;
   totalMatchedWords: number;
   totalPages: number;
+  hasNextPage: boolean;
   items: VocabularyWord[];
 };
 

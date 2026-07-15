@@ -71,24 +71,21 @@ public class VocabularyQueryService {
                 .map(UserLevelProfileEntity::getCefrLevel)
                 .orElse(CefrLevel.A1);
 
-        List<Object> countParameters = baseParameters(user.getId(), statusFilter, likeQuery, learnerLevel);
-        Integer totalMatchedWords = jdbcTemplate.queryForObject(
-                countSql(statusFilter, normalizedQuery, learnerLevel),
-                Integer.class,
-                countParameters.toArray()
-        );
-        int total = totalMatchedWords == null ? 0 : totalMatchedWords;
-        int totalPages = total == 0 ? 0 : (int) Math.ceil((double) total / pageSize);
-
-        List<Object> pageParameters = new ArrayList<>(countParameters);
+        List<Object> pageParameters = baseParameters(user.getId(), statusFilter, likeQuery, learnerLevel);
         addSortParameters(pageParameters, sortMode, learnerLevel);
-        pageParameters.add(pageSize);
+        pageParameters.add(pageSize + 1);
         pageParameters.add(offset);
-        List<Long> pageUnitIds = jdbcTemplate.query(
+        List<Long> fetchedUnitIds = jdbcTemplate.query(
                 pageSql(statusFilter, normalizedQuery, learnerLevel, sortMode),
                 (rows, rowNumber) -> rows.getLong("id"),
                 pageParameters.toArray()
         );
+        boolean hasNextPage = fetchedUnitIds.size() > pageSize;
+        List<Long> pageUnitIds = fetchedUnitIds.stream()
+                .limit(pageSize)
+                .toList();
+        int knownMatchedWords = page * pageSize + pageUnitIds.size() + (hasNextPage ? 1 : 0);
+        int knownTotalPages = knownMatchedWords == 0 ? 0 : page + (hasNextPage ? 2 : 1);
 
         Map<Long, WordBuilder> words = new LinkedHashMap<>();
         if (pageUnitIds.isEmpty()) {
@@ -97,8 +94,9 @@ public class VocabularyQueryService {
                     query == null ? null : query.trim(),
                     page,
                     pageSize,
-                    total,
-                    totalPages,
+                    knownMatchedWords,
+                    knownTotalPages,
+                    false,
                     List.of()
             );
         }
@@ -188,14 +186,11 @@ public class VocabularyQueryService {
                 query == null ? null : query.trim(),
                 page,
                 pageSize,
-                total,
-                totalPages,
+                knownMatchedWords,
+                knownTotalPages,
+                hasNextPage,
                 items
         );
-    }
-
-    private String countSql(String statusFilter, String normalizedQuery, CefrLevel learnerLevel) {
-        return "SELECT COUNT(*) FROM learning_units unit WHERE " + baseWhere(statusFilter, normalizedQuery, learnerLevel);
     }
 
     private String pageSql(String statusFilter, String normalizedQuery, CefrLevel learnerLevel, String sortMode) {
