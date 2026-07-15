@@ -43,9 +43,10 @@ public class VocabularyController {
             @RequestParam(required = false) String query,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) String sort,
             Authentication authentication
     ) {
-        return ApiResponse.ok(vocabularyQueryService.list(currentUsername(authentication), status, query, page, size));
+        return ApiResponse.ok(vocabularyQueryService.list(currentUsername(authentication), status, query, page, size, sort));
     }
 
     @PostMapping("/{learningUnitId}/plan")

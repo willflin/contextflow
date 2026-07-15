@@ -1219,8 +1219,8 @@ strong {
   padding: 12px;
 }
 
-.mastery-sense-item.locked {
-  opacity: 0.62;
+.mastery-sense-item.optional {
+  background: var(--panel-bg);
 }
 
 .mastery-sense-item span {

@@ -54,12 +54,14 @@ public class VocabularyQueryService {
             String status,
             String query,
             Integer requestedPage,
-            Integer requestedPageSize
+            Integer requestedPageSize,
+            String sort
     ) {
         UserEntity user = userRepository.findByUsername(username)
                 .filter(UserEntity::isActive)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or missing token."));
         String statusFilter = normalizeStatus(status);
+        String sortMode = normalizeSort(sort);
         String normalizedQuery = normalizeQuery(query);
         int page = normalizePage(requestedPage);
         int pageSize = normalizePageSize(requestedPageSize);
@@ -79,10 +81,11 @@ public class VocabularyQueryService {
         int totalPages = total == 0 ? 0 : (int) Math.ceil((double) total / pageSize);
 
         List<Object> pageParameters = new ArrayList<>(countParameters);
+        addSortParameters(pageParameters, sortMode, learnerLevel);
         pageParameters.add(pageSize);
         pageParameters.add(offset);
         List<Long> pageUnitIds = jdbcTemplate.query(
-                pageSql(statusFilter, normalizedQuery, learnerLevel),
+                pageSql(statusFilter, normalizedQuery, learnerLevel, sortMode),
                 (rows, rowNumber) -> rows.getLong("id"),
                 pageParameters.toArray()
         );
@@ -174,6 +177,10 @@ public class VocabularyQueryService {
         List<VocabularyWordResponse> items = words.values()
                 .stream()
                 .map(word -> word.toResponse(plannedSenseIds))
+                .sorted((left, right) -> Integer.compare(
+                        pageUnitIds.indexOf(left.learningUnitId()),
+                        pageUnitIds.indexOf(right.learningUnitId())
+                ))
                 .toList();
 
         return new VocabularyListResponse(
@@ -191,14 +198,46 @@ public class VocabularyQueryService {
         return "SELECT COUNT(*) FROM learning_units unit WHERE " + baseWhere(statusFilter, normalizedQuery, learnerLevel);
     }
 
-    private String pageSql(String statusFilter, String normalizedQuery, CefrLevel learnerLevel) {
+    private String pageSql(String statusFilter, String normalizedQuery, CefrLevel learnerLevel, String sortMode) {
         return """
                 SELECT unit.id
                 FROM learning_units unit
                 WHERE %s
-                ORDER BY unit.normalized_text ASC
+                ORDER BY %s
                 LIMIT ? OFFSET ?
-                """.formatted(baseWhere(statusFilter, normalizedQuery, learnerLevel));
+                """.formatted(baseWhere(statusFilter, normalizedQuery, learnerLevel), orderBySql(sortMode));
+    }
+
+    private String orderBySql(String sortMode) {
+        return switch (sortMode) {
+            case "DIFFICULTY_ASC" -> """
+                    COALESCE((
+                        SELECT MIN(NULLIF(FIELD(sort_sense.difficulty_level, 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'), 0))
+                        FROM learning_unit_senses sort_sense
+                        WHERE sort_sense.learning_unit_id = unit.id
+                          AND sort_sense.status = 'ACTIVE'
+                    ), 999) ASC,
+                    unit.normalized_text ASC
+                    """;
+            case "DIFFICULTY_DESC" -> """
+                    COALESCE((
+                        SELECT MAX(NULLIF(FIELD(sort_sense.difficulty_level, 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'), 0))
+                        FROM learning_unit_senses sort_sense
+                        WHERE sort_sense.learning_unit_id = unit.id
+                          AND sort_sense.status = 'ACTIVE'
+                    ), -1) DESC,
+                    unit.normalized_text ASC
+                    """;
+            default -> """
+                    COALESCE((
+                        SELECT MIN(ABS(NULLIF(FIELD(sort_sense.difficulty_level, 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'), 0) - ?))
+                        FROM learning_unit_senses sort_sense
+                        WHERE sort_sense.learning_unit_id = unit.id
+                          AND sort_sense.status = 'ACTIVE'
+                    ), 999) ASC,
+                    unit.normalized_text ASC
+                    """;
+        };
     }
 
     private String baseWhere(String statusFilter, String normalizedQuery, CefrLevel learnerLevel) {
@@ -293,6 +332,23 @@ public class VocabularyQueryService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid vocabulary status.");
         }
         return normalized;
+    }
+
+    private String normalizeSort(String sort) {
+        if (sort == null || sort.isBlank()) {
+            return "AUTO";
+        }
+        String normalized = sort.trim().toUpperCase(Locale.ROOT);
+        if (!List.of("AUTO", "DIFFICULTY_ASC", "DIFFICULTY_DESC").contains(normalized)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid vocabulary sort.");
+        }
+        return normalized;
+    }
+
+    private void addSortParameters(List<Object> parameters, String sortMode, CefrLevel learnerLevel) {
+        if ("AUTO".equals(sortMode)) {
+            parameters.add(learnerLevel.ordinal() + 1);
+        }
     }
 
     private List<String> lowLevelDifficultyNames(CefrLevel learnerLevel) {

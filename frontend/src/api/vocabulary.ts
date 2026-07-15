@@ -7,6 +7,7 @@ type ApiResponse<T> = {
 };
 
 export type VocabularyStatusFilter = 'ALL' | 'LEARNED' | 'UNLEARNED' | 'LOW_LEVEL';
+export type VocabularySortMode = 'AUTO' | 'DIFFICULTY_ASC' | 'DIFFICULTY_DESC';
 
 export type VocabularySenseProgress = {
   senseId: number;
@@ -77,12 +78,14 @@ export async function fetchVocabulary(
   status: VocabularyStatusFilter,
   query: string,
   page = 0,
-  pageSize = 100
+  pageSize = 100,
+  sort: VocabularySortMode = 'AUTO'
 ): Promise<VocabularyList> {
   const params = new URLSearchParams({
     status,
     page: String(page),
-    size: String(pageSize)
+    size: String(pageSize),
+    sort
   });
   if (query.trim()) {
     params.set('query', query.trim());

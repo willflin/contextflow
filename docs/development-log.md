@@ -1463,6 +1463,13 @@
 - 未新增依赖，未新增数据库表；本次无新增 SQL 文件。 / No dependency or database table was added; no new SQL file was needed.
 - 前端构建和后端编译已通过；后端普通沙箱编译仍受 `backend/target` 写入权限影响，已使用非沙箱编译完成验证。 / Frontend build and backend compile passed. Regular sandbox backend compile is still affected by `backend/target` write permissions, then verified outside the sandbox.
 
+### 修正 / Adjustment
+
+- 低难候选确认弹窗中，非候选词义从“只展示不可勾选”调整为“可手动勾选”。 / In the low-level confirmation dialog, non-candidate senses changed from display-only to manually selectable.
+- 默认勾选仍只包含低难候选词义，“全选候选词义”按钮也仍只选择候选词义。 / Default selection still includes only low-level candidate senses, and the "select all candidate senses" action still selects only candidates.
+- 后端放开非候选词义标记；对非低难候选的手动标记使用 `effectiveGap=max(gap,2)` 计算分散复习时间和低复习优先级，避免刚标记掌握后立即高优先级返场。 / The backend now accepts manually selected non-candidate senses; for non-low-level selected senses it uses `effectiveGap=max(gap,2)` for dispersed review timing and low review priority, avoiding immediate high-priority reappearance after marking mastered.
+- “全选”按钮调整为选择该单词的所有词义，而不再只选择候选词义。 / The "select all" button now selects all senses for the word, not only candidate senses.
+
 ## Phase 8.3：正式词表全量同步 / Full Formal Vocabulary Sync
 
 ### 问题 / Problem
@@ -1595,3 +1602,23 @@
 ### 说明 / Notes
 
 - 未新增依赖，未新增数据库表；本次无新增 SQL 文件。 / No dependency or database table was added; no new SQL file was needed.
+## Phase 8.5: Vocabulary Sorting and Initial Low-Level Cleanup
+
+### Problem / 问题
+
+- The vocabulary browser needed a default learner-aware order instead of only alphabetic pagination.
+- After a learner finishes placement for the first time, words far below the learner's level should no longer remain as unseen learning candidates.
+
+### Changes / 变更
+
+- Added `sort` support to `GET /api/learning/vocabulary` with `AUTO`, `DIFFICULTY_ASC`, and `DIFFICULTY_DESC`.
+- Made `AUTO` the frontend default; it ranks words whose difficulty is closest to the learner level first.
+- Added a vocabulary-page sorting dropdown next to the existing status/search/page-size controls.
+- On first profile creation after placement, automatically marks unseen active word senses at least 2 CEFR levels below the learner as `MASTERED`.
+- Kept the same dispersed review schedule and nonlinear low-priority curve used by manual low-level mastery.
+- Fixed the low-level mastery success message encoding in the backend response.
+
+### Notes / 说明
+
+- No new dependency or table was added.
+- Automatic cleanup only applies to far-below-level word senses, not words above the learner level.

@@ -47,6 +47,7 @@ import {
   fetchVocabulary,
   markLowLevelSensesMastered,
   VocabularyList,
+  VocabularySortMode,
   VocabularyStatusFilter,
   VocabularyWord
 } from './api/vocabulary';
@@ -149,6 +150,7 @@ export default function App() {
   const [vocabulary, setVocabulary] = useState<VocabularyList | null>(null);
   const [vocabularyQuery, setVocabularyQuery] = useState('');
   const [vocabularyStatus, setVocabularyStatus] = useState<VocabularyStatusFilter>('ALL');
+  const [vocabularySort, setVocabularySort] = useState<VocabularySortMode>('AUTO');
   const [vocabularyPage, setVocabularyPage] = useState(0);
   const [vocabularyPageSize, setVocabularyPageSize] = useState(100);
   const [vocabularyBusy, setVocabularyBusy] = useState(false);
@@ -562,7 +564,12 @@ export default function App() {
     setReviewError(null);
   }
 
-  async function loadVocabulary(page = vocabularyPage, pageSize = vocabularyPageSize, status = vocabularyStatus) {
+  async function loadVocabulary(
+    page = vocabularyPage,
+    pageSize = vocabularyPageSize,
+    status = vocabularyStatus,
+    sort = vocabularySort
+  ) {
     const token = tokenOrNull();
 
     if (!token) {
@@ -574,7 +581,7 @@ export default function App() {
     setVocabularyError(null);
 
     try {
-      const result = await fetchVocabulary(token, status, vocabularyQuery, page, pageSize);
+      const result = await fetchVocabulary(token, status, vocabularyQuery, page, pageSize, sort);
       setVocabularyPage(result.page);
       setVocabularyPageSize(result.pageSize);
       setVocabulary(result);
@@ -590,6 +597,7 @@ export default function App() {
     setVocabulary(null);
     setVocabularyQuery('');
     setVocabularyStatus('ALL');
+    setVocabularySort('AUTO');
     setVocabularyPage(0);
     setVocabularyPageSize(100);
     setVocabularyBusy(false);
@@ -654,12 +662,11 @@ export default function App() {
     });
   }
 
-  function selectAllLowLevelCandidateSenses() {
+  function selectAllLowLevelSenses() {
     setLowLevelMasteryDraft((previous) => previous
       ? {
           ...previous,
           selectedSenseIds: previous.word.senses
-            .filter((sense) => sense.lowLevelCandidate)
             .map((sense) => sense.senseId)
         }
       : previous);
@@ -709,7 +716,7 @@ export default function App() {
     setVocabularyBusy(true);
     setVocabularyError(null);
     try {
-      const result = await fetchVocabulary(token, status, vocabularyQuery, 0, vocabularyPageSize);
+      const result = await fetchVocabulary(token, status, vocabularyQuery, 0, vocabularyPageSize, vocabularySort);
       setVocabulary(result);
     } catch (exception) {
       setVocabulary(null);
@@ -729,6 +736,12 @@ export default function App() {
     setVocabularyPageSize(pageSize);
     setVocabularyPage(0);
     await loadVocabulary(0, pageSize);
+  }
+
+  async function changeVocabularySort(sort: VocabularySortMode) {
+    setVocabularySort(sort);
+    setVocabularyPage(0);
+    await loadVocabulary(0, vocabularyPageSize, vocabularyStatus, sort);
   }
 
   function formatVocabularyStatus(status: VocabularyStatusFilter) {
@@ -2175,6 +2188,16 @@ export default function App() {
             <option value="UNLEARNED">未学</option>
             <option value="LOW_LEVEL">远低于当前水平</option>
           </select>
+          <select
+            value={vocabularySort}
+            onChange={(event) => void changeVocabularySort(event.target.value as VocabularySortMode)}
+            disabled={vocabularyBusy}
+            aria-label="词库排序"
+          >
+            <option value="AUTO">自动排序</option>
+            <option value="DIFFICULTY_ASC">难度从低到高</option>
+            <option value="DIFFICULTY_DESC">难度从高到低</option>
+          </select>
           <input
             value={vocabularyQuery}
             onChange={(event) => setVocabularyQuery(event.target.value)}
@@ -2319,15 +2342,15 @@ export default function App() {
             <span className="status-pill">候选 {lowLevelMasteryDraft.word.lowLevelCandidateSenseCount}</span>
           </div>
           <p>
-            只会把已勾选且低于当前水平 2 档及以上的词义标记为已掌握；非候选词义仅展示，不能勾选。
+            候选词义会默认勾选；你也可以手动勾选其他词义一起标记为已掌握。
           </p>
           <div className="sense-list mastery-sense-list">
             {lowLevelMasteryDraft.word.senses.map((sense) => (
-              <label className={`mastery-sense-item ${sense.lowLevelCandidate ? 'candidate' : 'locked'}`} key={sense.senseId}>
+              <label className={`mastery-sense-item ${sense.lowLevelCandidate ? 'candidate' : 'optional'}`} key={sense.senseId}>
                 <input
                   type="checkbox"
                   checked={selected.has(sense.senseId)}
-                  disabled={!sense.lowLevelCandidate || lowLevelMasteryBusy}
+                  disabled={lowLevelMasteryBusy}
                   onChange={() => toggleLowLevelSense(sense.senseId)}
                 />
                 <span>{sense.partOfSpeech ?? 'OTHER'}</span>
@@ -2335,7 +2358,7 @@ export default function App() {
                   {sense.definitionZh ?? sense.definitionEn}
                   <small>
                     {sense.difficultyLevel ?? '未分级'}
-                    {sense.lowLevelCandidate ? ` · 低于当前水平 ${sense.learnerLevelGap} 档` : ' · 不符合低难候选规则'}
+                    {sense.lowLevelCandidate ? ` · 低于当前水平 ${sense.learnerLevelGap} 档` : ' · 可手动选择'}
                   </small>
                 </p>
               </label>
@@ -2345,8 +2368,8 @@ export default function App() {
             <button className="secondary-button compact-button" type="button" onClick={() => setLowLevelMasteryDraft(null)} disabled={lowLevelMasteryBusy}>
               取消
             </button>
-            <button className="secondary-button compact-button" type="button" onClick={selectAllLowLevelCandidateSenses} disabled={lowLevelMasteryBusy}>
-              全选候选词义
+            <button className="secondary-button compact-button" type="button" onClick={selectAllLowLevelSenses} disabled={lowLevelMasteryBusy}>
+              全选
             </button>
             <button
               className="primary-button compact-button"

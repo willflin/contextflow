@@ -1,5 +1,6 @@
 package com.contextflow.user.service;
 
+import com.contextflow.content.service.LowLevelMasteryService;
 import com.contextflow.placement.domain.CefrLevel;
 import com.contextflow.placement.domain.PlacementItemEntity;
 import com.contextflow.placement.domain.PlacementSessionAnswerEntity;
@@ -20,6 +21,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 public class UserLevelProfileService {
@@ -28,15 +30,18 @@ public class UserLevelProfileService {
 
     private final UserRepository userRepository;
     private final UserLevelProfileRepository userLevelProfileRepository;
+    private final LowLevelMasteryService lowLevelMasteryService;
     private final ObjectMapper objectMapper;
 
     public UserLevelProfileService(
             UserRepository userRepository,
             UserLevelProfileRepository userLevelProfileRepository,
+            LowLevelMasteryService lowLevelMasteryService,
             ObjectMapper objectMapper
     ) {
         this.userRepository = userRepository;
         this.userLevelProfileRepository = userLevelProfileRepository;
+        this.lowLevelMasteryService = lowLevelMasteryService;
         this.objectMapper = objectMapper;
     }
 
@@ -57,8 +62,10 @@ public class UserLevelProfileService {
             Map<Long, PlacementItemEntity> itemMap
     ) {
         ProfileSnapshot snapshot = buildSnapshot(answerRows, itemMap);
+        Optional<UserLevelProfileEntity> existingProfile = userLevelProfileRepository.findByUserId(user.getId());
+        boolean firstProfile = existingProfile.isEmpty();
 
-        UserLevelProfileEntity profile = userLevelProfileRepository.findByUserId(user.getId())
+        UserLevelProfileEntity profile = existingProfile
                 .orElseGet(() -> new UserLevelProfileEntity(
                         user.getId(),
                         cefrLevel,
@@ -81,6 +88,9 @@ public class UserLevelProfileService {
                 snapshot.vocabularyMeasurementError()
         );
         userLevelProfileRepository.save(profile);
+        if (firstProfile) {
+            lowLevelMasteryService.markLowLevelUnseenSensesMasteredAfterInitialPlacement(user, cefrLevel);
+        }
     }
 
     private UserEntity activeUser(String username) {
