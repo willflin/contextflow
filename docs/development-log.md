@@ -1641,3 +1641,30 @@
 
 - No new dependency or database table was added.
 - Pagination still loads page content on demand when the user clicks next page.
+
+## Phase 8.7: Vocabulary Query Sort-Key Optimization
+
+### Problem / 问题
+
+- Even after lazy pagination, the default `AUTO` vocabulary sort was slow because the SQL calculated each word's difficulty distance by repeatedly querying `learning_unit_senses`.
+- `EXPLAIN ANALYZE` showed the first page doing per-word dependent subqueries across about 46k words, taking about 1.8-1.9 seconds.
+
+### Changes / 变更
+
+- Added precomputed `difficulty_min_rank` and `difficulty_max_rank` fields to `learning_units`.
+- Added indexed sort paths for difficulty ascending, difficulty descending, and learner-level auto buckets.
+- Changed `AUTO` pagination to fetch indexed difficulty buckets in learner-distance order instead of globally sorting the whole vocabulary.
+- Refreshed sort keys after ECDICT synchronization and after admin-created or admin-updated word senses.
+- Added Flyway migration `V22__add_learning_unit_difficulty_sort_keys.sql` and synchronized SQL at `docs/sql/phase8_learning_unit_difficulty_sort_keys.sql`.
+
+### Result / 结果
+
+- Local `EXPLAIN ANALYZE` for representative first-page queries dropped from about 1.8s to sub-millisecond execution:
+  - `AUTO + UNLEARNED` first bucket: about 0.39ms.
+  - `DIFFICULTY_ASC`: about 0.18ms.
+  - `DIFFICULTY_DESC`: about 0.76ms.
+
+### Notes / 说明
+
+- No new dependency was added.
+- Existing local database was updated with the same V22 SQL so the current app can use the new indexed path immediately.

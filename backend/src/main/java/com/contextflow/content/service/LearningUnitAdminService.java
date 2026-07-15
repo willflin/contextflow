@@ -110,6 +110,8 @@ public class LearningUnitAdminService {
                 LearningUnitStatus.ACTIVE
         ));
         linkManualSource(sense);
+        learningUnitSenseRepository.flush();
+        refreshLearningUnitDifficultySortKey(unit.getId());
 
         return learningUnitQueryService.detailForAdmin(unit.getId());
     }
@@ -161,6 +163,8 @@ public class LearningUnitAdminService {
                 request.frequencyBand() == null ? sense.getFrequencyBand() : parseEnum(request.frequencyBand(), FrequencyBand.class),
                 request.status() == null ? sense.getStatus() : parseRequiredEnum(request.status(), LearningUnitStatus.class)
         );
+        learningUnitSenseRepository.flush();
+        refreshLearningUnitDifficultySortKey(sense.getLearningUnit().getId());
 
         return learningUnitQueryService.detailForAdmin(sense.getLearningUnit().getId());
     }
@@ -238,6 +242,26 @@ public class LearningUnitAdminService {
                 SenseSourceAttributeType.SENSE,
                 "admin:" + sense.getId()
         ));
+    }
+
+    private void refreshLearningUnitDifficultySortKey(Long learningUnitId) {
+        jdbcTemplate.update("""
+                UPDATE learning_units unit
+                LEFT JOIN (
+                    SELECT
+                        sense.learning_unit_id,
+                        MIN(NULLIF(FIELD(sense.difficulty_level, 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'), 0)) AS min_rank,
+                        MAX(NULLIF(FIELD(sense.difficulty_level, 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'), 0)) AS max_rank
+                    FROM learning_unit_senses sense
+                    WHERE sense.learning_unit_id = ?
+                      AND sense.status = 'ACTIVE'
+                    GROUP BY sense.learning_unit_id
+                ) ranks ON ranks.learning_unit_id = unit.id
+                SET
+                    unit.difficulty_min_rank = ranks.min_rank,
+                    unit.difficulty_max_rank = ranks.max_rank
+                WHERE unit.id = ?
+                """, learningUnitId, learningUnitId);
     }
 
     private String normalizeWord(String text) {

@@ -47,6 +47,7 @@ public class EcdictImportService {
         normalizeCleanRows(batchId);
         synchronizeLearningUnits();
         synchronizeLearningUnitSenses();
+        refreshLearningUnitDifficultySortKeys();
         synchronizeSourceLinks();
 
         int cleanRows = count("SELECT COUNT(*) FROM ecdict_clean_word_entries");
@@ -351,6 +352,25 @@ public class EcdictImportService {
                     status = 'ACTIVE',
                     difficulty_level = VALUES(difficulty_level),
                     frequency_band = VALUES(frequency_band)
+                """);
+    }
+
+    private void refreshLearningUnitDifficultySortKeys() {
+        jdbcTemplate.update("""
+                UPDATE learning_units unit
+                LEFT JOIN (
+                    SELECT
+                        sense.learning_unit_id,
+                        MIN(NULLIF(FIELD(sense.difficulty_level, 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'), 0)) AS min_rank,
+                        MAX(NULLIF(FIELD(sense.difficulty_level, 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'), 0)) AS max_rank
+                    FROM learning_unit_senses sense
+                    WHERE sense.status = 'ACTIVE'
+                    GROUP BY sense.learning_unit_id
+                ) ranks ON ranks.learning_unit_id = unit.id
+                SET
+                    unit.difficulty_min_rank = ranks.min_rank,
+                    unit.difficulty_max_rank = ranks.max_rank
+                WHERE unit.unit_type = 'WORD'
                 """);
     }
 

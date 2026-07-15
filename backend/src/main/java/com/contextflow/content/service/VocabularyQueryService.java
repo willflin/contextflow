@@ -71,14 +71,15 @@ public class VocabularyQueryService {
                 .map(UserLevelProfileEntity::getCefrLevel)
                 .orElse(CefrLevel.A1);
 
-        List<Object> pageParameters = baseParameters(user.getId(), statusFilter, likeQuery, learnerLevel);
-        addSortParameters(pageParameters, sortMode, learnerLevel);
-        pageParameters.add(pageSize + 1);
-        pageParameters.add(offset);
-        List<Long> fetchedUnitIds = jdbcTemplate.query(
-                pageSql(statusFilter, normalizedQuery, learnerLevel, sortMode),
-                (rows, rowNumber) -> rows.getLong("id"),
-                pageParameters.toArray()
+        List<Long> fetchedUnitIds = fetchPageUnitIds(
+                user.getId(),
+                statusFilter,
+                normalizedQuery,
+                likeQuery,
+                learnerLevel,
+                sortMode,
+                pageSize,
+                offset
         );
         boolean hasNextPage = fetchedUnitIds.size() > pageSize;
         List<Long> pageUnitIds = fetchedUnitIds.stream()
@@ -193,6 +194,86 @@ public class VocabularyQueryService {
         );
     }
 
+    private List<Long> fetchPageUnitIds(
+            Long userId,
+            String statusFilter,
+            String normalizedQuery,
+            String likeQuery,
+            CefrLevel learnerLevel,
+            String sortMode,
+            int pageSize,
+            int offset
+    ) {
+        if ("AUTO".equals(sortMode)) {
+            return fetchAutoPageUnitIds(userId, statusFilter, normalizedQuery, likeQuery, learnerLevel, pageSize, offset);
+        }
+
+        List<Object> pageParameters = baseParameters(userId, statusFilter, likeQuery, learnerLevel);
+        pageParameters.add(pageSize + 1);
+        pageParameters.add(offset);
+        return jdbcTemplate.query(
+                pageSql(statusFilter, normalizedQuery, learnerLevel, sortMode),
+                (rows, rowNumber) -> rows.getLong("id"),
+                pageParameters.toArray()
+        );
+    }
+
+    private List<Long> fetchAutoPageUnitIds(
+            Long userId,
+            String statusFilter,
+            String normalizedQuery,
+            String likeQuery,
+            CefrLevel learnerLevel,
+            int pageSize,
+            int offset
+    ) {
+        List<Long> unitIds = new ArrayList<>(pageSize + 1);
+        int remainingOffset = offset;
+        for (int rank : autoRankOrder(learnerLevel)) {
+            int needed = pageSize + 1 - unitIds.size();
+            if (needed <= 0) {
+                break;
+            }
+            if (remainingOffset > 0) {
+                int bucketCount = countAutoRankBucket(userId, statusFilter, normalizedQuery, likeQuery, learnerLevel, rank);
+                if (remainingOffset >= bucketCount) {
+                    remainingOffset -= bucketCount;
+                    continue;
+                }
+            }
+            List<Object> parameters = baseParameters(userId, statusFilter, likeQuery, learnerLevel);
+            parameters.add(rank);
+            parameters.add(needed);
+            parameters.add(remainingOffset);
+            unitIds.addAll(jdbcTemplate.query(
+                    autoRankPageSql(statusFilter, normalizedQuery, learnerLevel),
+                    (rows, rowNumber) -> rows.getLong("id"),
+                    parameters.toArray()
+            ));
+            remainingOffset = 0;
+        }
+        return unitIds;
+    }
+
+    private int countAutoRankBucket(
+            Long userId,
+            String statusFilter,
+            String normalizedQuery,
+            String likeQuery,
+            CefrLevel learnerLevel,
+            int rank
+    ) {
+        List<Object> parameters = baseParameters(userId, statusFilter, likeQuery, learnerLevel);
+        parameters.add(rank);
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM learning_units unit WHERE %s AND unit.difficulty_min_rank = ?"
+                        .formatted(baseWhere(statusFilter, normalizedQuery, learnerLevel)),
+                Integer.class,
+                parameters.toArray()
+        );
+        return count == null ? 0 : count;
+    }
+
     private String pageSql(String statusFilter, String normalizedQuery, CefrLevel learnerLevel, String sortMode) {
         return """
                 SELECT unit.id
@@ -203,33 +284,29 @@ public class VocabularyQueryService {
                 """.formatted(baseWhere(statusFilter, normalizedQuery, learnerLevel), orderBySql(sortMode));
     }
 
+    private String autoRankPageSql(String statusFilter, String normalizedQuery, CefrLevel learnerLevel) {
+        return """
+                SELECT unit.id
+                FROM learning_units unit
+                WHERE %s
+                  AND unit.difficulty_min_rank = ?
+                ORDER BY unit.normalized_text ASC
+                LIMIT ? OFFSET ?
+                """.formatted(baseWhere(statusFilter, normalizedQuery, learnerLevel));
+    }
+
     private String orderBySql(String sortMode) {
         return switch (sortMode) {
             case "DIFFICULTY_ASC" -> """
-                    COALESCE((
-                        SELECT MIN(NULLIF(FIELD(sort_sense.difficulty_level, 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'), 0))
-                        FROM learning_unit_senses sort_sense
-                        WHERE sort_sense.learning_unit_id = unit.id
-                          AND sort_sense.status = 'ACTIVE'
-                    ), 999) ASC,
+                    unit.difficulty_min_rank ASC,
                     unit.normalized_text ASC
                     """;
             case "DIFFICULTY_DESC" -> """
-                    COALESCE((
-                        SELECT MAX(NULLIF(FIELD(sort_sense.difficulty_level, 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'), 0))
-                        FROM learning_unit_senses sort_sense
-                        WHERE sort_sense.learning_unit_id = unit.id
-                          AND sort_sense.status = 'ACTIVE'
-                    ), -1) DESC,
+                    unit.difficulty_max_rank DESC,
                     unit.normalized_text ASC
                     """;
             default -> """
-                    COALESCE((
-                        SELECT MIN(ABS(NULLIF(FIELD(sort_sense.difficulty_level, 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'), 0) - ?))
-                        FROM learning_unit_senses sort_sense
-                        WHERE sort_sense.learning_unit_id = unit.id
-                          AND sort_sense.status = 'ACTIVE'
-                    ), 999) ASC,
+                    COALESCE(ABS(unit.difficulty_min_rank - ?), 999) ASC,
                     unit.normalized_text ASC
                     """;
         };
@@ -239,12 +316,7 @@ public class VocabularyQueryService {
         StringBuilder sql = new StringBuilder("""
                 unit.unit_type = 'WORD'
                 AND unit.status = 'ACTIVE'
-                AND EXISTS (
-                    SELECT 1
-                    FROM learning_unit_senses active_sense
-                    WHERE active_sense.learning_unit_id = unit.id
-                      AND active_sense.status = 'ACTIVE'
-                )
+                AND unit.difficulty_min_rank IS NOT NULL
                 """);
         if (normalizedQuery != null) {
             sql.append("""
@@ -340,10 +412,20 @@ public class VocabularyQueryService {
         return normalized;
     }
 
-    private void addSortParameters(List<Object> parameters, String sortMode, CefrLevel learnerLevel) {
-        if ("AUTO".equals(sortMode)) {
-            parameters.add(learnerLevel.ordinal() + 1);
+    private List<Integer> autoRankOrder(CefrLevel learnerLevel) {
+        int learnerRank = learnerLevel.ordinal() + 1;
+        List<Integer> ranks = new ArrayList<>();
+        for (int gap = 0; gap <= DifficultyLevel.values().length; gap++) {
+            int lower = learnerRank - gap;
+            int higher = learnerRank + gap;
+            if (lower >= 1 && !ranks.contains(lower)) {
+                ranks.add(lower);
+            }
+            if (higher <= DifficultyLevel.values().length && !ranks.contains(higher)) {
+                ranks.add(higher);
+            }
         }
+        return ranks;
     }
 
     private List<String> lowLevelDifficultyNames(CefrLevel learnerLevel) {
